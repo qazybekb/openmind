@@ -2,30 +2,23 @@
 
 ## Active Tasks
 
-- [ ] DEADLINE ALERTS (every heartbeat): Read course_cache.json from workspace — DO NOT call Canvas API. Check assignments:
-  - ⚠️ Due within 24hrs: URGENT alert
-  - 📋 Due in 2-3 days: Reminder
-  - 🚨 Past due + not submitted: WARNING
-  If nothing urgent: stay silent. This should use ZERO API calls — just read the local file.
+- [ ] ASSIGNMENT & ANNOUNCEMENT CHECK:
 
-- [ ] CACHE REFRESH (only at ~8am and ~8pm Pacific — skip other times): Check current time. Only if it's roughly 8am or 8pm Pacific (within 2 hours), do the full refresh:
-  1. Fetch assignments from Canvas API for each course
-  2. Compare with course_cache.json — check for:
-     - New assignments that weren't there before → notify + add to Todoist
-     - Changed due dates → notify: "📢 [Assignment] due date changed from [old] to [new]"
-     - New grades posted → notify: "🔥 You got [grade] on [assignment]!"
-  3. Fetch files list for each course — compare with cache, notify about new files:
-     "📄 New file in NLP: lecture_07_transformers.pdf" (include download link)
-  4. Update course_cache.json with fresh data (assignments, grades, files)
-  5. Fetch recent announcements — only notify about deadline changes or new assignments
-  If it's NOT around 8am/8pm: skip this task entirely.
+  Step 1: Fetch upcoming assignments from Canvas API:
+  https://bcourses.berkeley.edu/api/v1/users/self/upcoming_events?access_token=YOUR_CANVAS_API_TOKEN
 
-- [ ] TODOIST SYNC (during cache refresh only): After updating the cache, compare assignments with Todoist:
-  1. Get all tasks from Todoist
-  2. For each Canvas assignment with a future due date:
-     - If NOT in Todoist (no matching task name) → add it with due date → notify: "📌 New assignment added to Todoist: [Course] — [Name] (due [date])"
-     - If in Todoist but due date CHANGED from what's in Todoist → update the Todoist task due date → notify: "📅 Due date updated: [Course] — [Name] moved to [new date]"
-     - If already in Todoist with correct date → skip silently
-  3. Send one combined notification if anything changed
+  For each assignment, check days until due:
+  - ⚠️ Due within 24hrs + NOT submitted: URGENT alert
+  - 📋 Due in 2-3 days + NOT submitted: Reminder
+  - 📚 Due in 5 days + NOT submitted: Heads up
+  - 🚨 Past due within 5 days + NOT submitted: Warning
+  - Already submitted: skip silently
 
-- [ ] SESSION CLEANUP (only on Sundays): If today is Sunday, check the telegram session file size. If it's over 500KB, it's getting too large and will slow responses. Truncate old history by rewriting the session file to keep only the last 50 messages.
+  Step 2: Fetch announcements:
+  https://bcourses.berkeley.edu/api/v1/announcements?context_codes[]=course_1552198&context_codes[]=course_1550426&context_codes[]=course_1551850&context_codes[]=course_1550565&context_codes[]=course_1552042&context_codes[]=course_1550670&per_page=10&access_token=YOUR_CANVAS_API_TOKEN
+
+  Only notify about announcements from the last 3 hours that change deadlines, announce new assignments, or cancel classes.
+
+  Step 3: Send ONE combined message if anything to report.
+
+  If nothing to report: stay completely silent.
