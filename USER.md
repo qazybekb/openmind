@@ -2,8 +2,8 @@
 
 ## About Me
 
-- **Name**: Qazybek Beken
-- **Email**: qazybek@berkeley.edu
+- **Name**: YOUR_NAME
+- **Email**: YOUR_EMAIL
 - **School**: UC Berkeley, MIMS program (iSchool)
 - **Timezone**: US/Pacific
 
