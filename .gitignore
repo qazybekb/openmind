@@ -1,0 +1,8 @@
+config.json
+*.json
+!package.json
+course_cache.json
+sessions/
+memory/
+*.pdf
+.DS_Store
