@@ -11,28 +11,35 @@ AI-powered Canvas study buddy for UC Berkeley students. Runs on your laptop via 
 
 ## Install (10 min)
 
-### Step 1: Clone and build
+### Step 1: Clone the repo
 
 ```bash
-git clone https://github.com/HKUDS/nanobot.git
-cd nanobot
-docker build -t bcourses-bot .
+git clone https://github.com/qazybekb/bcourses_bot
+cd bcourses_bot
 ```
 
-### Step 2: Create config directory
+### Step 2: Set up environment variables
 
 ```bash
-mkdir -p ~/.nanobot-canvas/workspace
+cp .env.example .env
 ```
 
-### Step 3: Download bot personality files
+Edit `.env` and fill in your keys:
+
+```
+CANVAS_API_TOKEN=your_canvas_token_here
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+TELEGRAM_USER_ID=your_telegram_user_id
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+### Step 3: Set up config.json
 
 ```bash
-cd ~/.nanobot-canvas/workspace
-curl -sO https://raw.githubusercontent.com/qazybekb/bcourses_bot/main/SOUL.md
-curl -sO https://raw.githubusercontent.com/qazybekb/bcourses_bot/main/AGENTS.md
-curl -sO https://raw.githubusercontent.com/qazybekb/bcourses_bot/main/HEARTBEAT.md
+cp config.example.json config.json
 ```
+
+Edit `config.json` — replace all `YOUR_*` placeholders with your actual keys.
 
 ### Step 4: Find your course IDs
 
@@ -46,108 +53,28 @@ for c in json.load(sys.stdin):
 "
 ```
 
-### Step 5: Create USER.md
+### Step 5: Configure your courses
 
-Create `~/.nanobot-canvas/workspace/USER.md` with your info:
-
-```markdown
-# User Profile
-
-## About Me
-
-- **Name**: Your Name
-- **Email**: your.email@berkeley.edu
-- **School**: UC Berkeley
-- **Timezone**: US/Pacific
-
-## My Active Courses
-
-| Nickname | Full Name | Course ID |
-|----------|-----------|-----------|
-| (short name) | (full course name) | (ID from Step 4) |
-| (short name) | (full course name) | (ID from Step 4) |
-
-When I mention a course by nickname, use the Course ID above.
-
-## Canvas API
-
-Base URL — ALWAYS use this format:
-https://bcourses.berkeley.edu/api/v1/{endpoint}?access_token=YOUR_CANVAS_TOKEN
-
-Add &per_page=100 for lists.
-
-### Quick Reference
-
-| What | Endpoint |
-|------|----------|
-| All upcoming | /users/self/upcoming_events |
-| Course assignments | /courses/{id}/assignments?include[]=submission&order_by=due_at&per_page=100 |
-| Syllabus | /courses/{id}?include[]=syllabus_body |
-| Modules | /courses/{id}/modules?include[]=items&per_page=100 |
-| Page content | /courses/{id}/pages/{page_url} |
-| Files | /courses/{id}/files?per_page=100 |
-| Announcements | /announcements?context_codes[]=course_{id} |
-| Grades | /courses/{id}/enrollments?user_id=self |
-
-## Important Rules
-
-1. Use course IDs from the table — never fetch course list
-2. Always fetch live from Canvas API
-3. Flag anything due within 48 hours
-4. NEVER say "of course", "one moment" — just do it
-```
-
-Replace `YOUR_CANVAS_TOKEN` with your actual Canvas API token in the file.
-
-### Step 6: Create config.json
-
-Create `~/.nanobot-canvas/config.json`:
+Edit `workspace/courses.json` with your course IDs:
 
 ```json
 {
-  "providers": {
-    "gemini": {
-      "apiKey": "YOUR_GEMINI_API_KEY"
-    }
-  },
-  "channels": {
-    "telegram": {
-      "enabled": true,
-      "token": "YOUR_TELEGRAM_BOT_TOKEN",
-      "allowFrom": ["YOUR_TELEGRAM_USER_ID"]
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": "gemini-2.5-pro",
-      "provider": "gemini"
-    }
-  },
-  "gateway": {
-    "heartbeat": {
-      "enabled": true,
-      "interval_s": 10800
-    }
-  },
-  "tools": {
-    "web": {
-      "search": {
-        "provider": "duckduckgo"
-      }
-    }
+  "canvas_base_url": "https://bcourses.berkeley.edu/api/v1",
+  "courses": {
+    "1234567": "Course Nickname",
+    "1234568": "Another Course"
   }
 }
 ```
 
-Replace all `YOUR_*` placeholders with your actual keys.
+### Step 6: Set up your profile
+
+Edit `workspace/USER.md` — update your name and school info. Course IDs are loaded from `courses.json` automatically.
 
 ### Step 7: Run it
 
 ```bash
-docker run -d --name bcourses-bot \
-  -v ~/.nanobot-canvas:/root/.nanobot \
-  --restart unless-stopped \
-  bcourses-bot gateway
+docker compose up -d
 ```
 
 ### Step 8: Test it
@@ -155,6 +82,27 @@ docker run -d --name bcourses-bot \
 Message your bot on Telegram:
 
 > What's due this week?
+
+### Step 9 (Optional): Set up Gmail
+
+To let the bot check your email for professor messages and course updates:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a project (or use existing) → Enable **Gmail API**
+3. Go to **Credentials** → Create **OAuth 2.0 Client ID** → choose "Desktop app"
+4. Download the JSON credentials file
+5. Save it as `~/.gmail-mcp/gcp-oauth.keys.json`
+6. Run the auth flow:
+
+```bash
+npx @shinzolabs/gmail-mcp auth
+```
+
+A browser window opens — sign in with your Berkeley Google account and approve.
+
+The Gmail MCP server is already configured in `config.json`. Once authenticated, the bot can search and read your emails.
+
+**Privacy note:** The bot only reads emails — it cannot send, draft, or delete anything.
 
 ## What it can do
 
@@ -167,14 +115,20 @@ Message your bot on Telegram:
 | Teach me about [topic] | Step-by-step teaching with comprehension checks |
 | Quiz me on [topic] | Generates practice questions |
 | Show me files for [course] | Lists course files with download links |
+| Check my email | Shows recent important emails |
+| Any emails from professors? | Course-related email summaries |
+
+See [CAPABILITIES.md](CAPABILITIES.md) for the full feature guide.
 
 ## Notifications (automatic)
 
-Every 3 hours the bot checks Canvas and messages you ONLY if:
+Every 3 hours the bot checks Canvas and Gmail, and messages you ONLY if:
 - ⚠️ Assignment due within 24 hours (not submitted)
 - 📋 Assignment due in 2-3 days (not submitted)
+- 📈📉 Grade changed since last check
+- 🚨 Assignment was due but not submitted
+- 📧 Important email from a professor
 - 📢 Professor changed a deadline
-- 📄 New file uploaded
 
 If nothing to report — stays silent.
 
@@ -182,10 +136,11 @@ If nothing to report — stays silent.
 
 | Problem | Fix |
 |---------|-----|
-| Bot not responding | `docker restart bcourses-bot` |
+| Bot not responding | `docker compose restart` |
 | "Gemini rate limit" | Wait a few minutes, or switch to `gemini-2.5-flash` in config |
-| Wrong course matched | Update nicknames in USER.md |
-| Can't read PDFs | Install pymupdf: `docker exec bcourses-bot pip install pymupdf` |
+| Wrong course matched | Update nicknames in `workspace/USER.md` and `workspace/courses.json` |
+| Scripts failing | Check that `CANVAS_API_TOKEN` is set in `.env` |
+| Gmail not working | Re-run `npx @shinzolabs/gmail-mcp auth` |
 
 ## Privacy
 

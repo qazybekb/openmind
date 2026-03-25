@@ -1,0 +1,11 @@
+{
+  "canvas_base_url": "https://bcourses.berkeley.edu/api/v1",
+  "courses": {
+    "1552198": "Big Data",
+    "1550426": "Ethical AI",
+    "1551850": "Info Law",
+    "1550565": "Finance",
+    "1552042": "NLP",
+    "1550670": "Social Issues"
+  }
+}

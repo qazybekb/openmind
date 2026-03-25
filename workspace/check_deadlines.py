@@ -1,21 +1,36 @@
 #!/usr/bin/env python3
 """Check Canvas deadlines and output only NEW notifications."""
 import json, os, sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import urllib.request
 
-TOKEN = "YOUR_CANVAS_API_TOKEN"
-STATE_FILE = "/root/.nanobot/workspace/notification_state.json"
+TOKEN = os.environ.get("CANVAS_API_TOKEN", "")
+if not TOKEN:
+    print("ERROR: CANVAS_API_TOKEN environment variable not set", file=sys.stderr)
+    sys.exit(1)
 
-# Load previous state
+WORKSPACE = os.environ.get("WORKSPACE_DIR", "/root/.nanobot/workspace")
+COURSES_FILE = os.path.join(WORKSPACE, "courses.json")
+STATE_FILE = os.path.join(WORKSPACE, "notification_state.json")
+
+with open(COURSES_FILE) as f:
+    config = json.load(f)
+
+BASE = config["canvas_base_url"]
+
 prev = {}
 if os.path.exists(STATE_FILE):
     with open(STATE_FILE) as f:
         prev = json.load(f)
 
-# Fetch upcoming events
-resp = urllib.request.urlopen(f"https://bcourses.berkeley.edu/api/v1/users/self/upcoming_events?access_token={TOKEN}")
-events = json.loads(resp.read())
+try:
+    resp = urllib.request.urlopen(
+        f"{BASE}/users/self/upcoming_events?access_token={TOKEN}"
+    )
+    events = json.loads(resp.read())
+except urllib.error.URLError as e:
+    print(f"ERROR: Failed to fetch upcoming events: {e}", file=sys.stderr)
+    sys.exit(1)
 
 now = datetime.now(timezone.utc)
 notifications = []
@@ -39,35 +54,31 @@ for e in events:
     if days < 0 or days > 7:
         continue
 
-    # Determine urgency
     if days <= 1:
         level = "urgent"
-        emoji = "⚠️"
+        emoji = "\u26a0\ufe0f"
     elif days <= 3:
         level = "reminder"
-        emoji = "📋"
+        emoji = "\U0001f4cb"
     else:
         level = "headsup"
-        emoji = "📚"
+        emoji = "\U0001f4da"
 
     key = title.strip()
     prev_level = prev.get(key, "")
     new_state[key] = level
 
-    # Only notify if new or escalated
     urgency_order = {"headsup": 0, "reminder": 1, "urgent": 2}
     if prev_level == "" or urgency_order.get(level, 0) > urgency_order.get(prev_level, -1):
         due_str = due_dt.strftime('%b %d')
         days_str = f"{int(days)}d" if days >= 1 else "TODAY"
         notifications.append(f"{emoji} {title} (due {due_str}, {days_str})")
 
-# Save new state
 with open(STATE_FILE, 'w') as f:
     json.dump(new_state, f)
 
-# Output
 if notifications:
-    print("Hey Bear 🐻 deadline update:\n")
+    print("Hey Bear \U0001f43b deadline update:\n")
     for n in notifications:
         print(n)
 else:

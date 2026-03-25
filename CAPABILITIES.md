@@ -120,7 +120,43 @@ The bot can read lecture slides — even image-based PDFs exported from PowerPoi
 
 ---
 
-## 6. Assignment Help
+## 6. Gmail Integration (Optional)
+
+Check your email for course-related messages without leaving Telegram.
+
+### What you can ask
+
+| Prompt | What happens |
+|--------|-------------|
+| "Check my email" | Shows recent important emails (professors, course updates) |
+| "Any emails from professors?" | Searches for emails from berkeley.edu senders |
+| "Did my NLP professor reply?" | Searches for recent emails matching the professor/course |
+| "Email about the midterm?" | Searches for emails with relevant keywords |
+| "Summarize my unread emails" | Groups unread emails by course-related vs other |
+
+### What it checks automatically
+
+Every 3 hours (with heartbeat), the bot scans for new important emails:
+- Professor emails about deadlines or class changes
+- Assignment feedback sent via email
+- Grade notifications
+- Replies to your emails
+
+Ignores: newsletters, marketing, automated bCourses digest notifications (already covered by Canvas API checks).
+
+### Privacy
+
+- Gmail access is **read-only** — the bot cannot send, draft, or delete emails
+- Uses Google OAuth 2.0 — your credentials stay on your machine
+- Only your authenticated account is accessible
+
+### Setup
+
+Requires Google OAuth credentials — see the Setup Guide for details.
+
+---
+
+## 7. Assignment Help
 
 ### What you can ask
 
@@ -142,7 +178,7 @@ The bot can read lecture slides — even image-based PDFs exported from PowerPoi
 
 ---
 
-## 7. Teach Me Mode
+## 8. Teach Me Mode
 
 Interactive learning from YOUR actual course materials — not generic knowledge.
 
@@ -194,7 +230,7 @@ Interactive learning from YOUR actual course materials — not generic knowledge
 
 ---
 
-## 8. Automatic Notifications
+## 9. Automatic Notifications
 
 The bot checks Canvas every 3 hours and messages you on Telegram **only if something needs your attention**.
 
@@ -207,6 +243,7 @@ The bot checks Canvas every 3 hours and messages you on Telegram **only if somet
 | 📢 Deadline changed | Professor modified a due date |
 | 📄 New file uploaded | New slides or readings posted |
 | 📣 Important announcement | Deadline changes, new assignments, class cancellations |
+| 📧 Important email | Professor emails, assignment feedback, grade notifications |
 | *Nothing to report* | **Bot stays completely silent** |
 
 The bot ignores:
@@ -217,7 +254,7 @@ The bot ignores:
 
 ---
 
-## 9. Todoist Integration (Optional)
+## 10. Todoist Integration (Optional)
 
 Sync your Canvas assignments with Todoist for task management.
 
@@ -239,7 +276,7 @@ Example: `NLP — Midterm report` due March 21
 
 ---
 
-## 10. Obsidian Knowledge Graph (Optional)
+## 11. Obsidian Knowledge Graph (Optional)
 
 Build a connected knowledge base from your course materials.
 
@@ -273,7 +310,7 @@ All notes use `[[double bracket]]` links. Open Obsidian's **Graph View** to see 
 
 ---
 
-## 11. Web Browsing
+## 12. Web Browsing
 
 The bot has a headless browser (Playwright + Chromium) for accessing web content.
 

@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """Track grade snapshots over time. Run daily via heartbeat."""
-import json, os, urllib.request
+import json, os, sys, urllib.request
 from datetime import datetime, timezone
 
-TOKEN = "YOUR_CANVAS_API_TOKEN"
-BASE = "https://bcourses.berkeley.edu/api/v1"
-HISTORY_FILE = "/root/.nanobot/workspace/grade_history.json"
+TOKEN = os.environ.get("CANVAS_API_TOKEN", "")
+if not TOKEN:
+    print("ERROR: CANVAS_API_TOKEN environment variable not set", file=sys.stderr)
+    sys.exit(1)
 
-courses = {
-    "1552198": "Big Data",
-    "1550426": "Ethical AI",
-    "1551850": "Info Law",
-    "1550565": "Finance",
-    "1552042": "NLP",
-    "1550670": "Social Issues"
-}
+WORKSPACE = os.environ.get("WORKSPACE_DIR", "/root/.nanobot/workspace")
+COURSES_FILE = os.path.join(WORKSPACE, "courses.json")
+HISTORY_FILE = os.path.join(WORKSPACE, "grade_history.json")
 
-# Load history
+with open(COURSES_FILE) as f:
+    config = json.load(f)
+
+BASE = config["canvas_base_url"]
+courses = config["courses"]
+
 history = {}
 if os.path.exists(HISTORY_FILE):
     with open(HISTORY_FILE) as f:
@@ -27,7 +28,9 @@ today_grades = {}
 
 for cid, name in courses.items():
     try:
-        resp = urllib.request.urlopen(f"{BASE}/courses/{cid}/enrollments?user_id=self&access_token={TOKEN}")
+        resp = urllib.request.urlopen(
+            f"{BASE}/courses/{cid}/enrollments?user_id=self&access_token={TOKEN}"
+        )
         enrollments = json.loads(resp.read())
         for e in enrollments:
             g = e.get('grades', {})
@@ -35,16 +38,14 @@ for cid, name in courses.items():
             grade = g.get('current_grade')
             if score is not None:
                 today_grades[name] = {"score": score, "grade": grade}
-    except:
-        pass
+    except urllib.error.URLError as e:
+        print(f"WARNING: Failed to fetch grades for {name}: {e}", file=sys.stderr)
 
-# Save today's snapshot
 history[today] = today_grades
 
 with open(HISTORY_FILE, 'w') as f:
     json.dump(history, f, indent=2)
 
-# Show trends
 dates = sorted(history.keys())
 if len(dates) >= 2:
     prev_date = dates[-2]
@@ -55,8 +56,9 @@ if len(dates) >= 2:
         curr_score = current['score']
         if prev_score is not None:
             diff = curr_score - prev_score
-            arrow = "📈" if diff > 0 else "📉" if diff < 0 else "➡️"
-            print(f"  {arrow} {course}: {current['grade']} ({curr_score}%) — {'+' if diff >= 0 else ''}{diff:.1f}% since {prev_date}")
+            arrow = "\U0001f4c8" if diff > 0 else "\U0001f4c9" if diff < 0 else "\u27a1\ufe0f"
+            print(f"  {arrow} {course}: {current['grade']} ({curr_score}%) "
+                  f"\u2014 {'+' if diff >= 0 else ''}{diff:.1f}% since {prev_date}")
         else:
             print(f"  {course}: {current['grade']} ({curr_score}%)")
 else:

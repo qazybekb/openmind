@@ -28,13 +28,10 @@ RUN npm install -g @playwright/mcp@latest && \
     pip install pymupdf
 
 # Create directories
-RUN mkdir -p /root/.nanobot/workspace
+RUN mkdir -p /root/.nanobot/workspace /root/.gmail-mcp
 
-# Copy bot personality files
-COPY workspace/SOUL.md /root/.nanobot/workspace/
-COPY workspace/AGENTS.md /root/.nanobot/workspace/
-COPY workspace/HEARTBEAT.md /root/.nanobot/workspace/
-COPY workspace/read_pdf.py /root/.nanobot/workspace/
+# Copy workspace files (personality, scripts, config)
+COPY workspace/ /root/.nanobot/workspace/
 
 EXPOSE 18790
 

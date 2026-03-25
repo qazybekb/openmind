@@ -9,54 +9,79 @@ AI-powered Canvas LMS study buddy for UC Berkeley students. Built with [Nanobot]
 - **Readings** — Fetches, reads, and summarizes course readings from Canvas
 - **Assignment Help** — Reads the prompt + rubric, gives specific guidance
 - **Teach Me** — Step-by-step interactive teaching from course materials
+- **Gmail Integration** — Check course emails, professor messages, assignment feedback
 - **Todoist Sync** — Auto-adds assignments with due dates, detects changes
 - **Obsidian Knowledge Graph** — Saves reading summaries and assignment notes
-- **Proactive Alerts** — Deadline reminders, new file detection, grade notifications
+- **Proactive Alerts** — Deadline reminders, grade changes, submission checks, important emails
 
 ## Architecture
 
 ```
-Telegram (@qb_bcoursesbot)
+Telegram
     │
     ▼
 Nanobot (Docker) — Gemini 2.5 Pro
     │
     ├── Canvas API (web_fetch) — assignments, grades, files, modules
+    ├── Gmail MCP — course emails, professor messages
     ├── Todoist MCP — task management
     ├── Playwright + Chromium — read PDFs, external articles
     ├── Obsidian (filesystem MCP) — knowledge base
     └── DuckDuckGo — web search
 ```
 
-## Setup
+## Quick Start
 
-1. Clone this repo
-2. Copy `config.example.json` to `config.json` and fill in your API keys
-3. Copy workspace files (SOUL.md, USER.md, AGENTS.md, HEARTBEAT.md) to `~/.nanobot-canvas/workspace/`
-4. Update USER.md with your Canvas course IDs and API token
-5. Start with Docker: `docker compose up -d nanobot-canvas`
+```bash
+git clone https://github.com/qazybekb/bcourses_bot
+cd bcourses_bot
+cp .env.example .env         # fill in your API keys
+cp config.example.json config.json  # fill in your keys here too
+# edit workspace/courses.json with your course IDs
+docker compose up -d
+```
+
+See [SETUP.md](SETUP.md) for detailed step-by-step instructions.
 
 ## Required API Keys
 
-- **Gemini** — [aistudio.google.com](https://aistudio.google.com/apikey)
-- **Canvas** — bCourses Settings → Approved Integrations → New Access Token
-- **Todoist** — Settings → Integrations → Developer → API Token
-- **Telegram Bot** — [@BotFather](https://t.me/BotFather) → /newbot
+| Key | Where to get it |
+|-----|----------------|
+| **Canvas API token** | bCourses → Profile → Settings → + New Access Token |
+| **Telegram bot token** | [@BotFather](https://t.me/BotFather) → /newbot |
+| **Gemini API key** | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free) |
+| **Telegram user ID** | [@userinfobot](https://t.me/userinfobot) on Telegram |
+| Todoist (optional) | Settings → Integrations → Developer → API Token |
+| Gmail (optional) | Google Cloud Console → OAuth 2.0 → Gmail API |
 
-## Files
+## Project Structure
 
-- `config.example.json` — Configuration template
-- `SOUL.md` — Bot personality (Cal study buddy)
-- `USER.md` — User profile, Canvas API endpoints, interaction rules
-- `AGENTS.md` — Agent instructions for handling different requests
-- `HEARTBEAT.md` — Automated checks (deadlines, announcements, Todoist sync)
-- `Nanobot_Guide.md` — Full user guide
-- `Canvas_Bot_Improvements.md` — Future improvement roadmap
-- `Obsidian_bCourses_Strategy.md` — Obsidian knowledge graph strategy
+```
+├── config.example.json          # Nanobot configuration template
+├── .env.example                 # Environment variables template
+├── docker-compose.yml           # Docker Compose service definition
+├── Dockerfile                   # Container build
+├── workspace/                   # Bot personality & scripts (mounted into Docker)
+│   ├── SOUL.md                  # Bot personality (Cal study buddy)
+│   ├── USER.md                  # User profile, Canvas API reference, rules
+│   ├── AGENTS.md                # Agent instructions for handling requests
+│   ├── HEARTBEAT.md             # Automated checks (deadlines, grades, email)
+│   ├── courses.json             # Course IDs (single source of truth)
+│   ├── check_deadlines.py       # Deadline notification script
+│   ├── check_submissions.py     # Submission verification script
+│   ├── grade_history.py         # Grade tracking over time
+│   └── read_pdf.py              # PDF text extraction
+├── qa_check.py                  # QA tool for bot response quality
+├── SETUP.md                     # Detailed setup guide
+├── CAPABILITIES.md              # Full feature guide
+├── PLAN.md                      # Public release roadmap
+├── Canvas_Bot_Improvements.md   # Feature improvement ideas
+└── Obsidian_bCourses_Strategy.md # Obsidian knowledge graph strategy
+```
 
 ## Cost
 
-~$1-5/month on Gemini free/paid tier. Canvas, Todoist, and Telegram APIs are free.
+~$0-3/month on Gemini free/paid tier. Canvas, Todoist, Telegram, and Gmail APIs are free.
 
 ---
 

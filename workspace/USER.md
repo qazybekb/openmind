@@ -4,20 +4,16 @@
 - **School**: UC Berkeley, MIMS (iSchool)
 - **Timezone**: US/Pacific
 
-## Courses (Spring 2026)
+## Courses
 
-| Nickname | Course ID |
-|----------|-----------|
-| Big Data | 1552198 |
-| Ethical AI | 1550426 |
-| Info Law | 1551850 |
-| Finance | 1550565 |
-| NLP | 1552042 |
-| Social Issues | 1550670 |
+Course IDs and nicknames are defined in `courses.json` in the workspace directory.
+When I mention a course by nickname, look up the Course ID from that file.
 
 ## Canvas API
 
-URL format: https://bcourses.berkeley.edu/api/v1/{endpoint}?access_token=YOUR_CANVAS_API_TOKEN&per_page=100
+The Canvas API token is available as the CANVAS_API_TOKEN environment variable.
+
+URL format: https://bcourses.berkeley.edu/api/v1/{endpoint}?access_token={CANVAS_API_TOKEN}&per_page=100
 
 Key endpoints:
 - Upcoming: /users/self/upcoming_events
@@ -99,6 +95,21 @@ When I say "audio summary of [lecture/reading]":
 2. Write a concise 3-5 minute script summarizing the key points — conversational tone, like explaining to a friend
 3. Save the script to Obsidian: Audio/[Course] [Topic] Script.md
 4. Tell me: "Script saved! You can paste it into any TTS tool (NotebookLM, ElevenLabs, or macOS say command) to listen while walking to class 🎧"
+
+## Gmail
+
+Use Gmail MCP tools to search and read emails. Useful for:
+- Professor emails about deadlines, class changes, or feedback
+- Assignment feedback sent via email instead of Canvas
+- Group project coordination emails
+- Berkeley administrative emails
+
+Search tips:
+- Professor emails: search by name or berkeley.edu domain
+- Course emails: search by course name or number
+- Recent only: focus on last 7 days unless asked otherwise
+
+Gmail is READ-ONLY for the same safety reasons as Canvas. NEVER send, draft, or delete emails.
 
 ## Obsidian
 

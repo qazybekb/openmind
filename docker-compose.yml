@@ -1,0 +1,13 @@
+services:
+  bcourses-bot:
+    build: .
+    container_name: bcourses-bot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./config.json:/root/.nanobot/config.json:ro
+      - ./workspace:/root/.nanobot/workspace
+      - ${OBSIDIAN_VAULT:-./obsidian}:/root/obsidian
+      - ${GMAIL_CREDENTIALS:-./.gmail-mcp}:/root/.gmail-mcp:ro
+    ports:
+      - "18790:18790"
