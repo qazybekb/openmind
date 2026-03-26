@@ -1,0 +1,71 @@
+---
+---
+<section class="pt-32 pb-20 md:pt-40 md:pb-28">
+  <div class="container text-center">
+    <div class="badge mb-8">
+      <span>🐻</span>
+      Built by a Berkeley student, for Berkeley students
+    </div>
+
+    <h1 class="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-text-primary leading-[1.05] tracking-tight mb-8">
+      Your Cal study buddy,<br/>
+      <span class="text-cal-gold">in the terminal.</span>
+    </h1>
+
+    <p class="text-lg md:text-xl text-text-secondary max-w-2xl mx-auto mb-12 leading-relaxed">
+      OpenMind connects to bCourses, reads your lectures, tracks your deadlines, and talks like a Bear. Any LLM. Runs on your machine. Your data stays local.
+    </p>
+
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-20">
+      <button id="copy-btn" class="btn-primary flex items-center gap-2.5 text-base px-7 py-3"
+        onclick="navigator.clipboard.writeText('pip install openmind')">
+        <code class="font-mono font-medium">pip install openmind</code>
+        <svg class="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+      </button>
+      <a href="https://github.com/qazybekb/openmind" target="_blank" class="btn-secondary text-base px-7 py-3">
+        View on GitHub →
+      </a>
+    </div>
+
+    <!-- Hero terminal — large and prominent -->
+    <div class="terminal max-w-3xl mx-auto text-left shadow-2xl shadow-black/40">
+      <div class="terminal-header">
+        <div class="terminal-dot bg-[#ff5f57]"></div>
+        <div class="terminal-dot bg-[#febc2e]"></div>
+        <div class="terminal-dot bg-[#28c840]"></div>
+        <span class="ml-3 text-xs text-text-muted font-sans">openmind</span>
+      </div>
+      <div class="terminal-body text-text-secondary text-[13px] md:text-sm">
+        <div class="mb-3">
+          <span class="text-text-muted">$</span> <span class="text-text-primary">openmind</span>
+        </div>
+        <div class="mb-5 text-text-secondary">
+          🐻 Hey Oski! Go Bears! 💙💛
+        </div>
+        <div class="mb-4">
+          <span class="text-text-muted">You →</span> <span class="text-text-primary">What's due this week?</span>
+        </div>
+        <div class="space-y-2 mb-5">
+          <div>🔥 <span class="text-text-primary font-medium">HIGH</span> — NLP midterm report <span class="text-text-muted">(due Fri, 30% of grade)</span></div>
+          <div>📋 <span class="text-text-primary font-medium">MED</span>&ensp; — Social Issues writing prompt <span class="text-text-muted">(due Mon)</span></div>
+          <div>📚 <span class="text-text-primary font-medium">LOW</span>&ensp; — Finance case reading <span class="text-text-muted">(due next Wed)</span></div>
+        </div>
+        <div class="text-text-muted">
+          I'd start with the NLP report — that's 30% of your grade and due in 3 days.<br/>
+          You could knock out the outline at a Moffitt table tonight.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.getElementById('copy-btn')?.addEventListener('click', function() {
+    const btn = this;
+    const original = btn.innerHTML;
+    btn.innerHTML = '<code class="font-mono font-medium">Copied!</code> ✓';
+    setTimeout(() => { btn.innerHTML = original; }, 1500);
+  });
+</script>

@@ -1,173 +1,208 @@
-# bCourses Bot — Public Release Plan
+# OpenMind — Roadmap
 
-## Goal
-Make the bCourses bot available for all UC Berkeley students. They download it, add their APIs, and use it privately.
+## Current State (v0.1.0)
 
----
-
-## Phase 1: Clean Up (Before Release)
-
-### Remove hardcoded data
-- [ ] Replace hardcoded course IDs with dynamic fetching from Canvas API
-- [ ] Move Canvas token, Todoist token, Gemini key to environment variables
-- [ ] USER.md becomes a template — bot auto-fills courses on first run
-- [ ] Remove personal Telegram user ID from repo — use env var
-
-### Auto-onboarding flow
-- [ ] Student runs `docker compose up`
-- [ ] Bot sends first Telegram message: "Hey Bear! 🐻 Send me your Canvas API token to get started"
-- [ ] Bot validates token, fetches courses, builds cache
-- [ ] Bot asks: "Want to connect Todoist?" → optional setup
-- [ ] Zero manual config file editing
-
-### Simplify setup to 3 things
-1. Telegram bot token (from @BotFather)
-2. Canvas API token (from bCourses settings)
-3. Gemini API key (from aistudio.google.com)
-
-Everything else auto-configures.
+CLI tool installable via `pip install .`. Setup wizard, bCourses integration, OpenRouter LLM, Telegram bot, terminal REPL. Optional Gmail, Todoist, Obsidian integrations. Berkeley personality.
 
 ---
 
-## Phase 2: Make It Robust
+## Phase 1: Berkeley Knowledge Base
 
-### Error handling
-- [ ] Canvas token expired → bot tells user how to refresh
-- [ ] Gemini rate limit → graceful error message, retry later
-- [ ] Todoist not connected → bot works without it, just skips task features
-- [ ] Network errors → retry with backoff
+Turn OpenMind from "course tool" into "Berkeley companion."
 
-### Multi-student testing
-- [ ] Test with 3-5 Berkeley friends
-- [ ] Collect feedback on setup experience
-- [ ] Fix any course-specific issues (some courses use modules, some don't)
-- [ ] Test with different course loads (2 courses vs 6 courses)
+### Architecture
 
-### Documentation
-- [ ] Step-by-step setup guide with screenshots
-- [ ] Video walkthrough (2 min)
-- [ ] FAQ: common issues and fixes
-- [ ] List of supported features
-
----
-
-## Phase 3: Distribution
-
-### Option A: Public GitHub Repo (Recommended to start)
-- Effort: Low
-- Reach: Anyone can fork and self-host
-- Cost to you: $0
-- Students need: Mac/Linux with Docker, or a cloud server
+Bundled markdown files shipped with the package. One new tool (`berkeley_info`) searches filenames + content and returns relevant sections. Zero external dependencies, works offline.
 
 ```
-git clone https://github.com/qazybekb/bcourses_bot
-cd bcourses_bot
-cp .env.example .env
-# Edit .env with your tokens
-docker compose up -d
+src/openmind/knowledge/
+├── campus/
+│   ├── history.md          # Founding, Free Speech Movement, Nobel laureates
+│   ├── landmarks.md        # Sather Gate, Campanile, Doe, Moffitt, Memorial Glade
+│   ├── libraries.md        # Doe, Moffitt, Main Stacks, Bancroft, Music Library
+│   ├── dining.md           # Croads, Foothill, Asian Ghetto, Top Dog, Cheese Board
+│   └── housing.md          # Units 1-3, Clark Kerr, off-campus areas
+├── safety/
+│   ├── safewalk.md         # Hours, phone number, how to request
+│   ├── night_shuttle.md    # Routes, schedule, BearWalk
+│   ├── emergency.md        # UCPD, WarnMe alerts, active shooter protocol
+│   └── seismic.md          # Earthquake procedures
+├── health/
+│   ├── insurance.md        # SHIP/Wellfleet, waiver process, coverage
+│   ├── tang_center.md      # UHS, appointments, urgent care
+│   └── mental_health.md    # Counseling, crisis line, Let's Talk drop-in
+├── academics/
+│   ├── schools.md          # L&S, CoE, Haas, iSchool, Law, etc.
+│   ├── calendar.md         # Semester dates, dead week, RRR week, finals
+│   ├── grading.md          # GPA scale, P/NP deadlines, grade disputes
+│   └── advising.md         # L&S advisors, major declaration, Phase 1/2
+├── transit/
+│   ├── bart.md             # BayPass, stations, SF/Oakland trips
+│   ├── buses.md            # AC Transit, Bear Transit, campus shuttles
+│   └── biking.md           # Bay Wheels, bike theft prevention
+├── student_life/
+│   ├── events.md           # Big Game, Cal Day, Noon Concert, Sproul
+│   ├── clubs.md            # How to join, CODEBASE, data science, ASUC
+│   ├── rec_sports.md       # RSF, intramurals, outdoor adventures
+│   └── traditions.md       # 4.0 Hill, Big C hike, card stunts, Oski
+└── local/
+    ├── telegraph.md        # Telegraph Ave, shops, vibes
+    ├── neighborhoods.md    # Northside, Southside, downtown, Gourmet Ghetto
+    └── hidden_gems.md      # Best study spots, secret views, cheap eats
 ```
 
-### Option B: One-Click Cloud Deploy
-- Effort: Medium
-- Reach: Students who don't want to run Docker locally
-- Platforms: Railway, Render, Fly.io
-- Cost: ~$5/month per student (they pay their own)
-- Add: `railway.toml` or `render.yaml` for one-click deploy button in README
+### Implementation
 
-### Option C: Hosted Service (Future)
-- Effort: High
-- You run infrastructure for all students
-- Need: multi-tenant support, billing, user management
-- Cost: significant (API costs × number of students)
-- Only worth it if you want to build a startup
+1. Create `src/openmind/tools/berkeley.py` with a `berkeley_info(query)` tool
+2. Tool searches filenames and content via simple keyword matching
+3. Returns the matching section(s) for the LLM to use in its response
+4. Knowledge files are installed with the package via `pyproject.toml` package data
+5. Add to tool registry (conditionally always-on since it's Berkeley-specific)
+
+### Community contribution
+
+Knowledge files are markdown — students can PR new tips, corrections, hidden gems. Could be a growth vector on r/berkeley.
 
 ---
 
-## Phase 4: Growth
+## Phase 2: Slack & Google Calendar Integrations
 
-### Berkeley-specific
-- [ ] Post on r/berkeley subreddit
-- [ ] Share in MIMS/iSchool Slack
-- [ ] Present at a CODEBASE or data science club meeting
-- [ ] Ask professors to mention it (they'd love students using AI for studying)
+### Slack (read-only, like Gmail)
 
-### Expansion
-- [ ] Support other Canvas LMS schools (just change base URL)
-- [ ] Add more LLM providers (OpenAI, Claude, local models)
-- [ ] Community-contributed course-specific prompts
-- [ ] Plugin system for additional features
+Student provides their Slack user token from a course workspace (e.g., iSchool Slack). OpenMind can search and read messages but never post.
 
----
+**How it works:**
+- Student gets a Slack user OAuth token (xoxp-...) with `channels:history`, `channels:read`, `search:read` scopes
+- Token stored in `~/.openmind/config.json` alongside other integrations
+- Two tools: `slack_search(query)` and `slack_read_channel(channel, limit)`
 
-## Technical Changes Needed
-
-### Environment Variables (.env file)
+**Example interactions:**
 ```
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_USER_ID=
-CANVAS_API_TOKEN=
-CANVAS_BASE_URL=https://bcourses.berkeley.edu
-GEMINI_API_KEY=
-TODOIST_API_TOKEN=  # optional
+You → "What did the TA say about the midterm in Slack?"
+🐻 → Found 2 messages in #nlp-announcements:
+      Prof. Bamman (Mon): "Midterm report deadline extended to Apr 4"
+      TA Sarah (Tue): "Office hours moved to Wed 3pm this week"
+
+You → "Any Slack messages about the final project?"
+🐻 → 3 results across #info-law and #big-data...
 ```
 
-### Config auto-generation
-On first run, bot should:
-1. Read env vars
-2. Fetch active courses from Canvas
-3. Generate config.json with correct course IDs
-4. Generate USER.md with course list
-5. Build initial course cache
-6. Send welcome message on Telegram
+**Setup flow:**
+1. `openmind setup` asks "Enable Slack?" (y/n)
+2. Student provides workspace token
+3. Optionally lists channels to watch
 
-### Docker Compose (simplified for students)
-```yaml
-services:
-  bcourses-bot:
-    image: ghcr.io/qazybekb/bcourses_bot:latest
-    env_file: .env
-    restart: unless-stopped
+**Tools:**
+- `slack_search(query)` — search messages across accessible channels
+- `slack_read_channel(channel, limit)` — read recent messages from a specific channel
+- `slack_list_channels()` — list channels the user has access to
+
+**API:** Slack Web API (`https://slack.com/api/`)
+- `search.messages` — search
+- `conversations.list` — list channels
+- `conversations.history` — read channel messages
+
+**Security:** Read-only. Never post, react, or modify anything. Token stored locally.
+
+### Google Calendar
+
+Auto-create calendar events from Canvas deadlines and block study time.
+
+**How it works:**
+- Google OAuth (same flow as Gmail) with `calendar.events` scope
+- Two tools: `calendar_add_event(title, start, end)` and `calendar_list_events(days)`
+- Heartbeat can auto-add new Canvas deadlines as calendar events
+
+**Example interactions:**
+```
+You → "Add my deadlines to Google Calendar"
+🐻 → Added 3 events:
+      📅 NLP midterm report — Mar 28
+      📅 Social Issues writing prompt — Mar 31
+      📅 Big Data case analysis — Apr 2
+
+You → "Block 2 hours tomorrow for the midterm"
+🐻 → Added: "Study: NLP midterm report" tomorrow 2pm-4pm
+
+You → "What's on my calendar this week?"
+🐻 → You've got 4 things...
 ```
 
-Pre-built Docker image on GitHub Container Registry — students don't even need the source code.
+**Setup flow:**
+1. `openmind setup` asks "Enable Google Calendar?" (y/n)
+2. Uses same Google OAuth credentials as Gmail (adds `calendar` scope)
+3. Or separate OAuth if Gmail isn't enabled
+
+**Tools:**
+- `calendar_add_event(title, date, duration)` — create an event
+- `calendar_list_events(days_ahead)` — list upcoming events
+- `calendar_add_deadlines()` — bulk-add Canvas deadlines as events
+
+**API:** Google Calendar API v3
+- `events.insert` — create events
+- `events.list` — list events
+
+**Note:** Unlike Canvas/Gmail/Slack, Calendar is READ-WRITE. The tools can create events. This should be clearly documented and the LLM should confirm before bulk-adding.
 
 ---
 
-## Resume / Portfolio Value
+## Phase 3: Live Berkeley Data Feeds
 
-"Built an open-source AI study assistant for UC Berkeley students"
-- Canvas LMS API integration
-- LLM orchestration (Gemini 2.5 Pro)
-- MCP tool architecture
-- Docker containerization
-- Real users, real feedback
+Layer real-time Berkeley data on top of the static knowledge base.
 
-Relevant for: AI/ML roles, product engineering, EdTech, developer tools
+### Potential feeds
 
----
+| Feed | Source | Value |
+|------|--------|-------|
+| Berkeley events | cal.berkeley.edu RSS/API | "What's happening on campus this week?" |
+| Shuttle status | BearTransit API | "When's the next shuttle?" |
+| Emergency alerts | WarnMe feed | Proactive safety notifications |
+| Dining hours | Cal Dining API | "Is Croads open right now?" |
+| Library hours | lib.berkeley.edu | "Is Doe open?" |
 
-## Timeline
+### Implementation
 
-| Week | What |
-|------|------|
-| 1 | Test thoroughly, fix remaining bugs |
-| 2 | Remove hardcoded data, add env vars, auto-onboarding |
-| 3 | Test with 3-5 friends, iterate on feedback |
-| 4 | Clean up repo, write docs, record setup video |
-| 5 | Public release on GitHub + post on r/berkeley |
+Each feed is a separate tool. Only add feeds with reliable, stable APIs.
 
 ---
 
-## Risks
+## Phase 4: Multi-University Expansion
 
-| Risk | Mitigation |
-|------|-----------|
-| Canvas API token security | Tokens stay local, never sent to external services. Add warning in README. |
-| Gemini costs | Free tier covers most students. Add budget warning in docs. |
-| Canvas API rate limiting | Cache aggressively, 700 req/10min is generous |
-| Bot gives wrong info | Always fetch from Canvas, never guess. QA script catches issues. |
-| UC Berkeley policy | Check with iSchool if sharing Canvas API tools is allowed |
+Re-add the university registry (previously built, currently stripped to Berkeley-only).
+
+### What's needed
+
+1. Restore university picker in setup wizard
+2. Each university gets: Canvas URL, personality, knowledge base
+3. Knowledge base per university (or start with empty + community contributions)
+4. Personality generated dynamically from university config
+
+### Already built (saved for later)
+
+The multi-university registry with 12 schools was previously implemented and tested. Code is in git history if needed.
 
 ---
 
-*Go Bears! 🐻💙💛*
+## Phase 5: Distribution
+
+| Channel | Effort | Reach |
+|---------|--------|-------|
+| GitHub + pip install | Done | Anyone who finds the repo |
+| r/berkeley post | Low | Berkeley students |
+| MIMS/iSchool Slack | Low | Direct peers |
+| PyPI (`pip install openmind`) | Low | Broader Python community |
+| Homebrew formula | Medium | Mac users |
+
+---
+
+## Backlog
+
+- [ ] Course data cache (local JSON, refresh on heartbeat) for faster common queries
+- [ ] Quiet hours (no Telegram notifications 11pm-7am, batch morning alerts)
+- [ ] Weekly study plan generator (Sunday evening, based on upcoming deadlines + weights)
+- [ ] Reading tracker (mark readings as done, "what am I behind on?")
+- [ ] Anki export for flashcards
+- [ ] Notion integration (alternative to Obsidian — same tool pattern)
+- [ ] Apple Reminders integration (alternative to Todoist for Mac users)
+- [ ] CI/CD with GitHub Actions (lint, type check, test)
+- [ ] Test suite for session parsing, heartbeat logic, tool execution

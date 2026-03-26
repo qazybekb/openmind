@@ -1,0 +1,27 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Hero from '../components/Hero.astro';
+import Features from '../components/Features.astro';
+import Demos from '../components/Demos.astro';
+import Personality from '../components/Personality.astro';
+import Install from '../components/Install.astro';
+import Footer from '../components/Footer.astro';
+import '../styles/global.css';
+---
+
+<Layout>
+  <Nav />
+  <main>
+    <Hero />
+    <div class="gradient-line"></div>
+    <Features />
+    <div class="gradient-line"></div>
+    <Demos />
+    <div class="gradient-line"></div>
+    <Personality />
+    <div class="gradient-line"></div>
+    <Install />
+  </main>
+  <Footer />
+</Layout>

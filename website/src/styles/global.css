@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-bg text-text-secondary font-sans antialiased;
+  }
+  ::selection {
+    @apply bg-white/10 text-white;
+  }
+}
+
+@layer components {
+  .section {
+    @apply py-24 md:py-32;
+  }
+  .section-sm {
+    @apply py-16 md:py-24;
+  }
+  .container {
+    @apply max-w-5xl mx-auto px-6;
+  }
+  .terminal {
+    @apply bg-bg-card rounded-xl border border-border overflow-hidden font-mono text-sm;
+  }
+  .terminal-header {
+    @apply flex items-center gap-2 px-4 py-3 border-b border-border;
+  }
+  .terminal-dot {
+    @apply w-2.5 h-2.5 rounded-full;
+  }
+  .terminal-body {
+    @apply p-6 leading-relaxed;
+  }
+  .card {
+    @apply bg-bg-card border border-border rounded-xl p-6
+           transition-all duration-300
+           hover:border-border-hover hover:bg-bg-card-hover;
+  }
+  .badge {
+    @apply inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border text-xs text-text-muted;
+  }
+  .btn-primary {
+    @apply px-5 py-2.5 bg-text-primary text-bg font-medium rounded-lg text-sm
+           hover:bg-accent transition-colors;
+  }
+  .btn-secondary {
+    @apply px-5 py-2.5 border border-border text-text-secondary font-medium rounded-lg text-sm
+           hover:border-border-hover hover:text-text-primary transition-colors;
+  }
+}
+
+.fade-in {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Staggered fade-in for grids */
+.fade-in-delay-1 { transition-delay: 0.1s; }
+.fade-in-delay-2 { transition-delay: 0.2s; }
+.fade-in-delay-3 { transition-delay: 0.3s; }
+.fade-in-delay-4 { transition-delay: 0.35s; }
+.fade-in-delay-5 { transition-delay: 0.4s; }
+
+/* Subtle glow on hover */
+.glow:hover {
+  box-shadow: 0 0 40px rgba(255,255,255,0.03);
+}
+
+/* Gradient line separator */
+.gradient-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+}

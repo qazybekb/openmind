@@ -1,88 +1,192 @@
-# bCourses Bot 🐻💙💛
+<p align="center">
+  <img src="https://img.shields.io/badge/UC_Berkeley-003262?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIwLjllbSIgZm9udC1zaXplPSI4NSIgeD0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7wn5CrPC90ZXh0Pjwvc3ZnPg==&logoColor=white" alt="UC Berkeley" />
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/License-MIT-FDB515?style=for-the-badge" alt="MIT License" />
+  <img src="https://img.shields.io/badge/Tools-38-22c55e?style=for-the-badge" alt="38 Tools" />
+</p>
 
-AI-powered Canvas LMS study buddy for UC Berkeley students. Built with [Nanobot](https://github.com/HKUDS/nanobot), Gemini 2.5 Pro, and Cal spirit.
+<h1 align="center">🐻 OpenMind</h1>
+<p align="center"><strong>AI-powered study buddy for UC Berkeley students</strong></p>
+<p align="center">Connects to bCourses. Talks like a Bear. Runs from your terminal.</p>
 
-## What it does
-
-- **Assignments & Deadlines** — "What's due this week?" with urgency flags
-- **Grades** — "What are my grades?" / "What do I need for an A?"
-- **Readings** — Fetches, reads, and summarizes course readings from Canvas
-- **Assignment Help** — Reads the prompt + rubric, gives specific guidance
-- **Teach Me** — Step-by-step interactive teaching from course materials
-- **Gmail Integration** — Check course emails, professor messages, assignment feedback
-- **Todoist Sync** — Auto-adds assignments with due dates, detects changes
-- **Obsidian Knowledge Graph** — Saves reading summaries and assignment notes
-- **Proactive Alerts** — Deadline reminders, grade changes, submission checks, important emails
-
-## Architecture
-
-```
-Telegram
-    │
-    ▼
-Nanobot (Docker) — Gemini 2.5 Pro
-    │
-    ├── Canvas API (web_fetch) — assignments, grades, files, modules
-    ├── Gmail MCP — course emails, professor messages
-    ├── Todoist MCP — task management
-    ├── Playwright + Chromium — read PDFs, external articles
-    ├── Obsidian (filesystem MCP) — knowledge base
-    └── DuckDuckGo — web search
-```
+---
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/qazybekb/bcourses_bot
-cd bcourses_bot
-cp .env.example .env         # fill in your API keys
-cp config.example.json config.json  # fill in your keys here too
-# edit workspace/courses.json with your course IDs
-docker compose up -d
+pip install .
+openmind
 ```
 
-See [SETUP.md](SETUP.md) for detailed step-by-step instructions.
+First run asks for two things — your bCourses token and an OpenRouter key. Then you're chatting:
 
-## Required API Keys
+```
+🐻 Hey Oski! Go Bears! 💙💛
 
-| Key | Where to get it |
-|-----|----------------|
-| **Canvas API token** | bCourses → Profile → Settings → + New Access Token |
-| **Telegram bot token** | [@BotFather](https://t.me/BotFather) → /newbot |
-| **Gemini API key** | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free) |
-| **Telegram user ID** | [@userinfobot](https://t.me/userinfobot) on Telegram |
-| Todoist (optional) | Settings → Integrations → Developer → API Token |
-| Gmail (optional) | Google Cloud Console → OAuth 2.0 → Gmail API |
+You → What's due this week?
+
+🔥 HIGH — NLP midterm report (due Fri, 30% of grade)
+📋 MED  — Social Issues writing prompt (due Mon)
+📚 LOW  — Finance case reading (due next Wed)
+
+I'd start with the NLP report — that's 30% of your grade.
+You could knock out the outline at a Moffitt table tonight.
+```
+
+## What It Does
+
+| Category | Features |
+|----------|----------|
+| **Academics** | Smart deadlines (priority scoring), grade calculator, PDF summarizer, guided teaching mode, flashcards |
+| **Personalization** | Student profile, resume import, skill gap analysis, career-aware course recommendations |
+| **Course Catalog** | 11,000+ Berkeley courses (undergrad + graduate) searchable by subject, level, keyword |
+| **Campus** | Live events from events.berkeley.edu, library hours, study room booking links |
+| **Integrations** | Telegram, Gmail, Google Calendar, Slack, Todoist, Obsidian |
+| **Alerts** | Background heartbeat every 3 hours: deadline warnings, grade changes, submission checks, announcements |
+
+**38 tools total** — 25 always-on, 13 from optional integrations.
+
+## How It Works
+
+```
+You (Terminal or Telegram)
+    │
+    ▼
+OpenMind — Any LLM via OpenRouter
+    │
+    ├── bCourses API — assignments, grades, files, modules
+    ├── Course Catalog — 11K Berkeley courses (bundled)
+    ├── Campus Data — events, library hours, study rooms
+    ├── Student Profile — goals, skills, resume (local)
+    ├── PDF Reader — lecture slides, papers
+    ├── Web Search — DuckDuckGo + article fetch
+    └── Optional: Telegram, Gmail, Calendar, Slack, Todoist, Obsidian
+```
+
+## Commands
+
+```bash
+openmind                    # Start (Telegram bot or terminal REPL)
+openmind chat               # Terminal REPL only
+openmind config             # Show configuration
+openmind profile            # View your student profile
+openmind privacy            # What stays local vs what goes to the LLM
+
+openmind setup              # Full setup (all settings)
+openmind setup telegram     # Add Telegram alerts
+openmind setup gmail        # Add Gmail integration
+openmind setup calendar     # Add Google Calendar
+openmind setup slack        # Add Slack (read course channels)
+openmind setup profile      # Set up your academic profile
+openmind setup model        # Change your LLM model
+```
+
+## Install
+
+**Basic:**
+```bash
+pip install .
+```
+
+**With optional integrations:**
+```bash
+pip install ".[telegram]"   # Telegram bot + alerts
+pip install ".[gmail]"      # Gmail search + read
+pip install ".[all]"        # Everything
+```
+
+## Requirements
+
+| What | Where to get it |
+|------|----------------|
+| Python 3.11+ | [python.org](https://python.org) |
+| bCourses API token | bCourses → Profile → Settings → + New Access Token |
+| OpenRouter API key | [openrouter.ai/keys](https://openrouter.ai/keys) (free credits available) |
+
+## Personalization
+
+OpenMind gets smarter when it knows you. Run `openmind setup profile` to add:
+- Major, year, interests, career goals
+- Import your resume (PDF) for automatic skill extraction
+- Dream companies, GPA goal
+
+Then ask:
+- *"What skills am I missing for AI PM roles?"* → compares your resume to career requirements
+- *"What courses should I take?"* → searches 11K courses, recommends based on your goals
+- *"Help with the NLP midterm"* → connects rubric points to your experience
+
+All profile data stays at `~/.openmind/profile.json`. Run `openmind privacy` for full details.
+
+## Privacy
+
+- **Runs on your laptop** — no server, no cloud
+- **bCourses & Gmail are read-only** — can never submit, post, or modify
+- **API tokens stay local** — stored in `~/.openmind/config.json`
+- **No analytics, no tracking, no telemetry**
+- **Delete everything:** `rm -rf ~/.openmind`
+
+Your profile fields (major, interests, skills) are included in the AI's context so it can personalize responses. Run `openmind privacy` for the full breakdown.
 
 ## Project Structure
 
 ```
-├── config.example.json          # Nanobot configuration template
-├── .env.example                 # Environment variables template
-├── docker-compose.yml           # Docker Compose service definition
-├── Dockerfile                   # Container build
-├── workspace/                   # Bot personality & scripts (mounted into Docker)
-│   ├── SOUL.md                  # Bot personality (Cal study buddy)
-│   ├── USER.md                  # User profile, Canvas API reference, rules
-│   ├── AGENTS.md                # Agent instructions for handling requests
-│   ├── HEARTBEAT.md             # Automated checks (deadlines, grades, email)
-│   ├── courses.json             # Course IDs (single source of truth)
-│   ├── check_deadlines.py       # Deadline notification script
-│   ├── check_submissions.py     # Submission verification script
-│   ├── grade_history.py         # Grade tracking over time
-│   └── read_pdf.py              # PDF text extraction
-├── qa_check.py                  # QA tool for bot response quality
-├── SETUP.md                     # Detailed setup guide
-├── CAPABILITIES.md              # Full feature guide
-├── PLAN.md                      # Public release roadmap
-├── Canvas_Bot_Improvements.md   # Feature improvement ideas
-└── Obsidian_bCourses_Strategy.md # Obsidian knowledge graph strategy
+src/openmind/
+├── cli.py              # Entry point (7 commands)
+├── setup_wizard.py     # Progressive onboarding
+├── config.py           # ~/.openmind/config.json
+├── universities.py     # UC Berkeley config + personality
+├── personality.py      # System prompt generation
+├── llm.py              # OpenRouter client + tool calling
+├── repl.py             # Terminal REPL
+├── bot.py              # Telegram bot (async)
+├── heartbeat.py        # Background checks + notifications
+├── data/
+│   ├── undergraduate_courses.csv  # 6,771 courses
+│   └── graduate_courses.csv       # 4,398 courses
+└── tools/
+    ├── canvas.py       # 13 bCourses API tools (paginated)
+    ├── berkeley.py     # Campus events, library hours, study rooms
+    ├── courses.py      # Course catalog search (11K courses)
+    ├── profile.py      # Student profile + resume import
+    ├── pdf.py          # PDF text extraction
+    ├── web.py          # Web fetch + search (SSRF protected)
+    ├── gmail.py        # Gmail search + read
+    ├── slack.py        # Slack search + read channels
+    ├── calendar.py     # Google Calendar events
+    ├── todoist.py      # Task management
+    └── obsidian.py     # Vault read/write/search
 ```
 
-## Cost
+## Documentation
 
-~$0-3/month on Gemini free/paid tier. Canvas, Todoist, Telegram, and Gmail APIs are free.
+| Document | Description |
+|----------|-------------|
+| [Setup Guide](docs/SETUP.md) | Detailed installation and configuration |
+| [Features](docs/FEATURES.md) | Everything you can do with OpenMind |
+| [Architecture](docs/ARCHITECTURE.md) | Technical design, data flow, module reference |
+| [Tools Reference](docs/TOOLS.md) | All 38 tools with parameters |
+| [Privacy & Security](docs/PRIVACY.md) | What data goes where |
+| [Contributing](docs/CONTRIBUTING.md) | How to add tools and features |
+| [Roadmap](PLAN.md) | Berkeley knowledge base, multi-university, live feeds |
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
+
+```bash
+git clone https://github.com/qazybekb/openmind.git
+cd openmind
+pip install -e ".[all]"
+openmind --help
+```
+
+## License
+
+[MIT](LICENSE) — Qazybek Beken, 2026
 
 ---
 
-*Go Bears! 🐻 Fiat Lux! 💡*
+<p align="center">
+  Built with 💙💛 at UC Berkeley<br/>
+  <strong>Go Bears! 🐻 Fiat Lux! 💡</strong>
+</p>
