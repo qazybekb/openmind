@@ -37,9 +37,9 @@ pip install ".[all]"         # Everything
 openmind
 ```
 
-On first run, the wizard launches automatically. It will ask for:
+On first run, the wizard asks for just two things:
 
-### bCourses API Token
+### Step 1: bCourses API Token
 
 1. Go to [bCourses](https://bcourses.berkeley.edu)
 2. Click your profile picture (top-left) > **Settings**
@@ -48,53 +48,43 @@ On first run, the wizard launches automatically. It will ask for:
 5. Give it a name like "OpenMind" and click **Generate Token**
 6. Copy the token and paste it into the wizard
 
-The wizard validates your token immediately and fetches your active courses.
+The wizard validates your token immediately, greets you by name, and discovers your active courses.
 
-### OpenRouter API Key
+### Step 2: OpenRouter API Key
 
 1. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
 2. Create an account (free credits available for new users)
 3. Generate an API key
 4. Paste it into the wizard
 
-Then pick a model. Recommendations:
+That's it — you're chatting. OpenMind defaults to `google/gemini-2.5-pro`. Change it anytime with `openmind setup model`.
 
-| Model | Strengths | Cost |
-|-------|-----------|------|
-| `google/gemini-2.5-pro` | Great all-rounder, fast | ~$0-3/month |
-| `anthropic/claude-sonnet-4` | Excellent reasoning, detailed answers | ~$5-10/month |
-| `openai/gpt-4o` | Fast, capable | ~$3-8/month |
-| `meta-llama/llama-4-maverick` | Open source, very cheap | ~$0-1/month |
+### Adding integrations later
 
-### Optional: Telegram Bot
+Every integration has its own setup command. Run these whenever you're ready:
 
-Enables chatting via Telegram and receiving background alerts (deadlines, grade changes, submission checks) every 3 hours.
+```bash
+openmind setup telegram     # Telegram bot + background alerts
+openmind setup gmail        # Gmail search + read
+openmind setup calendar     # Google Calendar sync
+openmind setup slack        # Slack channel reader
+openmind setup todoist      # Todoist task sync
+openmind setup obsidian     # Obsidian vault integration
+openmind setup profile      # Academic profile + career goals
+openmind setup model        # Change your LLM model
+```
 
-1. Open Telegram, message [@BotFather](https://t.me/BotFather)
-2. Send `/newbot`, follow the prompts, copy the bot token
-3. Message [@userinfobot](https://t.me/userinfobot) to get your numeric user ID
-4. Paste both into the wizard
+### Integration details
 
-### Optional: Todoist
+**Telegram:** Message @BotFather → /newbot → copy token. Message @userinfobot → get user ID. Validated during setup — invalid tokens are rejected.
 
-Enables syncing Canvas assignments as Todoist tasks with due dates.
+**Gmail / Calendar:** Requires Google OAuth credentials (Desktop app) from Google Cloud Console. Both share the same credentials directory. Auth completes on first use via browser sign-in.
 
-1. Go to Todoist Settings > Integrations > Developer
-2. Copy your API token
-3. Paste it into the wizard
+**Slack:** Requires a Slack user token (xoxp-...) from api.slack.com/apps. Read-only access to course channels.
 
-### Optional: Gmail
+**Todoist:** API token from Todoist Settings > Integrations > Developer.
 
-Enables searching and reading course-related emails from within OpenMind.
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a project (or use existing)
-3. Enable the **Gmail API**
-4. Go to Credentials > Create **OAuth 2.0 Client ID** > choose "Desktop app"
-5. Download the JSON credentials file
-6. Provide the path to the JSON when the wizard asks
-
-Gmail authentication happens on first use — a browser window opens for Google sign-in. This requires a terminal (won't work from Telegram).
+**Obsidian:** Provide the path to your vault directory.
 
 ### Optional: Obsidian
 

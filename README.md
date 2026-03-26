@@ -105,12 +105,13 @@ pip install ".[all]"        # Everything
 
 ## Personalization
 
-OpenMind gets smarter when it knows you. Run `openmind setup profile` to add:
-- Major, year, interests, career goals
-- Import your resume (PDF) for automatic skill extraction
-- Dream companies, GPA goal
+OpenMind gets smarter when it knows you. Run `openmind setup profile` to add your major, year, interests, and career goals. You can also import your resume by asking the bot:
 
-Then ask:
+```
+You → Import my resume from ~/Documents/resume.pdf
+```
+
+The bot reads the PDF, extracts skills/experience/projects, and saves them to your profile. Then ask:
 - *"What skills am I missing for AI PM roles?"* → compares your resume to career requirements
 - *"What courses should I take?"* → searches 11K courses, recommends based on your goals
 - *"Help with the NLP midterm"* → connects rubric points to your experience
@@ -119,13 +120,22 @@ All profile data stays at `~/.openmind/profile.json`. Run `openmind privacy` for
 
 ## Privacy
 
-- **Runs on your laptop** — no server, no cloud
-- **bCourses & Gmail are read-only** — can never submit, post, or modify
-- **API tokens stay local** — stored in `~/.openmind/config.json`
-- **No analytics, no tracking, no telemetry**
-- **Delete everything:** `rm -rf ~/.openmind`
+OpenMind runs locally on your laptop. There is no OpenMind server — but it does talk to external services:
 
-Your profile fields (major, interests, skills) are included in the AI's context so it can personalize responses. Run `openmind privacy` for the full breakdown.
+| What | Where it goes |
+|------|--------------|
+| API tokens | **Stay local** — `~/.openmind/config.json`, never transmitted |
+| Your profile (major, goals, skills) | **Sent to your LLM provider** (OpenRouter) as part of every conversation |
+| Conversation messages | **Sent to your LLM provider** for processing |
+| Canvas data (assignments, grades) | **Fetched from bCourses**, passed through LLM when you ask about it |
+| Gmail/Slack content | **Fetched only when you ask**, then passed through LLM |
+| Resume PDF | **Stays local** — only extracted text goes through LLM once during import |
+
+**What OpenMind can never do:** submit assignments, post discussions, send emails, or modify any account. All external access is read-only (except Google Calendar, which can create events).
+
+**No analytics, no tracking, no telemetry.** Delete everything: `rm -rf ~/.openmind`
+
+Run `openmind privacy` for the full breakdown.
 
 ## Project Structure
 

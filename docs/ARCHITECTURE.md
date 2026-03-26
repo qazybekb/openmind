@@ -144,4 +144,6 @@ Canvas returns paginated results with a `Link` header containing `rel="next"`. T
 
 ## Conversation Memory
 
-Messages are kept in a list per user (REPL: single list; Telegram: per-user dict). Before each LLM call, the list is trimmed to the system prompt + last 40 messages to stay within context limits. No persistent conversation storage — history resets on restart.
+Messages are kept in a list per user (REPL: single list; Telegram: per-user dict). Before each LLM call, the list is trimmed to the system prompt + last 40 messages to stay within context limits.
+
+The REPL persists command history to `~/.openmind/repl_history` (for up-arrow recall), but conversation context (the messages sent to the LLM) is in-memory only and resets on restart.

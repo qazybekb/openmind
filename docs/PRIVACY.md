@@ -1,112 +1,83 @@
 # OpenMind — Privacy & Security
 
-## Data Storage
+## How OpenMind works
 
-All data stays on your machine. OpenMind stores configuration and runtime state in `~/.openmind/`:
+OpenMind is a Python CLI that runs on your laptop. It connects to external services to function:
 
-| File | Contains | Sensitive? |
-|------|----------|-----------|
-| `config.json` | API tokens, model choice, courses, integration settings | Yes |
-| `state/deadlines.json` | Last-seen deadline urgency levels | No |
-| `state/grades.json` | Last-seen grade scores (for change detection) | Mildly |
-| `state/submissions.json` | IDs of recently-checked assignments | No |
-| `state/announcements.json` | IDs of seen announcements | No |
-| `repl_history` | Your terminal REPL command history | Mildly |
-| `gmail/credentials.json` | Google OAuth client credentials | Yes |
-| `gmail/token.json` | Google OAuth access/refresh token | Yes |
+1. **bCourses** (Canvas API) — to read your assignments, grades, files, and announcements
+2. **OpenRouter** — to send your messages to an LLM (Gemini, Claude, GPT-4, etc.) for processing
+3. **Optional integrations** — Gmail, Slack, Google Calendar, Todoist (when you enable them)
 
-## What OpenMind Can Access
+There is no OpenMind server. But your data does leave your machine when you chat — it goes to your chosen LLM provider via OpenRouter.
 
-### bCourses (Canvas API)
+## What stays on your machine
 
-OpenMind can **read**:
-- Your courses, assignments, grades, modules, pages, files
-- Announcements, discussion topics, syllabus
-- Your submission status for assignments
+| Data | Location | Transmitted? |
+|------|----------|-------------|
+| API tokens (Canvas, OpenRouter, Telegram, Slack, Google) | `~/.openmind/config.json` | **Never** — used locally for authentication |
+| Student profile (major, interests, career goals) | `~/.openmind/profile.json` | **Fields are included** in every LLM request as context |
+| Resume PDF (if imported) | Your filesystem | **Never** — only extracted text passes through LLM once |
+| Heartbeat state (seen deadlines, grades) | `~/.openmind/state/*.json` | **Never** |
+| Terminal command history | `~/.openmind/repl_history` | **Never** |
+| Google OAuth tokens | `~/.openmind/gmail/` | **Never** — used locally for Google API auth |
+| Course catalog (11K courses) | Bundled in package | **Never** — searched locally |
 
-OpenMind **cannot**:
-- Submit assignments
-- Post discussions or replies
-- Upload files
-- Modify grades, submissions, or any data
-- Do anything that changes your bCourses account
+## What goes to external services
 
-The Canvas API token is sent only to `bcourses.berkeley.edu` via HTTPS with Bearer authentication.
+### On every conversation turn (sent to OpenRouter → your chosen LLM):
+- **System prompt** containing:
+  - Berkeley personality instructions
+  - Your name and course list
+  - Your profile fields: level, major, year, interests, career goals, GPA goal, strengths, areas to improve, dream companies, study preferences
+  - Resume-extracted data: skills, experience summaries, project names (if you imported a resume)
+  - Tool definitions (function names and descriptions)
+  - Safety and security rules
+- **Your messages** and the bot's previous responses (last 40 messages)
+- **Tool results** from the current conversation (Canvas data, PDF text, web content, etc.)
 
-### Gmail (optional)
+### When you ask about specific services:
+- **Gmail content** — fetched from Gmail API, then passed to LLM for summarization
+- **Slack messages** — fetched from Slack API, then passed to LLM
+- **Google Calendar events** — fetched from Google Calendar API, then passed to LLM
 
-OpenMind can **read**:
-- Search your emails by query
-- Read email content by message ID
+### Sent to bCourses (Canvas API):
+- Your Canvas API token (as Bearer auth header)
+- API requests for assignments, grades, files, modules, announcements
 
-OpenMind **cannot**:
-- Send, draft, or delete emails
-- Modify labels or settings
-- Access contacts or calendar
+### Sent to Telegram (if enabled):
+- Bot responses and heartbeat notifications
+- Your Telegram messages
 
-OAuth scope is restricted to `gmail.readonly`. Tokens are stored locally.
+## What OpenMind can never do
 
-### Todoist (optional)
+| Action | Enforced by |
+|--------|------------|
+| Submit assignments | Canvas tools are read-only — no POST/PUT endpoints |
+| Post discussions | No write endpoints exposed |
+| Send or delete emails | Gmail OAuth scoped to `gmail.readonly` |
+| Post to Slack | Slack tools use read-only API methods |
+| Modify grades | No write endpoints |
+| Send data to OpenMind servers | There are no OpenMind servers |
 
-OpenMind can:
-- Create tasks
-- List active tasks
+**Exception:** Google Calendar can create events (this is the only write integration).
 
-Todoist token is sent only to `api.todoist.com` via HTTPS.
+## Security measures
 
-### Obsidian (optional)
+| Measure | Implementation |
+|---------|---------------|
+| SSRF protection | `web.py` blocks localhost, private IPs, non-http schemes, and validates redirect targets |
+| Path traversal | `obsidian.py` checks `is_relative_to()` before any file I/O |
+| Prompt injection | System prompt declares tool results as untrusted data |
+| Canvas URL validation | `config.py` allowlists `bcourses.berkeley.edu` only |
+| File permissions | Config dir is 0700, config file is 0600 |
+| Atomic writes | Config and profile use temp-file + rename |
+| Token logging | No logger or print statement interpolates stored tokens |
 
-OpenMind can:
-- Read, write, and search markdown files in your specified vault directory
-
-Files stay local. Path traversal outside the vault is blocked.
-
-## External Services Contacted
-
-| Service | Purpose | What's sent |
-|---------|---------|------------|
-| `bcourses.berkeley.edu` | Canvas API | Bearer token + API requests |
-| `openrouter.ai` | LLM inference | API key + conversation messages + tool results |
-| `api.telegram.org` | Telegram bot (optional) | Bot token + messages |
-| `api.todoist.com` | Todoist (optional) | Bearer token + task data |
-| `googleapis.com` | Gmail (optional) | OAuth token + search queries |
-| `html.duckduckgo.com` | Web search | Search queries |
-| Various web URLs | Web fetch / PDF read | Requested by LLM for readings |
-
-## What Goes to the LLM
-
-When you ask a question, OpenMind sends to OpenRouter:
-
-1. The system prompt (Berkeley personality + agent instructions)
-2. Your conversation history (last 40 messages)
-3. Tool definitions (function names + descriptions)
-4. Tool results (Canvas API responses, PDF text, web page content)
-
-**This means your course data, grades, and assignment content pass through the LLM provider.** OpenRouter routes to the model you chose (Google, Anthropic, OpenAI, Meta, etc.). Review your chosen provider's data policies.
-
-## What Does NOT Leave Your Machine
-
-- Your Canvas API token (sent only to bcourses.berkeley.edu)
-- Your config.json file
-- Your heartbeat state files
-- Your Gmail credentials
-- Your Obsidian vault contents (unless the LLM requests a file to answer your question)
-
-## Deleting Everything
+## Deleting everything
 
 ```bash
 rm -rf ~/.openmind
 pip uninstall openmind
 ```
 
-This removes all config, tokens, state, and history.
-
-## Security Practices
-
-- Canvas API token sent via `Authorization: Bearer` header, never in URL query parameters
-- SSRF protection blocks `web_fetch` and `read_pdf` from accessing localhost, private IPs, and non-http(s) schemes
-- Obsidian file operations check `is_relative_to()` to prevent path traversal
-- Gmail OAuth only initiates interactive browser flow when running in a terminal (TTY check)
-- Config validation ensures the app can't start with missing tokens (routes to setup wizard)
-- All external HTTP requests have explicit timeouts (15-60 seconds)
-- Telegram bot only responds to the configured user ID
+This removes all configuration, profile data, tokens, and state.
