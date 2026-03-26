@@ -137,7 +137,7 @@ def execute_slack_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
     """Execute a Slack tool and return a JSON string."""
     token = _get_token(cfg)
     if not token:
-        return _error_result("Slack not configured. Run: openmind setup")
+        return _error_result("Slack is not connected yet. The student can set it up by running: openmind setup slack. They will need a Slack user token (xoxp-...) from api.slack.com/apps with channels:history, channels:read, and search:read scopes.")
 
     try:
         return _execute_slack_tool(name, args, token)

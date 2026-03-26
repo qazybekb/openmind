@@ -117,7 +117,7 @@ def execute_obsidian_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
     """Execute an Obsidian tool and return a JSON string."""
     vault = _vault_path(cfg)
     if vault is None:
-        return _error_result("Obsidian not configured. Run: openmind setup")
+        return _error_result("Obsidian is not connected yet. The student can set it up by running: openmind setup obsidian. They just need to provide the path to their Obsidian vault folder.")
 
     try:
         return _execute_obsidian_tool(name, args, vault)

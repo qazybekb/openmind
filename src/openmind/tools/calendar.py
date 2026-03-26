@@ -164,9 +164,10 @@ def _get_calendar_service(cfg: ConfigDict) -> Any | None:
 
 
 _NOT_READY_MSG: Final[str] = (
-    "Google Calendar not ready. Either: (1) run pip install 'openmind[calendar]', "
-    "(2) run openmind chat for browser auth, or "
-    "(3) delete ~/.openmind/gmail/calendar_token.json and re-auth."
+    "Google Calendar is not connected yet. To set it up: "
+    "(1) pip install 'openmind-berkeley[calendar]' for Google dependencies, "
+    "(2) run: openmind setup calendar. If Gmail is already set up, it shares the same credentials. "
+    "(3) on first use a browser window will open for Google sign-in."
 )
 
 

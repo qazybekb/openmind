@@ -70,7 +70,7 @@ def execute_todoist_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
     """Execute a Todoist tool and return a JSON string."""
     token = _get_token(cfg)
     if token is None:
-        return _error_result("Todoist not configured. Run: openmind setup")
+        return _error_result("Todoist is not connected yet. The student can set it up by running: openmind setup todoist. They will need their Todoist API token from Settings > Integrations > Developer.")
 
     headers = {"Authorization": f"Bearer {token}"}
 
