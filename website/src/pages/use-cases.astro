@@ -8,6 +8,8 @@ const categories = [
   {
     name: "Deadlines & Assignments",
     icon: "📚",
+    about: "OpenMind fetches all your upcoming assignments from bCourses and sorts them by what actually matters — a 30% midterm due Friday outranks a 1% attendance quiz due tomorrow. It checks submission status too, so you never miss a deadline without knowing.",
+    setup: "Works out of the box — just needs your bCourses connection.",
     templates: [
       { q: "What's due this week?", desc: "Priority-sorted deadlines across all courses" },
       { q: "What's due for NLP?", desc: "Assignments for a specific course" },
@@ -22,6 +24,8 @@ const categories = [
   {
     name: "Grades & GPA",
     icon: "📊",
+    about: "See your current grades across all courses, calculate exactly what you need on the final to hit your target, and identify which classes need the most attention. OpenMind pulls real-time grade data from bCourses and does the math for you using actual assignment weights.",
+    setup: "Works out of the box — just needs your bCourses connection.",
     templates: [
       { q: "What are my grades?", desc: "Current grade for every course" },
       { q: "What do I need on the final to get an A in Finance?", desc: "Grade calculation with assignment weights" },
@@ -35,6 +39,8 @@ const categories = [
   {
     name: "Readings & PDFs",
     icon: "📖",
+    about: "OpenMind fetches your course module pages from bCourses, finds the readings, and actually reads them — downloading PDFs, extracting text from lecture slides, and fetching web articles. It summarizes each reading so you know the key arguments before class.",
+    setup: "Works out of the box. PDF extraction uses pymupdf (bundled).",
     templates: [
       { q: "What readings for Info Law this week?", desc: "Fetch and summarize weekly readings" },
       { q: "Summarize the NLP lecture 7 slides", desc: "Download PDF, extract text, summarize" },
@@ -48,6 +54,8 @@ const categories = [
   {
     name: "Assignment Help",
     icon: "✍️",
+    about: "OpenMind reads the full assignment description and rubric from bCourses, then gives you specific guidance — what the professor is looking for, how to structure your response, and which rubric points to focus on. If you have a profile, it connects the assignment to your experience.",
+    setup: "Works out of the box. Even better with a profile (openmind setup profile).",
     templates: [
       { q: "Help me with the NLP midterm report", desc: "Reads the prompt + rubric, gives specific guidance" },
       { q: "What does the rubric say for the Big Data paper?", desc: "Rubric breakdown" },
@@ -61,6 +69,8 @@ const categories = [
   {
     name: "Teach Me",
     icon: "🎓",
+    about: "Interactive learning from your actual course materials — not generic knowledge. OpenMind finds the relevant lecture slides or readings, explains one concept at a time with analogies, asks you real scenario questions, and adjusts based on your answers. It connects everything back to your assignments.",
+    setup: "Works out of the box. Uses your course materials from bCourses.",
     templates: [
       { q: "Teach me about attention mechanisms from NLP", desc: "Step-by-step interactive teaching" },
       { q: "Explain algorithmic fairness like I'm five", desc: "Simplified concept explanation" },
@@ -75,6 +85,8 @@ const categories = [
   {
     name: "Flashcards & Study",
     icon: "🃏",
+    about: "Generate flashcards from your actual lecture slides and readings — not generic study material. OpenMind reads the PDF, extracts the key concepts, and creates Q&A pairs. If Obsidian is connected, it saves them to your vault.",
+    setup: "Works out of the box. Obsidian integration optional for saving.",
     templates: [
       { q: "Make flashcards for NLP lecture 7", desc: "Q&A pairs from lecture content" },
       { q: "Make flashcards for algorithmic fairness", desc: "Concept-based flashcards" },
@@ -87,8 +99,10 @@ const categories = [
   {
     name: "Career & Skills",
     icon: "🚀",
+    about: "OpenMind compares what you have (your skills, experience, projects from your profile) against what you need (based on your career goals and target companies). It identifies specific gaps and recommends Berkeley courses, projects, or resources to fill them. This is the most powerful feature when your profile is set up.",
+    setup: "Requires a profile: openmind setup profile. Much better with resume data.",
     templates: [
-      { q: "What skills am I missing for AI PM roles?", desc: "Skill gap analysis from resume" },
+      { q: "What skills am I missing for AI PM roles?", desc: "Skill gap analysis from profile" },
       { q: "What CS courses should I take for AI?", desc: "Course recommendations based on goals" },
       { q: "Based on my profile, what should I focus on for AI PM roles?", desc: "Profile-based career guidance" },
       { q: "What should I focus on to get into Google?", desc: "Company-specific career advice" },
@@ -102,6 +116,8 @@ const categories = [
   {
     name: "Course Catalog",
     icon: "📘",
+    about: "Search across 11,169 Berkeley courses (6,771 undergraduate + 4,398 graduate) from 240 departments. The catalog is bundled with OpenMind — no network request needed. Filter by subject, level, or keyword. See course descriptions, units, prerequisites, and terms offered.",
+    setup: "Works out of the box. Catalog is bundled with the package.",
     templates: [
       { q: "Search for machine learning courses", desc: "Keyword search across 11K courses" },
       { q: "What INFO courses are available?", desc: "Department-specific listing" },
@@ -115,6 +131,8 @@ const categories = [
   {
     name: "Campus Life",
     icon: "🏛️",
+    about: "Live campus data from Berkeley's official sources. Events come from events.berkeley.edu's JSON API (lectures, concerts, career fairs, sports). Library hours are scraped from lib.berkeley.edu. Study room links go directly to LibCal for booking.",
+    setup: "Works out of the box. All data is fetched live from Berkeley's public sources.",
     templates: [
       { q: "What's happening on campus this week?", desc: "Live events from events.berkeley.edu" },
       { q: "Any featured events today?", desc: "Highlighted campus events" },
@@ -128,6 +146,8 @@ const categories = [
   {
     name: "Email & Slack",
     icon: "💬",
+    about: "Search and read your Gmail and Slack messages without leaving the terminal. Useful for checking professor emails, TA announcements in course Slack channels, or assignment feedback. Both are strictly read-only — OpenMind can never send, post, or delete anything.",
+    setup: "Requires setup: openmind setup gmail and/or openmind setup slack",
     templates: [
       { q: "Check my email for anything from professors", desc: "Gmail search by sender" },
       { q: "Did my NLP professor reply?", desc: "Professor email check" },
@@ -140,6 +160,8 @@ const categories = [
   {
     name: "Calendar & Tasks",
     icon: "📆",
+    about: "Add assignment deadlines to your Google Calendar with one command, or create individual study blocks. Todoist integration syncs your Canvas assignments as tasks with due dates. Calendar is the one integration that can write — it creates events when you ask.",
+    setup: "Requires setup: openmind setup calendar and/or openmind setup todoist",
     templates: [
       { q: "Add my deadlines to Google Calendar", desc: "Bulk-sync Canvas assignments" },
       { q: "Block 2 hours tomorrow for the midterm", desc: "Create study time event" },
@@ -152,6 +174,8 @@ const categories = [
   {
     name: "Obsidian Notes",
     icon: "📓",
+    about: "Save reading summaries, assignment outlines, and flashcards directly to your Obsidian vault. OpenMind writes structured markdown files with wiki-style [[links]] between notes. Search your vault by filename or content to find past summaries.",
+    setup: "Requires setup: openmind setup obsidian (provide your vault path)",
     templates: [
       { q: "Save this reading summary to Obsidian", desc: "Write to Readings/ folder" },
       { q: "Search my notes for 'fairness'", desc: "Vault search by content" },
@@ -177,14 +201,17 @@ const totalTemplates = categories.reduce((sum, cat) => sum + cat.templates.lengt
         <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-text-primary leading-tight tracking-tight mb-6">
           What can you ask<br/><span class="text-cal-gold">OpenMind?</span>
         </h1>
-        <p class="text-lg text-text-secondary max-w-xl mx-auto">
-          Copy any prompt below and paste it into OpenMind. Or just use them as inspiration.
+        <p class="text-lg text-text-secondary max-w-xl mx-auto mb-4">
+          Copy any prompt and paste it into OpenMind. Or just use them as inspiration.
+        </p>
+        <p class="text-sm text-text-muted max-w-md mx-auto">
+          Each category explains what it does, what powers it, and what setup is needed.
         </p>
       </div>
     </section>
 
     <!-- Category navigation -->
-    <div class="container mb-12">
+    <div class="container mb-16">
       <div class="flex flex-wrap justify-center gap-2">
         {categories.map((cat) => (
           <a href={`#${cat.name.toLowerCase().replace(/[^a-z]/g, '-')}`}
@@ -196,16 +223,25 @@ const totalTemplates = categories.reduce((sum, cat) => sum + cat.templates.lengt
       </div>
     </div>
 
-    <!-- Template sections -->
+    <!-- Category sections -->
     <div class="container pb-20">
       {categories.map((cat) => (
-        <section id={cat.name.toLowerCase().replace(/[^a-z]/g, '-')} class="mb-16 fade-in">
-          <h2 class="text-xl font-bold text-text-primary mb-2 flex items-center gap-2">
-            <span>{cat.icon}</span>
-            {cat.name}
-          </h2>
-          <p class="text-text-muted text-sm mb-6">{cat.templates.length} templates</p>
+        <section id={cat.name.toLowerCase().replace(/[^a-z]/g, '-')} class="mb-20 fade-in">
+          <!-- Category header -->
+          <div class="mb-8">
+            <h2 class="text-2xl font-bold text-text-primary mb-3 flex items-center gap-3">
+              <span class="text-3xl">{cat.icon}</span>
+              {cat.name}
+            </h2>
+            <p class="text-text-secondary text-sm leading-relaxed max-w-3xl mb-3">
+              {cat.about}
+            </p>
+            <p class="text-text-muted text-xs">
+              <span class="text-text-primary font-medium">Setup:</span> {cat.setup}
+            </p>
+          </div>
 
+          <!-- Prompts grid -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             {cat.templates.map((t) => (
               <div class="card group cursor-pointer" onclick={`navigator.clipboard.writeText('${t.q.replace(/'/g, "\\'")}'); this.querySelector('.copy-hint').textContent = 'Copied!'; setTimeout(() => this.querySelector('.copy-hint').textContent = 'Click to copy', 1500);`}>
