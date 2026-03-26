@@ -14,12 +14,12 @@ There is no OpenMind server. But your data does leave your machine when you chat
 
 | Data | Location | Transmitted? |
 |------|----------|-------------|
-| API tokens (Canvas, OpenRouter, Telegram, Slack, Google) | `~/.openmind/config.json` | **Never** — used locally for authentication |
-| Student profile (major, interests, career goals) | `~/.openmind/profile.json` | **Fields are included** in every LLM request as context |
+| API tokens (Canvas, OpenRouter, Telegram, Slack, Google) | `~/.openmind/config.json` | **Yes, but only to the service they authenticate with** — never to the LLM as prompt content |
+| Student profile (major, interests, career goals) | `~/.openmind/profile.json` | **Fields are included** in every LLM request as context when present |
 | Resume PDF (if imported) | Your filesystem | **Never** — only extracted text passes through LLM once |
 | Heartbeat state (seen deadlines, grades) | `~/.openmind/state/*.json` | **Never** |
 | Terminal command history | `~/.openmind/repl_history` | **Never** |
-| Google OAuth tokens | `~/.openmind/gmail/` | **Never** — used locally for Google API auth |
+| Google OAuth tokens | `~/.openmind/gmail/` | **Yes, to Google APIs only** — never to the LLM as prompt content |
 | Course catalog (11K courses) | Bundled in package | **Never** — searched locally |
 
 ## What goes to external services
@@ -28,7 +28,7 @@ There is no OpenMind server. But your data does leave your machine when you chat
 - **System prompt** containing:
   - Berkeley personality instructions
   - Your name and course list
-  - Your profile fields: level, major, year, interests, career goals, GPA goal, strengths, areas to improve, dream companies, study preferences
+  - Your profile fields: level, major, school, year, expected graduation, interests, career goals, GPA goal, strengths, areas to improve, dream companies, study and learning preferences
   - Resume-extracted data: skills, experience summaries, project names (if you imported a resume)
   - Tool definitions (function names and descriptions)
   - Safety and security rules
@@ -69,7 +69,7 @@ There is no OpenMind server. But your data does leave your machine when you chat
 | Path traversal | `obsidian.py` checks `is_relative_to()` before any file I/O |
 | Prompt injection | System prompt declares tool results as untrusted data |
 | Canvas URL validation | `config.py` allowlists `bcourses.berkeley.edu` only |
-| File permissions | Config dir is 0700, config file is 0600 |
+| File permissions | Config/profile/Google credential files created by OpenMind use owner-only permissions |
 | Atomic writes | Config and profile use temp-file + rename |
 | Token logging | No logger or print statement interpolates stored tokens |
 

@@ -247,7 +247,6 @@ def _fetch_library_hours(args: ToolArgs) -> str:
     lines = html.replace("<br>", "\n").replace("<br/>", "\n").replace("</div>", "\n").replace("</li>", "\n")
 
     # Remove HTML tags but keep text
-    import re
     clean_text = re.sub(r"<[^>]+>", " ", lines)
     clean_text = re.sub(r"\s+", " ", clean_text)
 

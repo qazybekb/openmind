@@ -27,9 +27,14 @@ src/openmind/
 └── tools/
     ├── __init__.py     # Tool registry — loads tools based on config
     ├── canvas.py       # 13 Canvas API tools with pagination
+    ├── berkeley.py     # Campus events, library hours, study rooms
+    ├── courses.py      # Bundled Berkeley catalog search
+    ├── profile.py      # Student profile + resume-derived data
     ├── pdf.py          # PDF download + text extraction
     ├── web.py          # Web fetch + DuckDuckGo search + SSRF protection
     ├── gmail.py        # Gmail search + read (optional)
+    ├── slack.py        # Slack search + channel reads (optional)
+    ├── calendar.py     # Google Calendar events (optional)
     ├── todoist.py      # Todoist task management (optional)
     └── obsidian.py     # Obsidian vault read/write/search (optional)
 ```
@@ -61,11 +66,20 @@ MY_TOOLS = [
 3. Create an executor function:
 
 ```python
-def execute_my_tool(name: str, args: dict, cfg: dict) -> str:
-    if name == "my_tool_name":
-        # Do the thing
-        return json.dumps({"result": "..."})
-    return json.dumps({"error": f"Unknown tool: {name}"})
+from typing import Any
+
+from openmind.config import ConfigDict
+
+
+def execute_my_tool(name: str, args: dict[str, Any], cfg: ConfigDict) -> str:
+    if name != "my_tool_name":
+        return json.dumps({"error": f"Unknown tool: {name}"})
+
+    param1 = str(args.get("param1", "")).strip()
+    if not param1:
+        return json.dumps({"error": "Missing required argument: param1."})
+
+    return json.dumps({"result": "..."})
 ```
 
 4. Register in `tools/__init__.py`:
@@ -102,7 +116,7 @@ If your tool needs the LLM to use it in a specific way, add instructions to `per
 - Python 3.11+
 - No unnecessary dependencies — check if httpx/stdlib can do it first
 - All external HTTP calls need `timeout=` set
-- All tool executors must return strings (JSON for structured data, plain text for content)
+- All tool executors must return JSON strings
 - All tool executors must handle errors gracefully — return `{"error": "..."}`, never raise
 - Canvas API calls use Bearer auth headers, never URL query params
 - Keep the Berkeley personality authentic — reference real places, use real slang
@@ -122,13 +136,16 @@ Before submitting:
 Run the validation suite:
 
 ```bash
-python3 -c "
-import sys; sys.path.insert(0, 'src')
+PYTHONPATH=src python3 -c "
 from openmind.tools import get_all_tools
-tools = get_all_tools({'obsidian': {'enabled': True}, 'todoist': {'enabled': True}, 'gmail': {'enabled': True}})
-print(f'{len(tools)} tools loaded')
-for t in tools:
-    print(f'  {t[\"function\"][\"name\"]}')
+tools = get_all_tools({
+    'obsidian': {'enabled': True},
+    'todoist': {'enabled': True},
+    'gmail': {'enabled': True},
+    'slack': {'enabled': True},
+    'calendar': {'enabled': True},
+})
+print(len(tools))
 "
 ```
 

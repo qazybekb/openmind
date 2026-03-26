@@ -122,7 +122,7 @@ def config() -> None:
     # Show available integrations that aren't enabled
     disabled = [n for n in ("telegram", "gmail", "calendar", "slack", "todoist", "obsidian") if not cfg.get(n, {}).get("enabled")]
     if disabled:
-        console.print(f"\n[dim]Add integrations: openmind setup <name>[/dim]")
+        console.print("\n[dim]Add integrations: openmind setup <name>[/dim]")
         console.print(f"[dim]Available: {', '.join(disabled)}[/dim]")
     console.print()
 
@@ -138,7 +138,7 @@ def chat() -> None:
 
 @app.command()
 def profile() -> None:
-    """View or edit your student profile."""
+    """View your student profile."""
     from openmind.tools.profile import PROFILE_FILE, load_profile
 
     p = load_profile()
@@ -148,7 +148,7 @@ def profile() -> None:
         console.print("Add yours: [cyan]openmind setup profile[/cyan]\n")
         return
 
-    console.print(f"\n[bold]Your profile[/bold] \U0001f43b\n")
+    console.print("\n[bold]Your profile[/bold] \U0001f43b\n")
 
     if p.get("level"):
         console.print(f"  Level: {p['level']}")
@@ -178,7 +178,7 @@ def profile() -> None:
                 if isinstance(exp, dict):
                     console.print(f"  Experience: {exp.get('role', '')} @ {exp.get('company', '')}")
 
-    console.print(f"\n  Edit: [cyan]openmind setup profile[/cyan]")
+    console.print("\n  Edit: [cyan]openmind setup profile[/cyan]")
     console.print(f"  File: {PROFILE_FILE}\n")
 
 
@@ -186,6 +186,8 @@ def profile() -> None:
 def privacy() -> None:
     """Show what data stays local vs what goes to the LLM."""
     console.print("\n[bold]\U0001f512 Privacy summary[/bold]\n")
+    console.print("  [dim]OpenMind runs on your machine. There is no OpenMind server.[/dim]")
+    console.print()
 
     console.print("  [bold]Files that stay on your machine:[/bold]")
     console.print("    \u2705 ~/.openmind/config.json (API tokens, settings)")
@@ -197,21 +199,33 @@ def privacy() -> None:
 
     console.print("  [bold]Sent to the LLM on every request (via OpenRouter):[/bold]")
     console.print("    \u26a0\ufe0f  Your name and course list")
-    console.print("    \u26a0\ufe0f  Profile fields: major, year, interests, career goals,")
-    console.print("       strengths, areas to improve, GPA goal (if set)")
+    console.print("    \u26a0\ufe0f  Profile fields when present: level, major, school, year,")
+    console.print("       expected graduation, interests, career goals, dream companies,")
+    console.print("       GPA goal, strengths, areas to improve, study/learning preferences")
     console.print("    \u26a0\ufe0f  Resume-extracted data: skills, experience, projects")
     console.print("       (if you imported a resume)")
-    console.print("    \u26a0\ufe0f  Canvas data fetched during the conversation")
+    console.print("    \u26a0\ufe0f  Tool results used in the conversation: Canvas data, PDFs,")
+    console.print("       web pages, and any other fetched content")
     console.print("    \u26a0\ufe0f  Your messages and the bot's responses")
     console.print()
 
-    console.print("  [bold]Sent to the LLM only when you ask:[/bold]")
-    console.print("    \u26a0\ufe0f  Gmail message content (when you ask about email)")
-    console.print("    \u26a0\ufe0f  Slack message content (when you ask about Slack)")
+    console.print("  [bold]Sent to external services when needed:[/bold]")
+    console.print("    \u26a0\ufe0f  Canvas token \u2192 bCourses")
+    console.print("    \u26a0\ufe0f  OpenRouter API key \u2192 OpenRouter")
+    console.print("    \u26a0\ufe0f  Telegram bot token \u2192 Telegram (if enabled)")
+    console.print("    \u26a0\ufe0f  Slack/Todoist/Google tokens \u2192 their own APIs (if enabled)")
     console.print()
 
-    console.print("  [bold]Never sent anywhere:[/bold]")
-    console.print("    \U0001f6ab API tokens (Canvas, OpenRouter, Telegram, Slack)")
+    console.print("  [bold]Sent to the LLM only when you explicitly ask:[/bold]")
+    console.print("    \u26a0\ufe0f  Gmail message content (when you ask about email)")
+    console.print("    \u26a0\ufe0f  Slack message content (when you ask about Slack)")
+    console.print("    \u26a0\ufe0f  Google Calendar events (when you ask about calendar)")
+    console.print("    \u26a0\ufe0f  Todoist task content (when you ask about tasks)")
+    console.print("    \u26a0\ufe0f  Obsidian note content (when you ask about notes)")
+    console.print()
+
+    console.print("  [bold]Never sent to the LLM or an OpenMind server:[/bold]")
+    console.print("    \U0001f6ab API tokens themselves")
     console.print("    \U0001f6ab Raw resume PDF file")
     console.print("    \U0001f6ab Heartbeat state")
     console.print("    \U0001f6ab Terminal history")

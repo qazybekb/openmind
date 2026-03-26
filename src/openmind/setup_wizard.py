@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import stat
 import shutil
 from pathlib import Path
 from typing import Any, Final
@@ -24,6 +26,17 @@ TELEGRAM_API_BASE: Final[str] = "https://api.telegram.org"
 TELEGRAM_VALIDATE_TIMEOUT_S: Final[float] = 10.0
 
 console: Console = Console()
+
+
+def _ensure_private_dir(path: Path) -> None:
+    """Create a directory with owner-only permissions."""
+    path.mkdir(parents=True, exist_ok=True)
+    os.chmod(path, stat.S_IRWXU)
+
+
+def _restrict_file(path: Path) -> None:
+    """Restrict a file to owner read/write when possible."""
+    os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
 
 
 # ---------------------------------------------------------------------------
@@ -53,7 +66,7 @@ def run_first_setup() -> None:
     cfg["courses"] = courses
 
     # Step 2: OpenRouter
-    console.print(f"\n[bold]Step 2 of 2[/bold] — Connect an AI model\n")
+    console.print("\n[bold]Step 2 of 2[/bold] — Connect OpenRouter\n")
     api_key = _setup_openrouter_key()
     cfg["openrouter_api_key"] = api_key
     cfg["model"] = DEFAULT_MODEL
@@ -66,9 +79,9 @@ def run_first_setup() -> None:
 
     console.print(f"\n[bold]\U0001f389 You're ready![/bold] {university.get('mascot', '')}{university.get('colors', '')}")
     console.print(f"\n  Using model: [dim]{DEFAULT_MODEL}[/dim]")
-    console.print(f"  Change it anytime: [cyan]openmind setup model[/cyan]\n")
+    console.print("  Change it anytime: [cyan]openmind setup model[/cyan]\n")
     console.print("  [dim]Add more features later:[/dim]")
-    console.print("    [cyan]openmind profile[/cyan]    — personalize advice with your goals")
+    console.print("    [cyan]openmind setup profile[/cyan] — personalize advice with your goals")
     console.print("    [cyan]openmind setup telegram[/cyan] — get alerts on your phone")
     console.print("    [cyan]openmind setup gmail[/cyan]    — check professor emails")
     console.print()
@@ -157,7 +170,7 @@ def setup_single_integration(name: str) -> None:
         cfg[name] = result
         save_config(cfg)
 
-    console.print(f"\n[green]Saved![/green]")
+    console.print("\n[green]Saved![/green]")
 
 
 # ---------------------------------------------------------------------------
@@ -329,9 +342,9 @@ def _setup_profile() -> None:
     meaningful_keys = [k for k, v in profile.items() if v]
     if meaningful_keys:
         save_profile(profile)
-        console.print(f"\n  [green]Saved![/green] Edit anytime: [cyan]openmind profile[/cyan]\n")
+        console.print("\n  [green]Saved![/green] Edit anytime: [cyan]openmind profile[/cyan]\n")
     else:
-        console.print(f"\n  [dim]Skipped. Add your profile later: [cyan]openmind setup profile[/cyan][/dim]\n")
+        console.print("\n  [dim]Skipped. Add your profile later: [cyan]openmind setup profile[/cyan][/dim]\n")
 
 
 # ---------------------------------------------------------------------------
@@ -393,9 +406,11 @@ def _setup_gmail() -> dict[str, Any]:
     creds_path = Prompt.ask("    Path to OAuth JSON (or Enter to skip)", default="")
 
     if creds_path:
-        GMAIL_CREDS_DIR.mkdir(parents=True, exist_ok=True)
+        _ensure_private_dir(GMAIL_CREDS_DIR)
         try:
-            shutil.copy(Path(creds_path).expanduser(), GMAIL_CREDS_DIR / "credentials.json")
+            destination = GMAIL_CREDS_DIR / "credentials.json"
+            shutil.copy(Path(creds_path).expanduser(), destination)
+            _restrict_file(destination)
             console.print("    [green]Credentials saved[/green]")
         except (OSError, shutil.SameFileError):
             logger.warning("Failed to copy Gmail credentials", exc_info=True)
@@ -417,9 +432,10 @@ def _setup_calendar() -> dict[str, Any]:
         console.print("    Google Cloud Console \u2192 Calendar API \u2192 OAuth 2.0 Client ID")
         creds_path = Prompt.ask("    Path to OAuth JSON (or Enter to skip)", default="")
         if creds_path:
-            GMAIL_CREDS_DIR.mkdir(parents=True, exist_ok=True)
+            _ensure_private_dir(GMAIL_CREDS_DIR)
             try:
                 shutil.copy(Path(creds_path).expanduser(), creds_file)
+                _restrict_file(creds_file)
                 console.print("    [green]Credentials saved[/green]")
             except (OSError, shutil.SameFileError):
                 logger.warning("Failed to copy Calendar credentials", exc_info=True)

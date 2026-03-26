@@ -1,0 +1,40 @@
+---
+---
+<section class="section-sm">
+  <div class="container">
+    <div class="max-w-3xl mx-auto fade-in">
+      <div class="card border-border/50">
+        <div class="flex items-start gap-4">
+          <span class="text-2xl mt-0.5">&#x1f512;</span>
+          <div>
+            <h3 class="text-text-primary font-semibold mb-1">How your data works</h3>
+            <p class="text-xs text-text-muted mb-4">OpenMind runs on your laptop. There is no OpenMind server.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 text-xs">
+              <div>
+                <span class="text-text-primary font-medium">Stays on your machine:</span>
+                <div class="text-text-muted mt-1 space-y-0.5">
+                  <div>&check; Config, profile, and state files</div>
+                  <div>&check; Resume PDF &mdash; never uploaded</div>
+                  <div>&check; No OpenMind server or telemetry</div>
+                </div>
+              </div>
+              <div>
+                <span class="text-text-primary font-medium">Sent to your LLM provider:</span>
+                <div class="text-text-muted mt-1 space-y-0.5">
+                  <div>&bull; Your messages, course list, and profile fields</div>
+                  <div>&bull; Tool results like Canvas data, PDFs, and web pages</div>
+                  <div>&bull; Gmail, Slack, Calendar, Todoist, or notes content when you ask</div>
+                </div>
+              </div>
+            </div>
+            <p class="text-xs text-text-muted mt-4">
+              API tokens stay in local config and go only to the service they authenticate with.
+              bCourses, Gmail, and Slack are read-only. Google Calendar can create events.
+              Run <code class="text-text-secondary">openmind privacy</code> for the full breakdown.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

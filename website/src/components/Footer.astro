@@ -1,18 +1,54 @@
 ---
 ---
 <footer class="border-t border-border mt-20">
-  <div class="max-w-5xl mx-auto px-6 py-10">
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-text-muted">
-      <div class="flex items-center gap-4">
-        <span>🐻 OpenMind</span>
-        <a href="https://github.com/qazybekb/openmind" target="_blank" class="hover:text-text-secondary transition-colors">GitHub</a>
-        <a href="https://github.com/qazybekb/openmind/blob/main/docs/SETUP.md" target="_blank" class="hover:text-text-secondary transition-colors">Setup</a>
-        <a href="https://github.com/qazybekb/openmind/blob/main/docs/PRIVACY.md" target="_blank" class="hover:text-text-secondary transition-colors">Privacy</a>
-        <a href="https://github.com/qazybekb/openmind/blob/main/docs/CONTRIBUTING.md" target="_blank" class="hover:text-text-secondary transition-colors">Contributing</a>
+  <div class="container py-12">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+      <!-- Brand -->
+      <div class="col-span-2 md:col-span-1">
+        <div class="flex items-center gap-2 text-text-primary font-semibold mb-3">
+          <span>🐻</span> OpenMind
+        </div>
+        <p class="text-xs text-text-muted leading-relaxed">
+          AI-powered study buddy for UC Berkeley students.
+          Built at the School of Information.
+        </p>
       </div>
+
+      <!-- Resources -->
       <div>
-        Built at UC Berkeley · Go Bears! 🐻 Fiat Lux! 💡
+        <h4 class="text-xs font-semibold text-text-primary uppercase tracking-widest mb-3">Resources</h4>
+        <div class="space-y-2 text-xs">
+          <a href="https://github.com/qazybekb/openmind/blob/main/docs/SETUP.md" target="_blank" class="block text-text-muted hover:text-text-secondary transition-colors">Setup Guide</a>
+          <a href="https://github.com/qazybekb/openmind/blob/main/docs/FEATURES.md" target="_blank" class="block text-text-muted hover:text-text-secondary transition-colors">Features</a>
+          <a href="https://github.com/qazybekb/openmind/blob/main/docs/TOOLS.md" target="_blank" class="block text-text-muted hover:text-text-secondary transition-colors">38 Tools Reference</a>
+          <a href="https://github.com/qazybekb/openmind/blob/main/docs/ARCHITECTURE.md" target="_blank" class="block text-text-muted hover:text-text-secondary transition-colors">Architecture</a>
+        </div>
       </div>
+
+      <!-- Community -->
+      <div>
+        <h4 class="text-xs font-semibold text-text-primary uppercase tracking-widest mb-3">Community</h4>
+        <div class="space-y-2 text-xs">
+          <a href="https://github.com/qazybekb/openmind" target="_blank" class="block text-text-muted hover:text-text-secondary transition-colors">GitHub</a>
+          <a href="https://github.com/qazybekb/openmind/blob/main/docs/CONTRIBUTING.md" target="_blank" class="block text-text-muted hover:text-text-secondary transition-colors">Contributing</a>
+          <a href="https://github.com/qazybekb/openmind/blob/main/PLAN.md" target="_blank" class="block text-text-muted hover:text-text-secondary transition-colors">Roadmap</a>
+        </div>
+      </div>
+
+      <!-- Legal -->
+      <div>
+        <h4 class="text-xs font-semibold text-text-primary uppercase tracking-widest mb-3">Legal</h4>
+        <div class="space-y-2 text-xs">
+          <a href="https://github.com/qazybekb/openmind/blob/main/docs/PRIVACY.md" target="_blank" class="block text-text-muted hover:text-text-secondary transition-colors">Privacy</a>
+          <a href="https://github.com/qazybekb/openmind/blob/main/LICENSE" target="_blank" class="block text-text-muted hover:text-text-secondary transition-colors">MIT License</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="gradient-line mb-6"></div>
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
+      <div>Built at UC Berkeley &middot; School of Information</div>
+      <div>Go Bears! 🐻 Fiat Lux! 💡</div>
     </div>
   </div>
 </footer>

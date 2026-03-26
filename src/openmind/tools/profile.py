@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import stat
 from pathlib import Path
 from typing import Any, Final, TypeAlias
 
@@ -116,19 +118,21 @@ def load_profile() -> ProfileDict:
 
 
 def save_profile(profile: ProfileDict) -> None:
-    """Save the student profile to disk atomically and invalidate the cache."""
+    """Save the student profile to disk atomically with owner-only permissions."""
     global _profile_cache
-    import os
     import tempfile
 
     PROFILE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(PROFILE_FILE.parent, stat.S_IRWXU)
     content = json.dumps(profile, indent=2, ensure_ascii=False)
 
     fd, tmp_path = tempfile.mkstemp(dir=PROFILE_FILE.parent, suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
-        Path(tmp_path).replace(PROFILE_FILE)
+        tmp_file = Path(tmp_path)
+        tmp_file.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        tmp_file.replace(PROFILE_FILE)
         _profile_cache = profile.copy()
     except Exception:
         Path(tmp_path).unlink(missing_ok=True)

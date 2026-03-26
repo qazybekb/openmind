@@ -1,0 +1,227 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import '../styles/global.css';
+
+const categories = [
+  {
+    name: "Deadlines & Assignments",
+    icon: "📚",
+    templates: [
+      { q: "What's due this week?", desc: "Priority-sorted deadlines across all courses" },
+      { q: "What's due for NLP?", desc: "Assignments for a specific course" },
+      { q: "Am I missing anything?", desc: "Check for unsubmitted past-due assignments" },
+      { q: "What's the most important thing I should work on right now?", desc: "Priority scoring by urgency × grade weight" },
+      { q: "What assignments are worth the most in Finance?", desc: "Grade weight breakdown" },
+      { q: "Do I have anything due tomorrow?", desc: "Urgent deadline check" },
+      { q: "Show me everything due in the next 2 weeks", desc: "Extended deadline view" },
+      { q: "What did I submit this week?", desc: "Submission status review" },
+    ]
+  },
+  {
+    name: "Grades & GPA",
+    icon: "📊",
+    templates: [
+      { q: "What are my grades?", desc: "Current grade for every course" },
+      { q: "What do I need on the final to get an A in Finance?", desc: "Grade calculation with assignment weights" },
+      { q: "What's my worst grade right now?", desc: "Identify courses that need attention" },
+      { q: "If I skip the writing prompt, what happens to my grade?", desc: "What-if scenario" },
+      { q: "What assignments can I afford to do poorly on?", desc: "Low-impact assignment identification" },
+      { q: "Which class needs the most attention right now?", desc: "Compare current grades and workload" },
+      { q: "Which course is dragging down my average?", desc: "Spot the weakest current grade" },
+    ]
+  },
+  {
+    name: "Readings & PDFs",
+    icon: "📖",
+    templates: [
+      { q: "What readings for Info Law this week?", desc: "Fetch and summarize weekly readings" },
+      { q: "Summarize the NLP lecture 7 slides", desc: "Download PDF, extract text, summarize" },
+      { q: "Summarize this article: [URL]", desc: "Fetch and summarize any web article" },
+      { q: "What are the key arguments in the Barocas paper?", desc: "Deep reading summary" },
+      { q: "Compare this week's readings across my courses", desc: "Cross-course reading overview" },
+      { q: "Summarize this week's NLP readings", desc: "Module and reading summary" },
+      { q: "Make a one-page summary of all readings for the midterm", desc: "Consolidated study material" },
+    ]
+  },
+  {
+    name: "Assignment Help",
+    icon: "✍️",
+    templates: [
+      { q: "Help me with the NLP midterm report", desc: "Reads the prompt + rubric, gives specific guidance" },
+      { q: "What does the rubric say for the Big Data paper?", desc: "Rubric breakdown" },
+      { q: "Draft an outline for the Info Law lab", desc: "Rubric-based outline generation" },
+      { q: "What format does the professor want for this essay?", desc: "Format requirements extraction" },
+      { q: "What's the word count for the Social Issues prompt?", desc: "Assignment requirements" },
+      { q: "Check if my outline covers all rubric points", desc: "Rubric alignment check" },
+      { q: "What are the most common mistakes on this type of assignment?", desc: "Proactive guidance" },
+    ]
+  },
+  {
+    name: "Teach Me",
+    icon: "🎓",
+    templates: [
+      { q: "Teach me about attention mechanisms from NLP", desc: "Step-by-step interactive teaching" },
+      { q: "Explain algorithmic fairness like I'm five", desc: "Simplified concept explanation" },
+      { q: "I don't understand transformers", desc: "Start from basics, build up" },
+      { q: "Quiz me on NLP lectures 6-9", desc: "Practice questions from course content" },
+      { q: "Continue where we left off", desc: "Resume previous study session" },
+      { q: "Explain this concept using a real-world analogy", desc: "Analogy-based learning" },
+      { q: "What's the difference between supervised and unsupervised learning?", desc: "Comparison-based teaching" },
+      { q: "Give me 5 practice problems on regression", desc: "Practice problem generation" },
+    ]
+  },
+  {
+    name: "Flashcards & Study",
+    icon: "🃏",
+    templates: [
+      { q: "Make flashcards for NLP lecture 7", desc: "Q&A pairs from lecture content" },
+      { q: "Make flashcards for algorithmic fairness", desc: "Concept-based flashcards" },
+      { q: "Quiz me on these flashcards", desc: "Interactive flashcard review" },
+      { q: "Prepare me for the Social Issues midterm", desc: "Study guide from course materials" },
+      { q: "What topics will be on the final?", desc: "Syllabus-based topic extraction" },
+      { q: "Create a cheat sheet for the NLP midterm", desc: "Key formulas and definitions" },
+    ]
+  },
+  {
+    name: "Career & Skills",
+    icon: "🚀",
+    templates: [
+      { q: "What skills am I missing for AI PM roles?", desc: "Skill gap analysis from resume" },
+      { q: "What CS courses should I take for AI?", desc: "Course recommendations based on goals" },
+      { q: "Based on my profile, what should I focus on for AI PM roles?", desc: "Profile-based career guidance" },
+      { q: "What should I focus on to get into Google?", desc: "Company-specific career advice" },
+      { q: "What classes would help me get into a PhD program?", desc: "Academic career planning" },
+      { q: "Which Berkeley classes fit my interests and career goals best?", desc: "Profile-based course matching" },
+      { q: "What electives complement my major?", desc: "Cross-disciplinary course suggestions" },
+      { q: "What projects should I build for my portfolio?", desc: "Project recommendations based on skills" },
+      { q: "How does my coursework compare to typical AI PM job requirements?", desc: "Career-course alignment" },
+    ]
+  },
+  {
+    name: "Course Catalog",
+    icon: "📘",
+    templates: [
+      { q: "Search for machine learning courses", desc: "Keyword search across 11K courses" },
+      { q: "What INFO courses are available?", desc: "Department-specific listing" },
+      { q: "Show me graduate-level data science courses", desc: "Level-filtered search" },
+      { q: "What are the prerequisites for CS 189?", desc: "Course detail lookup" },
+      { q: "What departments offer AI-related courses?", desc: "Cross-department search" },
+      { q: "List all subjects available at Berkeley", desc: "Full department listing (240)" },
+      { q: "What 3-unit courses are in the iSchool?", desc: "Filtered course search" },
+    ]
+  },
+  {
+    name: "Campus Life",
+    icon: "🏛️",
+    templates: [
+      { q: "What's happening on campus this week?", desc: "Live events from events.berkeley.edu" },
+      { q: "Any featured events today?", desc: "Highlighted campus events" },
+      { q: "Is Doe Library open right now?", desc: "Library hours lookup" },
+      { q: "I need a study room in Main Stacks", desc: "LibCal booking link" },
+      { q: "What lectures are happening this week?", desc: "Academic events filter" },
+      { q: "Any concerts or performances coming up?", desc: "Arts events" },
+      { q: "What sports events are this weekend?", desc: "Athletic events" },
+    ]
+  },
+  {
+    name: "Email & Slack",
+    icon: "💬",
+    templates: [
+      { q: "Check my email for anything from professors", desc: "Gmail search by sender" },
+      { q: "Did my NLP professor reply?", desc: "Professor email check" },
+      { q: "Summarize my unread emails", desc: "Email summary" },
+      { q: "Any updates in the NLP Slack?", desc: "Slack channel reader" },
+      { q: "What did the TA say about the midterm in Slack?", desc: "Slack message search" },
+      { q: "Search Slack for 'office hours'", desc: "Keyword search across channels" },
+    ]
+  },
+  {
+    name: "Calendar & Tasks",
+    icon: "📆",
+    templates: [
+      { q: "Add my deadlines to Google Calendar", desc: "Bulk-sync Canvas assignments" },
+      { q: "Block 2 hours tomorrow for the midterm", desc: "Create study time event" },
+      { q: "What's on my calendar this week?", desc: "Calendar overview" },
+      { q: "Add my assignments to Todoist", desc: "Task sync with due dates" },
+      { q: "What's in my Todoist?", desc: "Active task list" },
+      { q: "Add task: review NLP slides by Friday", desc: "Manual task creation" },
+    ]
+  },
+  {
+    name: "Obsidian Notes",
+    icon: "📓",
+    templates: [
+      { q: "Save this reading summary to Obsidian", desc: "Write to Readings/ folder" },
+      { q: "Search my notes for 'fairness'", desc: "Vault search by content" },
+      { q: "Create an assignment outline in Obsidian", desc: "Structured note generation" },
+      { q: "Save these flashcards to my vault", desc: "Flashcard export" },
+      { q: "What notes do I have on transformers?", desc: "Topic-based note search" },
+    ]
+  },
+];
+
+const totalTemplates = categories.reduce((sum, cat) => sum + cat.templates.length, 0);
+---
+
+<Layout title="Use Cases — OpenMind" description="80+ ways to use OpenMind. Ready-to-use prompts for deadlines, grades, career advice, and more.">
+  <Nav />
+  <main>
+    <section class="pt-32 pb-16 md:pt-40 md:pb-20">
+      <div class="container text-center">
+        <div class="badge mb-8">
+          <span>💡</span>
+          {totalTemplates} use cases
+        </div>
+        <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-text-primary leading-tight tracking-tight mb-6">
+          What can you ask<br/><span class="text-cal-gold">OpenMind?</span>
+        </h1>
+        <p class="text-lg text-text-secondary max-w-xl mx-auto">
+          Copy any prompt below and paste it into OpenMind. Or just use them as inspiration.
+        </p>
+      </div>
+    </section>
+
+    <!-- Category navigation -->
+    <div class="container mb-12">
+      <div class="flex flex-wrap justify-center gap-2">
+        {categories.map((cat) => (
+          <a href={`#${cat.name.toLowerCase().replace(/[^a-z]/g, '-')}`}
+             class="badge hover:border-border-hover hover:text-text-secondary transition-colors">
+            <span>{cat.icon}</span>
+            {cat.name}
+          </a>
+        ))}
+      </div>
+    </div>
+
+    <!-- Template sections -->
+    <div class="container pb-20">
+      {categories.map((cat) => (
+        <section id={cat.name.toLowerCase().replace(/[^a-z]/g, '-')} class="mb-16 fade-in">
+          <h2 class="text-xl font-bold text-text-primary mb-2 flex items-center gap-2">
+            <span>{cat.icon}</span>
+            {cat.name}
+          </h2>
+          <p class="text-text-muted text-sm mb-6">{cat.templates.length} templates</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {cat.templates.map((t) => (
+              <div class="card group cursor-pointer" onclick={`navigator.clipboard.writeText('${t.q.replace(/'/g, "\\'")}'); this.querySelector('.copy-hint').textContent = 'Copied!'; setTimeout(() => this.querySelector('.copy-hint').textContent = 'Click to copy', 1500);`}>
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-text-primary text-sm font-medium mb-1">&ldquo;{t.q}&rdquo;</p>
+                    <p class="text-text-muted text-xs">{t.desc}</p>
+                  </div>
+                  <span class="copy-hint text-[10px] text-text-muted opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap mt-1">Click to copy</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  </main>
+  <Footer />
+</Layout>

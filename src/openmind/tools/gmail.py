@@ -5,6 +5,8 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import os
+import stat
 import sys
 from typing import Any, Final, TypeAlias
 
@@ -56,6 +58,17 @@ NOT_READY_MESSAGE: Final[str] = (
     "(2) run openmind chat for browser auth, or "
     "(3) delete ~/.openmind/gmail/token.json and re-auth."
 )
+
+
+def _ensure_private_google_dir() -> None:
+    """Create the shared Google credentials directory with owner-only permissions."""
+    GMAIL_CREDS_DIR.mkdir(parents=True, exist_ok=True)
+    os.chmod(GMAIL_CREDS_DIR, stat.S_IRWXU)
+
+
+def _restrict_file(path: Any) -> None:
+    """Restrict a credential or token file to owner read/write."""
+    os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
 
 
 def _json_result(payload: Any) -> str:
@@ -162,7 +175,9 @@ def _get_gmail_service(cfg: ConfigDict) -> Any | None:
                 flow = InstalledAppFlow.from_client_secrets_file(str(credentials_file), SCOPES)
                 credentials = flow.run_local_server(port=0)
 
+            _ensure_private_google_dir()
             token_file.write_text(credentials.to_json(), encoding="utf-8")
+            _restrict_file(token_file)
 
         return build("gmail", "v1", credentials=credentials)
     except Exception:

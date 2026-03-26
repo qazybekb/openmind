@@ -28,6 +28,7 @@ pip install git+https://github.com/qazybekb/openmind.git
 ```bash
 pip install ".[telegram]"    # Telegram bot + background alerts
 pip install ".[gmail]"       # Gmail search + read
+pip install ".[calendar]"    # Google Calendar sync
 pip install ".[all]"         # Everything
 ```
 
@@ -162,8 +163,9 @@ Browse all available models at [openrouter.ai/models](https://openrouter.ai/mode
 
 ## Privacy
 
-- All data stays on your machine
-- API tokens are stored in `~/.openmind/config.json` (local only)
-- Canvas and Gmail access is read-only — OpenMind cannot submit, post, send, or modify anything
+- OpenMind runs on your machine, but chat data goes to OpenRouter for LLM responses
+- API tokens are stored in `~/.openmind/config.json` and sent only to the service they authenticate with
+- Canvas, Gmail, and Slack access are read-only — OpenMind cannot submit, post, send, or modify them
+- Google Calendar is the one write integration: it can create calendar events when you ask
 - No analytics, no tracking, no telemetry
 - Delete everything: `rm -rf ~/.openmind`

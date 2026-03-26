@@ -2,21 +2,53 @@
 ---
 <nav class="fixed top-0 w-full z-50 bg-bg/80 backdrop-blur-md border-b border-border">
   <div class="container h-14 flex items-center justify-between">
-    <a href="#" class="flex items-center gap-2.5 text-text-primary font-semibold tracking-tight">
-      <span class="text-lg">🐻</span>
-      OpenMind
+    <a href="/openmind/" class="flex items-center gap-2 text-text-primary font-semibold tracking-tight">
+      <img src="/openmind/logo.svg" alt="" class="w-6 h-6" />
+      <span>Open<span class="text-cal-gold">Mind</span></span>
     </a>
-    <div class="flex items-center gap-8 text-[13px] text-text-muted">
-      <a href="#features" class="hidden sm:block hover:text-text-primary transition-colors">Features</a>
-      <a href="#demos" class="hidden sm:block hover:text-text-primary transition-colors">Demos</a>
-      <a href="#install" class="hidden sm:block hover:text-text-primary transition-colors">Install</a>
+    <div class="hidden sm:flex items-center gap-8 text-[13px] text-text-muted">
+      <a href="/openmind/#features" class="hover:text-text-primary transition-colors">Features</a>
+      <a href="/openmind/#demos" class="hover:text-text-primary transition-colors">Demos</a>
+      <a href="/openmind/#install" class="hover:text-text-primary transition-colors">Install</a>
+      <a href="/openmind/use-cases/" class="hover:text-text-primary transition-colors">Use Cases</a>
       <a href="https://github.com/qazybekb/openmind/blob/main/docs/SETUP.md" target="_blank"
-         class="hidden md:block hover:text-text-primary transition-colors">Docs</a>
+         class="hover:text-text-primary transition-colors">Docs</a>
       <a href="https://github.com/qazybekb/openmind" target="_blank"
          class="flex items-center gap-1.5 text-text-secondary hover:text-text-primary transition-colors">
         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        <span class="hidden sm:inline">GitHub</span>
+        GitHub
       </a>
+    </div>
+
+    <!-- Mobile menu button -->
+    <button id="mobile-nav-btn" class="sm:hidden text-text-muted hover:text-text-primary" aria-label="Menu">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Mobile dropdown -->
+  <div id="mobile-nav" class="hidden sm:hidden border-t border-border bg-bg/95 backdrop-blur-md">
+    <div class="container py-4 flex flex-col gap-3 text-sm text-text-muted">
+      <a href="/openmind/#features" class="hover:text-text-primary">Features</a>
+      <a href="/openmind/#demos" class="hover:text-text-primary">Demos</a>
+      <a href="/openmind/#install" class="hover:text-text-primary">Install</a>
+      <a href="/openmind/use-cases/" class="hover:text-text-primary">Use Cases</a>
+      <a href="https://github.com/qazybekb/openmind/blob/main/docs/SETUP.md" target="_blank" class="hover:text-text-primary">Docs</a>
+      <a href="https://github.com/qazybekb/openmind" target="_blank" class="hover:text-text-primary">GitHub</a>
     </div>
   </div>
 </nav>
+
+<script>
+  document.getElementById('mobile-nav-btn')?.addEventListener('click', () => {
+    document.getElementById('mobile-nav')?.classList.toggle('hidden');
+  });
+  // Close mobile menu on link click
+  document.querySelectorAll('#mobile-nav a').forEach(link => {
+    link.addEventListener('click', () => {
+      document.getElementById('mobile-nav')?.classList.add('hidden');
+    });
+  });
+</script>

@@ -103,6 +103,20 @@ Flashcards are formatted as numbered Q/A lists. If Obsidian is enabled, they're 
 
 ---
 
+## Course Catalog & Advising
+
+| Ask this | What happens |
+|----------|-------------|
+| "Search for machine learning courses" | Searches the bundled Berkeley catalog (11,169 courses) by keyword |
+| "Show me INFO courses" | Filters the catalog by subject code |
+| "List all subjects available at Berkeley" | Returns all 240 subject codes with course counts |
+| "What CS courses should I take for AI?" | Gives fit-based suggestions using your profile and the local catalog |
+| "What skills am I missing for AI PM roles?" | Uses your profile and any resume-derived skills to point out gaps |
+
+Course advice is fit-based guidance, not official Berkeley advising.
+
+---
+
 ## Announcements & Discussions
 
 | Ask this | What happens |
@@ -110,6 +124,16 @@ Flashcards are formatted as numbered Q/A lists. If Obsidian is enabled, they're 
 | "Any new announcements?" | Checks all courses for recent announcements |
 | "What did the NLP professor announce?" | Course-specific announcements |
 | "What's the latest discussion?" | Shows current discussion topic and prompt |
+
+---
+
+## Campus Life
+
+| Ask this | What happens |
+|----------|-------------|
+| "What's happening on campus this week?" | Fetches live events from events.berkeley.edu |
+| "Is Doe Library open right now?" | Looks up current library hours |
+| "I need a study room in Main Stacks" | Returns the right LibCal booking link |
 
 ---
 
@@ -123,6 +147,30 @@ Flashcards are formatted as numbered Q/A lists. If Obsidian is enabled, they're 
 | "Summarize my unread emails" | Groups by course-related vs other |
 
 Gmail is read-only — OpenMind cannot send, draft, or delete emails.
+
+---
+
+## Slack (optional)
+
+| Ask this | What happens |
+|----------|-------------|
+| "Any updates in the NLP Slack?" | Reads recent channel messages |
+| "Search Slack for office hours" | Searches accessible Slack messages |
+| "List my Slack channels" | Lists channels you can read |
+
+Slack is read-only — OpenMind cannot post or edit anything.
+
+---
+
+## Google Calendar (optional)
+
+| Ask this | What happens |
+|----------|-------------|
+| "What's on my calendar this week?" | Lists upcoming events |
+| "Block 2 hours tomorrow for the midterm" | Creates a timed study event |
+| "Add my deadlines to Google Calendar" | Bulk-adds assignment deadlines |
+
+Google Calendar is the one write integration: it creates events when you ask.
 
 ---
 
@@ -144,7 +192,7 @@ Tasks are formatted as: `[Course] — [Assignment name]` with the correct due da
 |----------|-------------|
 | "Save this reading summary" | Writes to `Readings/[Author] [Title].md` |
 | "Search my notes for fairness" | Searches vault by filename and content |
-| "What notes do I have?" | Lists recent notes |
+| "Search my notes for transformers" | Finds matching notes by title or content |
 
 ---
 

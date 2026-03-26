@@ -88,7 +88,7 @@ OpenMind uses LLM function calling (tool use) to interact with external services
 | `slack_read_channel` | `channel` (required), `limit` (optional) | Read recent messages. Resolves channel names to IDs. |
 | `slack_list_channels` | — | List accessible channels with topics. |
 
-### Google Calendar — 3 tools (enable: `openmind setup calendar`, requires `pip install ".[gmail]"`)
+### Google Calendar — 3 tools (enable: `openmind setup calendar`, requires `pip install ".[calendar]"`)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|

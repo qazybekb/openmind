@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import stat
 import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any, Final, TypeAlias
@@ -84,6 +86,17 @@ CALENDAR_TOOLS: list[ToolDefinition] = [
 ]
 
 
+def _ensure_private_google_dir() -> None:
+    """Create the shared Google credentials directory with owner-only permissions."""
+    GMAIL_CREDS_DIR.mkdir(parents=True, exist_ok=True)
+    os.chmod(GMAIL_CREDS_DIR, stat.S_IRWXU)
+
+
+def _restrict_file(path: Any) -> None:
+    """Restrict a credential or token file to owner read/write."""
+    os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+
+
 def _json_result(payload: Any) -> str:
     """Serialize a Calendar tool payload as JSON."""
     return json.dumps(payload, default=str)
@@ -140,7 +153,9 @@ def _get_calendar_service(cfg: ConfigDict) -> Any | None:
                     return None  # Can't do interactive auth in headless mode
                 flow = InstalledAppFlow.from_client_secrets_file(str(creds_file), SCOPES)
                 credentials = flow.run_local_server(port=0)
+            _ensure_private_google_dir()
             CALENDAR_TOKEN_FILE.write_text(credentials.to_json(), encoding="utf-8")
+            _restrict_file(CALENDAR_TOKEN_FILE)
 
         return build("calendar", "v3", credentials=credentials)
     except Exception:
@@ -149,7 +164,7 @@ def _get_calendar_service(cfg: ConfigDict) -> Any | None:
 
 
 _NOT_READY_MSG: Final[str] = (
-    "Google Calendar not ready. Either: (1) run pip install 'openmind[gmail]', "
+    "Google Calendar not ready. Either: (1) run pip install 'openmind[calendar]', "
     "(2) run openmind chat for browser auth, or "
     "(3) delete ~/.openmind/gmail/calendar_token.json and re-auth."
 )

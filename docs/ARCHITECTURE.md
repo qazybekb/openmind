@@ -58,7 +58,7 @@ The LLM never constructs Canvas API URLs directly. Instead, it calls named funct
 
 ### OpenRouter as the LLM gateway
 
-OpenRouter provides a single OpenAI-compatible API that routes to any model (Gemini, Claude, GPT-4, Llama, etc.). Students pick their preferred model during setup. The `openai` Python SDK works out of the box since OpenRouter is API-compatible.
+OpenRouter provides a single OpenAI-compatible API that routes to any model (Gemini, Claude, GPT-4, Llama, etc.). First-run setup validates the OpenRouter key and defaults to `google/gemini-2.5-pro`; students can change models later with `openmind setup model`. The `openai` Python SDK works out of the box since OpenRouter is API-compatible.
 
 ### Single config file
 
@@ -66,7 +66,7 @@ Everything lives in `~/.openmind/config.json` — tokens, model choice, courses,
 
 ### Optional integrations via extras
 
-Telegram, Gmail, and their dependencies are optional pip extras. The base install is lightweight (typer, rich, httpx, openai, pymupdf). Students who don't want Telegram don't need to install `python-telegram-bot`.
+Telegram and the Google API integrations use optional pip extras. The base install stays lightweight (typer, rich, httpx, openai, pymupdf), while Slack, Todoist, and Obsidian use the base dependency set plus local config.
 
 ### Berkeley personality baked in
 
@@ -118,9 +118,14 @@ The system prompt is generated dynamically from the university config in `univer
 | `heartbeat.py` | Background checks for deadlines, submissions, grades, announcements. |
 | `tools/__init__.py` | Tool registry. Conditionally loads tools based on config. |
 | `tools/canvas.py` | 13 Canvas API tools with pagination, reusable client, error mapping. |
+| `tools/berkeley.py` | Berkeley campus events, library hours, and study-room booking tools. |
+| `tools/courses.py` | Bundled Berkeley course catalog search and subject listing. |
+| `tools/profile.py` | Student profile load/save, updates, and resume-derived profile data. |
 | `tools/pdf.py` | PDF download + text extraction via pymupdf. |
 | `tools/web.py` | Web fetch + DuckDuckGo search. SSRF protection. |
 | `tools/gmail.py` | Gmail search + read via Google API. OAuth flow with TTY detection. |
+| `tools/slack.py` | Slack search, channel listing, and recent channel reads. |
+| `tools/calendar.py` | Google Calendar listing and event/deadline creation. |
 | `tools/todoist.py` | Todoist task creation + listing via REST API. |
 | `tools/obsidian.py` | Obsidian vault read/write/search. Path traversal protection. |
 
@@ -131,8 +136,9 @@ The system prompt is generated dynamically from the university config in `univer
 | Canvas token storage | Stored in `~/.openmind/config.json`, not tracked by git |
 | Canvas write protection | All Canvas tools are read-only. No POST/PUT/DELETE endpoints exposed. |
 | Gmail write protection | Gmail OAuth scoped to `gmail.readonly`. Tool never sends/deletes. |
-| SSRF (web_fetch/read_pdf) | Blocks localhost, private IPs, non-http(s) schemes |
+| SSRF (web_fetch/read_pdf) | Blocks localhost, private IPs, non-http(s) schemes, validates redirects |
 | Obsidian path traversal | `is_relative_to()` check prevents `../../` escapes |
+| Prompt injection | System prompt treats tool results as untrusted data |
 | Token in URL params | All Canvas requests use `Authorization: Bearer` header |
 | Gmail in headless | Interactive OAuth blocked when not on a TTY. Clear error message. |
 | Config validation | Missing/corrupt config routes to setup wizard, never crashes |

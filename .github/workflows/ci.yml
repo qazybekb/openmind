@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install project and lint tool
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . ruff
+
+      - name: Compile package
+        run: python -m compileall src/openmind
+
+      - name: Verify tool counts
+        run: |
+          PYTHONPATH=src python -c "from openmind.tools import get_all_tools; assert len(get_all_tools({})) == 25"
+          PYTHONPATH=src python -c "from openmind.tools import get_all_tools; assert len(get_all_tools({'obsidian':{'enabled':True},'todoist':{'enabled':True},'gmail':{'enabled':True},'slack':{'enabled':True},'calendar':{'enabled':True}})) == 38"
+
+      - name: Verify CLI help
+        run: |
+          PYTHONPATH=src python -m openmind --help > /tmp/openmind-help.txt
+          grep -q "setup" /tmp/openmind-help.txt
+          grep -q "config" /tmp/openmind-help.txt
+          grep -q "chat" /tmp/openmind-help.txt
+          grep -q "profile" /tmp/openmind-help.txt
+          grep -q "privacy" /tmp/openmind-help.txt
+
+      - name: Verify package import
+        run: PYTHONPATH=src python -c "import openmind; print(openmind.__version__)"
+
+      - name: Run Ruff
+        run: ruff check src/openmind
