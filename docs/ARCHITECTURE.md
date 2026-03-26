@@ -139,6 +139,7 @@ The system prompt is generated dynamically from the university config in `univer
 | SSRF (web_fetch/read_pdf) | Blocks localhost, private IPs, non-http(s) schemes, validates redirects |
 | Obsidian path traversal | `is_relative_to()` check prevents `../../` escapes |
 | Prompt injection | System prompt treats tool results as untrusted data |
+| Sensitive tool access | `llm.py` requires explicit recent user intent before Gmail/Slack/Calendar/Todoist/Obsidian calls |
 | Token in URL params | All Canvas requests use `Authorization: Bearer` header |
 | Gmail in headless | Interactive OAuth blocked when not on a TTY. Clear error message. |
 | Config validation | Missing/corrupt config routes to setup wizard, never crashes |

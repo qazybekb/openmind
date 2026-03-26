@@ -113,3 +113,4 @@ Canvas-specific error mapping:
 - **Path traversal protection** on Obsidian tools — `is_relative_to()` check before any file I/O
 - **Canvas URL validation** — only `bcourses.berkeley.edu` is allowed
 - **Prompt injection guardrail** — system prompt declares tool results as untrusted data
+- **Sensitive integration gating** — Gmail, Slack, Calendar, Todoist, and Obsidian tools require explicit recent user intent

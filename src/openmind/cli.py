@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Optional
 
 import typer
@@ -21,12 +22,23 @@ app: typer.Typer = typer.Typer(
 console: Console = Console()
 
 
+def _run_setup_action(action: Callable[[], None]) -> None:
+    """Run a setup action and convert local persistence failures into user-friendly CLI errors."""
+    try:
+        action()
+    except OSError:
+        logger.exception("OpenMind setup failed while reading or writing local files.")
+        console.print("[red]OpenMind could not update files in ~/.openmind.[/red]")
+        console.print("Check file permissions and available disk space, then try again.")
+        raise typer.Exit(1)
+
+
 def _ensure_config() -> ConfigDict:
     """Load config, running first-time setup if needed."""
     if not config_exists():
         from openmind.setup_wizard import run_first_setup
 
-        run_first_setup()
+        _run_setup_action(run_first_setup)
         if not config_exists():
             raise typer.Exit(1)
 
@@ -36,7 +48,7 @@ def _ensure_config() -> ConfigDict:
         console.print("Running setup...\n")
         from openmind.setup_wizard import run_first_setup
 
-        run_first_setup()
+        _run_setup_action(run_first_setup)
         cfg = load_config()
         if not config_valid(cfg):
             console.print("[red]Setup incomplete. Run: openmind setup[/red]")
@@ -87,11 +99,11 @@ def setup(
     if integration:
         from openmind.setup_wizard import setup_single_integration
 
-        setup_single_integration(integration)
+        _run_setup_action(lambda: setup_single_integration(integration))
     else:
         from openmind.setup_wizard import run_full_setup
 
-        run_full_setup()
+        _run_setup_action(run_full_setup)
 
 
 @app.command()

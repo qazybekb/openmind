@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import stat
 from typing import Any, TypeAlias
 
 from prompt_toolkit import PromptSession
@@ -30,6 +32,9 @@ def run_repl(cfg: ConfigDict) -> None:
 
     history_file = CONFIG_DIR / "repl_history"
     history_file.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(history_file.parent, stat.S_IRWXU)
+    history_file.touch(exist_ok=True)
+    os.chmod(history_file, stat.S_IRUSR | stat.S_IWUSR)
     session: PromptSession[str] = PromptSession(history=FileHistory(str(history_file)))
     client = create_client(cfg)
     messages: list[ChatMessage] = []

@@ -130,6 +130,8 @@ def save_profile(profile: ProfileDict) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
         tmp_file = Path(tmp_path)
         tmp_file.chmod(stat.S_IRUSR | stat.S_IWUSR)
         tmp_file.replace(PROFILE_FILE)

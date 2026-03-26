@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import stat
+import tempfile
 import time
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
@@ -32,10 +35,16 @@ TELEGRAM_TIMEOUT_S: Final[float] = 15.0
 _URGENCY_ORDER: Final[dict[str, int]] = {"headsup": 0, "reminder": 1, "urgent": 2}
 
 
+def _ensure_private_state_dir() -> None:
+    """Create the heartbeat state directory with owner-only permissions."""
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    os.chmod(STATE_DIR, stat.S_IRWXU)
+
+
 def start_heartbeat(cfg: ConfigDict, bot_token: str, chat_id: str) -> None:
     """Run heartbeat checks in a loop."""
     try:
-        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        _ensure_private_state_dir()
     except OSError:
         logger.exception("Failed to prepare heartbeat state directory at %s", STATE_DIR)
         return
@@ -107,9 +116,21 @@ def _load_state(name: str) -> JsonObject:
 def _save_state(name: str, data: Mapping[str, Any]) -> None:
     """Persist heartbeat state by name."""
     path = STATE_DIR / f"{name}.json"
+    tmp_path: str | None = None
     try:
-        path.write_text(json.dumps(dict(data), sort_keys=True), encoding="utf-8")
+        _ensure_private_state_dir()
+        payload = json.dumps(dict(data), sort_keys=True)
+        fd, tmp_path = tempfile.mkstemp(dir=STATE_DIR, suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        tmp_file = Path(tmp_path)
+        tmp_file.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        tmp_file.replace(path)
     except OSError:
+        if tmp_path is not None:
+            Path(tmp_path).unlink(missing_ok=True)
         logger.warning("Failed to write heartbeat state to %s", path, exc_info=True)
 
 

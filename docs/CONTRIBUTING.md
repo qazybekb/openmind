@@ -133,27 +133,28 @@ Before submitting:
 
 ## Testing
 
-Run the validation suite:
+Run the Python validation suite:
 
 ```bash
-PYTHONPATH=src python3 -c "
-from openmind.tools import get_all_tools
-tools = get_all_tools({
-    'obsidian': {'enabled': True},
-    'todoist': {'enabled': True},
-    'gmail': {'enabled': True},
-    'slack': {'enabled': True},
-    'calendar': {'enabled': True},
-})
-print(len(tools))
-"
+PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_*.py' -v
+ruff check src/openmind tests
+python3 -m compileall src/openmind
 ```
 
 Verify the CLI:
 
 ```bash
-openmind --help
-openmind config
+PYTHONPATH=src python3 -m openmind --help
+PYTHONPATH=src python3 -c "from openmind.tools import get_all_tools; print(len(get_all_tools({})))"
+PYTHONPATH=src python3 -c "from openmind.tools import get_all_tools; print(len(get_all_tools({'obsidian': {'enabled': True}, 'todoist': {'enabled': True}, 'gmail': {'enabled': True}, 'slack': {'enabled': True}, 'calendar': {'enabled': True}})))"
+```
+
+Build the website before changing public-facing copy:
+
+```bash
+cd website
+npm ci
+npm run build
 ```
 
 ## Berkeley Knowledge Base (Phase 1)
@@ -176,6 +177,6 @@ SafeWalk provides free walking escorts on campus.
 1. Fork the repo
 2. Create a branch: `git checkout -b my-feature`
 3. Make your changes
-4. Test: `openmind --help`, `python -m openmind --help`, tool import check
+4. Test: unit tests, lint, `python -m openmind --help`, and the website build
 5. Commit with a clear message
 6. Open a PR describing what you changed and why

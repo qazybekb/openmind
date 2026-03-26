@@ -68,6 +68,7 @@ There is no OpenMind server. But your data does leave your machine when you chat
 | SSRF protection | `web.py` blocks localhost, private IPs, non-http schemes, and validates redirect targets |
 | Path traversal | `obsidian.py` checks `is_relative_to()` before any file I/O |
 | Prompt injection | System prompt declares tool results as untrusted data |
+| Sensitive integration gating | `llm.py` blocks Gmail/Slack/Calendar/Todoist/Obsidian tool calls unless recent user messages explicitly ask for them |
 | Canvas URL validation | `config.py` allowlists `bcourses.berkeley.edu` only |
 | File permissions | Config/profile/Google credential files created by OpenMind use owner-only permissions |
 | Atomic writes | Config and profile use temp-file + rename |

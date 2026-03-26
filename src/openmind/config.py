@@ -88,6 +88,8 @@ def save_config(cfg: Mapping[str, Any]) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
         tmp = Path(tmp_path)
         tmp.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0600
         tmp.replace(CONFIG_FILE)

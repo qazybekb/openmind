@@ -21,6 +21,25 @@ MAX_TOOL_ROUNDS: Final[int] = 10
 MAX_HISTORY: Final[int] = 40
 OPENROUTER_API_BASE: Final[str] = "https://openrouter.ai/api/v1"
 OPENROUTER_TIMEOUT_S: Final[float] = 60.0
+SENSITIVE_TOOL_LOOKBACK_USER_MESSAGES: Final[int] = 2
+SENSITIVE_TOOL_KEYWORDS: Final[dict[str, tuple[str, ...]]] = {
+    "gmail_search": ("email", "emails", "gmail", "inbox", "mail", "reply", "replied"),
+    "gmail_read": ("email", "emails", "gmail", "inbox", "mail", "reply", "replied"),
+    "slack_search": ("slack", "channel", "channels"),
+    "slack_read_channel": ("slack", "channel", "channels"),
+    "slack_list_channels": ("slack", "channel", "channels"),
+    "calendar_list_events": ("calendar", "event", "events", "schedule", "scheduled", "meeting"),
+    "calendar_add_event": ("calendar", "event", "events", "schedule", "scheduled", "meeting", "block", "reminder", "remind"),
+    "calendar_add_deadlines": ("calendar", "event", "events", "schedule", "scheduled", "deadline", "deadlines", "reminder"),
+    "todoist_add_task": ("todoist", "task", "tasks", "todo", "to-do"),
+    "todoist_list_tasks": ("todoist", "task", "tasks", "todo", "to-do"),
+    "obsidian_read": ("obsidian", "note", "notes", "vault", "markdown"),
+    "obsidian_write": ("obsidian", "note", "notes", "vault", "markdown", "save"),
+    "obsidian_search": ("obsidian", "note", "notes", "vault", "search my notes"),
+}
+SENSITIVE_TOOL_ERROR: Final[str] = (
+    "This integration is only available when the student explicitly asks about email, Slack, calendar, tasks, or notes."
+)
 
 
 def create_client(cfg: ConfigDict) -> OpenAI:
@@ -30,6 +49,28 @@ def create_client(cfg: ConfigDict) -> OpenAI:
         api_key=str(cfg.get("openrouter_api_key", "")),
         timeout=OPENROUTER_TIMEOUT_S,
     )
+
+
+def _recent_user_messages(conversation: list[ChatMessage]) -> list[str]:
+    """Return the most recent user messages, newest first."""
+    recent: list[str] = []
+    for message in reversed(conversation):
+        if message.get("role") != "user":
+            continue
+        recent.append(str(message.get("content", "")).lower())
+        if len(recent) >= SENSITIVE_TOOL_LOOKBACK_USER_MESSAGES:
+            break
+    return recent
+
+
+def _user_explicitly_requested_tool(name: str, conversation: list[ChatMessage]) -> bool:
+    """Return whether recent user messages explicitly mention a sensitive integration."""
+    keywords = SENSITIVE_TOOL_KEYWORDS.get(name)
+    if not keywords:
+        return True
+
+    recent_messages = _recent_user_messages(conversation)
+    return any(any(keyword in message for keyword in keywords) for message in recent_messages)
 
 
 def chat(
@@ -81,11 +122,15 @@ def chat(
             except (json.JSONDecodeError, TypeError):
                 fn_args = {}
 
-            try:
-                result = execute_tool(fn_name, fn_args, cfg)
-            except Exception:
-                logger.exception("Tool '%s' crashed unexpectedly", fn_name)
-                result = json.dumps({"error": "Tool execution failed unexpectedly."})
+            if not _user_explicitly_requested_tool(fn_name, conversation):
+                logger.warning("Blocked tool '%s' because the student did not explicitly request that integration.", fn_name)
+                result = json.dumps({"error": SENSITIVE_TOOL_ERROR})
+            else:
+                try:
+                    result = execute_tool(fn_name, fn_args, cfg)
+                except Exception:
+                    logger.exception("Tool '%s' crashed unexpectedly", fn_name)
+                    result = json.dumps({"error": "Tool execution failed unexpectedly."})
 
             conversation.append(
                 {

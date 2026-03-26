@@ -178,6 +178,8 @@ src/openmind/
 | [Tools Reference](docs/TOOLS.md) | All 38 tools with parameters |
 | [Privacy & Security](docs/PRIVACY.md) | What data goes where |
 | [Contributing](docs/CONTRIBUTING.md) | How to add tools and features |
+| [Security Policy](SECURITY.md) | How to report vulnerabilities responsibly |
+| [Changelog](CHANGELOG.md) | Release history and notable changes |
 | [Roadmap](PLAN.md) | Berkeley knowledge base, multi-university, live feeds |
 
 ## Contributing
