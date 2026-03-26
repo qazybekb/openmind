@@ -71,19 +71,39 @@ def run_first_setup() -> None:
     cfg["openrouter_api_key"] = api_key
     cfg["model"] = DEFAULT_MODEL
 
-    # Set all integrations to disabled by default
+    # Optional integrations — show what's available, let them skip or enable
+    console.print("\n[bold]Optional features[/bold] (press Enter to skip any)\n")
+
+    cfg["telegram"] = _setup_telegram()
+    cfg["gmail"] = _setup_gmail()
+    cfg["calendar"] = _setup_calendar()
+    cfg["slack"] = _setup_slack()
+    cfg["todoist"] = _setup_todoist()
+    cfg["obsidian"] = _setup_obsidian()
+
+    console.print()
+    if Confirm.ask("  Set up your academic profile? (major, interests, career goals)", default=False):
+        _setup_profile()
+
+    # Disable anything that wasn't explicitly enabled
     for integration in ("telegram", "todoist", "gmail", "calendar", "slack", "obsidian"):
         cfg.setdefault(integration, {"enabled": False})
 
     save_config(cfg)
 
+    # Summary
+    enabled = [name for name in ("telegram", "gmail", "calendar", "slack", "todoist", "obsidian")
+               if cfg.get(name, {}).get("enabled")]
+
     console.print(f"\n[bold]\U0001f389 You're ready![/bold] {university.get('mascot', '')}{university.get('colors', '')}")
-    console.print(f"\n  Using model: [dim]{DEFAULT_MODEL}[/dim]")
-    console.print("  Change it anytime: [cyan]openmind setup model[/cyan]\n")
-    console.print("  [dim]Add more features later:[/dim]")
-    console.print("    [cyan]openmind setup profile[/cyan] — personalize advice with your goals")
-    console.print("    [cyan]openmind setup telegram[/cyan] — get alerts on your phone")
-    console.print("    [cyan]openmind setup gmail[/cyan]    — check professor emails")
+    console.print(f"\n  Model: [dim]{DEFAULT_MODEL}[/dim]")
+    if enabled:
+        console.print(f"  Integrations: [dim]{', '.join(enabled)}[/dim]")
+    console.print()
+    console.print("  [dim]Change anytime:[/dim]")
+    console.print("    [cyan]openmind setup model[/cyan]     — change your LLM")
+    console.print("    [cyan]openmind setup profile[/cyan]   — add your goals + interests")
+    console.print("    [cyan]openmind setup <name>[/cyan]    — add/change any integration")
     console.print()
 
 
