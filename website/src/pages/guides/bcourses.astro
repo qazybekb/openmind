@@ -1,0 +1,149 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import '../../styles/global.css';
+---
+
+<Layout title="Get bCourses API Token — OpenMind" description="Step-by-step guide to generate a Canvas access token from bCourses for OpenMind.">
+  <Nav />
+  <main>
+    <section class="pt-28 pb-20 md:pt-36 md:pb-28">
+      <div class="container max-w-3xl">
+
+        <!-- Header -->
+        <div class="mb-12 fade-in">
+          <a href="/guides/" class="text-xs text-text-muted hover:text-text-primary transition-colors">&larr; All Guides</a>
+          <div class="flex items-center gap-3 mt-4 mb-2">
+            <span class="text-3xl">📘</span>
+            <div>
+              <h1 class="text-2xl md:text-4xl font-bold text-text-primary tracking-tight">bCourses API Token</h1>
+              <div class="flex items-center gap-3 mt-1">
+                <span class="text-[10px] font-semibold text-cal-gold uppercase tracking-widest">Required</span>
+                <span class="text-xs text-text-muted">~2 minutes</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-text-body mt-4">
+            bCourses is UC Berkeley's Canvas LMS. OpenMind uses the Canvas API to read your courses, assignments, grades, announcements, and lecture materials. You need a personal access token to authenticate.
+          </p>
+        </div>
+
+        <!-- What you'll need -->
+        <div class="card mb-8 fade-in">
+          <h3 class="text-text-primary font-semibold mb-2">What you'll need</h3>
+          <ul class="text-sm text-text-secondary space-y-1">
+            <li>- A UC Berkeley account with bCourses access</li>
+            <li>- A web browser</li>
+          </ul>
+        </div>
+
+        <!-- Steps -->
+        <div class="space-y-6">
+
+          <!-- Step 1 -->
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">1</div>
+              <h3 class="text-text-primary font-semibold">Go to bCourses Settings</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Open <a href="https://bcourses.berkeley.edu" target="_blank" class="text-cal-gold underline underline-offset-2">bcourses.berkeley.edu</a> and log in with your CalNet ID.</p>
+              <p>Click your <span class="text-text-primary font-medium">profile picture</span> (or initials) in the top-left sidebar, then click <span class="text-text-primary font-medium">Settings</span>.</p>
+              <div class="terminal mt-4">
+                <div class="terminal-body text-[13px] py-4">
+                  <div class="text-text-muted">Navigation path:</div>
+                  <div class="mt-2 text-text-primary">
+                    bCourses &rarr; Profile icon (top-left) &rarr; Settings
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">2</div>
+              <h3 class="text-text-primary font-semibold">Create a New Access Token</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Scroll down to the <span class="text-text-primary font-medium">Approved Integrations</span> section.</p>
+              <p>Click the <span class="text-text-primary font-medium">+ New Access Token</span> button.</p>
+              <p>Fill in the form:</p>
+              <div class="terminal mt-2">
+                <div class="terminal-body text-[13px] py-4 space-y-2">
+                  <div><span class="text-text-muted">Purpose:</span> <span class="text-text-primary">OpenMind</span></div>
+                  <div><span class="text-text-muted">Expires:</span> <span class="text-text-primary">Leave blank (no expiry) or set a date</span></div>
+                </div>
+              </div>
+              <p>Click <span class="text-text-primary font-medium">Generate Token</span>.</p>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">3</div>
+              <h3 class="text-text-primary font-semibold">Copy the Token</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>A dialog will show your new token. <span class="text-cal-gold font-medium">Copy it immediately</span> &mdash; you won't be able to see it again.</p>
+              <div class="bg-bg rounded-lg border border-border p-4 mt-2">
+                <p class="text-xs text-text-muted mb-1">Your token will look something like:</p>
+                <code class="text-text-primary text-sm">12345~abcdefghijklmnopqrstuvwxyz1234567890</code>
+              </div>
+              <p class="text-text-muted text-xs mt-2">If you lose it, you can always generate a new one from the same Settings page.</p>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">4</div>
+              <h3 class="text-text-primary font-semibold">Paste into OpenMind</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>When OpenMind asks for your bCourses token during setup, paste it in:</p>
+              <div class="terminal mt-2">
+                <div class="terminal-header">
+                  <div class="terminal-dot bg-[#ff5f57]"></div>
+                  <div class="terminal-dot bg-[#febc2e]"></div>
+                  <div class="terminal-dot bg-[#28c840]"></div>
+                </div>
+                <div class="terminal-body text-[13px] space-y-1.5">
+                  <div><span class="text-text-primary">Step 1 of 2</span> &mdash; Connect to bCourses</div>
+                  <div>&ensp;<span class="text-text-secondary">bCourses token:</span> &bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</div>
+                  <div>&ensp;<span class="text-text-muted">Key: 12345~****wxyz</span></div>
+                  <div>&ensp;<span class="text-green-500">Connected!</span> Hey Oski 🐻</div>
+                  <div>&ensp;Finding your courses... <span class="text-green-500">6 courses</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Security note -->
+        <div class="card mt-8 fade-in border-border/50">
+          <div class="flex items-start gap-3">
+            <span class="text-lg">🔒</span>
+            <div>
+              <h3 class="text-text-primary font-semibold text-sm mb-1">Security</h3>
+              <p class="text-xs text-text-secondary leading-relaxed">
+                Your token is stored locally at <code class="text-text-body">~/.openmind/config.json</code> with restricted permissions (owner-only read/write). It is sent only to <code class="text-text-body">bcourses.berkeley.edu</code> for authentication. OpenMind uses read-only Canvas API calls &mdash; it cannot modify your courses or grades.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="flex items-center justify-between mt-12 fade-in">
+          <a href="/guides/" class="btn-secondary text-sm">&larr; All Guides</a>
+          <a href="/guides/openrouter/" class="btn-primary text-sm">Next: OpenRouter &rarr;</a>
+        </div>
+
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Layout>

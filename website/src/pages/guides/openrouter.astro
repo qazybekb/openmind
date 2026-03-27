@@ -1,0 +1,151 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import '../../styles/global.css';
+---
+
+<Layout title="Get OpenRouter API Key — OpenMind" description="Step-by-step guide to create an OpenRouter account and get your API key for OpenMind.">
+  <Nav />
+  <main>
+    <section class="pt-28 pb-20 md:pt-36 md:pb-28">
+      <div class="container max-w-3xl">
+
+        <!-- Header -->
+        <div class="mb-12 fade-in">
+          <a href="/guides/" class="text-xs text-text-muted hover:text-text-primary transition-colors">&larr; All Guides</a>
+          <div class="flex items-center gap-3 mt-4 mb-2">
+            <span class="text-3xl">🤖</span>
+            <div>
+              <h1 class="text-2xl md:text-4xl font-bold text-text-primary tracking-tight">OpenRouter API Key</h1>
+              <div class="flex items-center gap-3 mt-1">
+                <span class="text-[10px] font-semibold text-cal-gold uppercase tracking-widest">Required</span>
+                <span class="text-xs text-text-muted">~3 minutes</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-text-body mt-4">
+            OpenRouter is an API gateway that gives you access to models from Google, Anthropic, OpenAI, and more &mdash; all through one API key. OpenMind uses it to power the AI conversation.
+          </p>
+        </div>
+
+        <!-- What you'll need -->
+        <div class="card mb-8 fade-in">
+          <h3 class="text-text-primary font-semibold mb-2">What you'll need</h3>
+          <ul class="text-sm text-text-secondary space-y-1">
+            <li>- A Google or GitHub account (for sign-up)</li>
+            <li>- No credit card required &mdash; free credits available</li>
+          </ul>
+        </div>
+
+        <!-- Steps -->
+        <div class="space-y-6">
+
+          <!-- Step 1 -->
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">1</div>
+              <h3 class="text-text-primary font-semibold">Create an Account</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Go to <a href="https://openrouter.ai" target="_blank" class="text-cal-gold underline underline-offset-2">openrouter.ai</a> and sign up with Google or GitHub.</p>
+              <p>It takes 30 seconds. No credit card needed.</p>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">2</div>
+              <h3 class="text-text-primary font-semibold">Generate an API Key</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Go to <a href="https://openrouter.ai/keys" target="_blank" class="text-cal-gold underline underline-offset-2">openrouter.ai/keys</a>.</p>
+              <p>Click <span class="text-text-primary font-medium">Create Key</span>.</p>
+              <p>Name it something like <span class="text-text-primary">OpenMind</span> and click <span class="text-text-primary font-medium">Create</span>.</p>
+              <div class="bg-bg rounded-lg border border-border p-4 mt-2">
+                <p class="text-xs text-text-muted mb-1">Your key will look something like:</p>
+                <code class="text-text-primary text-sm">sk-or-v1-abc123def456...</code>
+              </div>
+              <p class="text-text-muted text-xs mt-2">Copy it immediately &mdash; you can't view it again after leaving the page.</p>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">3</div>
+              <h3 class="text-text-primary font-semibold">Choose a Model</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>During OpenMind setup, you'll pick your LLM model:</p>
+              <div class="terminal mt-2">
+                <div class="terminal-header">
+                  <div class="terminal-dot bg-[#ff5f57]"></div>
+                  <div class="terminal-dot bg-[#febc2e]"></div>
+                  <div class="terminal-dot bg-[#28c840]"></div>
+                </div>
+                <div class="terminal-body text-[13px] space-y-1.5">
+                  <div class="text-text-primary font-medium">Choose your LLM model</div>
+                  <div class="text-text-muted text-xs">All models below support tool calling (required for OpenMind)</div>
+                  <div class="mt-2"></div>
+                  <div>&ensp;<span class="text-cal-gold">1</span>&ensp; google/gemini-2.5-pro &mdash; smart, low cost <span class="text-text-muted">(default)</span></div>
+                  <div>&ensp;<span class="text-cal-gold">2</span>&ensp; xiaomi/mimo-v2-pro &mdash; smart, very cheap</div>
+                  <div>&ensp;<span class="text-cal-gold">3</span>&ensp; anthropic/claude-sonnet-4-6 &mdash; excellent reasoning</div>
+                  <div class="text-text-muted">&ensp;Or type any OpenRouter model ID</div>
+                  <div class="mt-2"><span class="text-text-secondary">Model [1]:</span> <span class="text-text-primary">1</span></div>
+                </div>
+              </div>
+              <p class="mt-3">
+                <span class="text-text-primary font-medium">Recommendation:</span> Start with <code class="text-text-body">google/gemini-2.5-pro</code> (default). It's smart, fast, and cheap. You can always switch later with <code class="text-text-body">openmind setup model</code>.
+              </p>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">4</div>
+              <h3 class="text-text-primary font-semibold">Add Credits (Optional)</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>New accounts often come with free credits. If you run out, you can add more at <a href="https://openrouter.ai/credits" target="_blank" class="text-cal-gold underline underline-offset-2">openrouter.ai/credits</a>.</p>
+              <p>Typical costs for a study session:</p>
+              <div class="grid grid-cols-2 gap-3 mt-2">
+                <div class="bg-bg rounded-lg border border-border p-3">
+                  <div class="text-text-primary font-medium text-sm">Gemini 2.5 Pro</div>
+                  <div class="text-text-muted text-xs">~$0.01&ndash;0.05 / session</div>
+                </div>
+                <div class="bg-bg rounded-lg border border-border p-3">
+                  <div class="text-text-primary font-medium text-sm">MiMo V2 Pro</div>
+                  <div class="text-text-muted text-xs">~$0.005&ndash;0.02 / session</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Security note -->
+        <div class="card mt-8 fade-in border-border/50">
+          <div class="flex items-start gap-3">
+            <span class="text-lg">🔒</span>
+            <div>
+              <h3 class="text-text-primary font-semibold text-sm mb-1">Security</h3>
+              <p class="text-xs text-text-secondary leading-relaxed">
+                Your API key is stored locally at <code class="text-text-body">~/.openmind/config.json</code> with restricted permissions. It is sent only to <code class="text-text-body">openrouter.ai</code> for model requests. Your conversations pass through OpenRouter to the model provider &mdash; see the <a href="https://openrouter.ai/privacy" target="_blank" class="text-cal-gold underline underline-offset-2">OpenRouter privacy policy</a> for details.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="flex items-center justify-between mt-12 fade-in">
+          <a href="/guides/bcourses/" class="btn-secondary text-sm">&larr; bCourses</a>
+          <a href="/guides/telegram/" class="btn-primary text-sm">Next: Telegram &rarr;</a>
+        </div>
+
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Layout>

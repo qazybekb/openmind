@@ -1,0 +1,139 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import '../../styles/global.css';
+---
+
+<Layout title="Set Up Gmail — OpenMind" description="Connect Gmail to OpenMind to search professor emails and course communications.">
+  <Nav />
+  <main>
+    <section class="pt-28 pb-20 md:pt-36 md:pb-28">
+      <div class="container max-w-3xl">
+
+        <div class="mb-12 fade-in">
+          <a href="/guides/" class="text-xs text-text-muted hover:text-text-primary transition-colors">&larr; All Guides</a>
+          <div class="flex items-center gap-3 mt-4 mb-2">
+            <span class="text-3xl">📧</span>
+            <div>
+              <h1 class="text-2xl md:text-4xl font-bold text-text-primary tracking-tight">Gmail Integration</h1>
+              <div class="flex items-center gap-3 mt-1">
+                <span class="text-[10px] font-semibold text-text-muted uppercase tracking-widest">Optional</span>
+                <span class="text-xs text-text-muted">~10 minutes</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-text-body mt-4">
+            Connect your Berkeley Gmail to search professor emails and course communications. OpenMind uses read-only access &mdash; it can never send, delete, or modify your emails.
+          </p>
+        </div>
+
+        <div class="card mb-8 fade-in">
+          <h3 class="text-text-primary font-semibold mb-2">What you'll need</h3>
+          <ul class="text-sm text-text-secondary space-y-1">
+            <li>- A Google account (your @berkeley.edu or personal Gmail)</li>
+            <li>- Access to Google Cloud Console</li>
+          </ul>
+        </div>
+
+        <div class="space-y-6">
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">1</div>
+              <h3 class="text-text-primary font-semibold">Create a Google Cloud Project</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Go to <a href="https://console.cloud.google.com/projectcreate" target="_blank" class="text-cal-gold underline underline-offset-2">console.cloud.google.com</a> and create a new project.</p>
+              <p>Name it something like <span class="text-text-primary">OpenMind</span>.</p>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">2</div>
+              <h3 class="text-text-primary font-semibold">Enable the Gmail API</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>In your project, go to <span class="text-text-primary font-medium">APIs & Services &rarr; Library</span>.</p>
+              <p>Search for <span class="text-text-primary font-medium">Gmail API</span> and click <span class="text-text-primary font-medium">Enable</span>.</p>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">3</div>
+              <h3 class="text-text-primary font-semibold">Configure OAuth Consent Screen</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Go to <span class="text-text-primary font-medium">APIs & Services &rarr; OAuth consent screen</span>.</p>
+              <p>Select <span class="text-text-primary font-medium">External</span> user type.</p>
+              <p>Fill in the required fields (app name, user support email, developer email). The rest can be left blank.</p>
+              <p>Add scopes: <code class="text-text-body">gmail.readonly</code></p>
+              <p>Add your email as a <span class="text-text-primary font-medium">test user</span>.</p>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">4</div>
+              <h3 class="text-text-primary font-semibold">Create OAuth Credentials</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Go to <span class="text-text-primary font-medium">APIs & Services &rarr; Credentials</span>.</p>
+              <p>Click <span class="text-text-primary font-medium">+ Create Credentials &rarr; OAuth client ID</span>.</p>
+              <p>Choose <span class="text-text-primary font-medium">Desktop app</span> as the application type.</p>
+              <p>Click <span class="text-text-primary font-medium">Download JSON</span> &mdash; this is your <code class="text-text-body">credentials.json</code> file.</p>
+              <div class="bg-bg rounded-lg border border-border p-4 mt-2">
+                <p class="text-xs text-text-muted mb-1">Save the file somewhere you can find it:</p>
+                <code class="text-text-primary text-sm">~/Downloads/credentials.json</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">5</div>
+              <h3 class="text-text-primary font-semibold">Enter in OpenMind Setup</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Run <code class="text-text-body">openmind setup gmail</code> and provide the path to your credentials file:</p>
+              <div class="terminal mt-2">
+                <div class="terminal-header">
+                  <div class="terminal-dot bg-[#ff5f57]"></div>
+                  <div class="terminal-dot bg-[#febc2e]"></div>
+                  <div class="terminal-dot bg-[#28c840]"></div>
+                </div>
+                <div class="terminal-body text-[13px] space-y-1.5">
+                  <div><span class="text-text-secondary">Enable Gmail? [y/n]:</span> <span class="text-text-primary">y</span></div>
+                  <div>&ensp;<span class="text-text-secondary">Path to credentials.json:</span> <span class="text-text-primary">~/Downloads/credentials.json</span></div>
+                  <div>&ensp;<span class="text-green-500">Gmail enabled!</span> A browser window will open for OAuth on first use.</div>
+                </div>
+              </div>
+              <p class="mt-2">The first time you ask OpenMind about email, a browser window will open to authorize read-only access.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-8 fade-in border-border/50">
+          <div class="flex items-start gap-3">
+            <span class="text-lg">🔒</span>
+            <div>
+              <h3 class="text-text-primary font-semibold text-sm mb-1">Security</h3>
+              <p class="text-xs text-text-secondary leading-relaxed">
+                OpenMind uses <code class="text-text-body">gmail.readonly</code> scope only &mdash; it cannot send, delete, or modify emails. Credentials are stored locally at <code class="text-text-body">~/.openmind/gmail/</code>. Email content is sent to the LLM only when you ask about it.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between mt-12 fade-in">
+          <a href="/guides/telegram/" class="btn-secondary text-sm">&larr; Telegram</a>
+          <a href="/guides/calendar/" class="btn-primary text-sm">Next: Calendar &rarr;</a>
+        </div>
+
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Layout>

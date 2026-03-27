@@ -1,0 +1,131 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import '../../styles/global.css';
+---
+
+<Layout title="Set Up Telegram Bot — OpenMind" description="Create a Telegram bot for OpenMind to get push notifications and chat on the go.">
+  <Nav />
+  <main>
+    <section class="pt-28 pb-20 md:pt-36 md:pb-28">
+      <div class="container max-w-3xl">
+
+        <div class="mb-12 fade-in">
+          <a href="/guides/" class="text-xs text-text-muted hover:text-text-primary transition-colors">&larr; All Guides</a>
+          <div class="flex items-center gap-3 mt-4 mb-2">
+            <span class="text-3xl">📱</span>
+            <div>
+              <h1 class="text-2xl md:text-4xl font-bold text-text-primary tracking-tight">Telegram Bot</h1>
+              <div class="flex items-center gap-3 mt-1">
+                <span class="text-[10px] font-semibold text-text-muted uppercase tracking-widest">Optional</span>
+                <span class="text-xs text-text-muted">~5 minutes</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-text-body mt-4">
+            Connect a Telegram bot to chat with OpenMind from your phone and receive push notifications for deadlines, grade changes, and announcements.
+          </p>
+        </div>
+
+        <div class="card mb-8 fade-in">
+          <h3 class="text-text-primary font-semibold mb-2">What you'll need</h3>
+          <ul class="text-sm text-text-secondary space-y-1">
+            <li>- A Telegram account</li>
+            <li>- The Telegram app (mobile or desktop)</li>
+          </ul>
+        </div>
+
+        <div class="space-y-6">
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">1</div>
+              <h3 class="text-text-primary font-semibold">Create a Bot with BotFather</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Open Telegram and search for <a href="https://t.me/BotFather" target="_blank" class="text-cal-gold underline underline-offset-2">@BotFather</a>.</p>
+              <p>Send the command <code class="text-text-body">/newbot</code>.</p>
+              <p>Follow the prompts:</p>
+              <div class="terminal mt-2">
+                <div class="terminal-body text-[13px] space-y-2 py-4">
+                  <div><span class="text-cal-gold">BotFather:</span> Alright, a new bot. How are we going to call it?</div>
+                  <div><span class="text-text-primary">You:</span> OpenMind Study Bot</div>
+                  <div><span class="text-cal-gold">BotFather:</span> Good. Now let's choose a username for your bot.</div>
+                  <div><span class="text-text-primary">You:</span> my_openmind_bot</div>
+                  <div><span class="text-cal-gold">BotFather:</span> Done! Here is your bot token:</div>
+                  <div class="text-text-primary">7123456789:AAF...</div>
+                </div>
+              </div>
+              <p class="text-text-muted text-xs">The username must end in <code class="text-text-body">bot</code> and be globally unique.</p>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">2</div>
+              <h3 class="text-text-primary font-semibold">Get Your User ID</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Search for <a href="https://t.me/userinfobot" target="_blank" class="text-cal-gold underline underline-offset-2">@userinfobot</a> on Telegram and start a chat.</p>
+              <p>It will immediately reply with your user ID:</p>
+              <div class="bg-bg rounded-lg border border-border p-4 mt-2">
+                <p class="text-xs text-text-muted mb-1">Your user ID:</p>
+                <code class="text-text-primary text-sm">123456789</code>
+              </div>
+              <p>This ensures only <span class="text-text-primary">you</span> can talk to your bot.</p>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">3</div>
+              <h3 class="text-text-primary font-semibold">Enter in OpenMind Setup</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Run <code class="text-text-body">openmind setup telegram</code> and paste both values:</p>
+              <div class="terminal mt-2">
+                <div class="terminal-header">
+                  <div class="terminal-dot bg-[#ff5f57]"></div>
+                  <div class="terminal-dot bg-[#febc2e]"></div>
+                  <div class="terminal-dot bg-[#28c840]"></div>
+                </div>
+                <div class="terminal-body text-[13px] space-y-1.5">
+                  <div><span class="text-text-secondary">Enable Telegram bot? [y/n]:</span> <span class="text-text-primary">y</span></div>
+                  <div>&ensp;<span class="text-text-secondary">Bot token:</span> &bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</div>
+                  <div>&ensp;<span class="text-text-muted">Token: 712345****AAF...</span></div>
+                  <div>&ensp;<span class="text-text-secondary">Your Telegram user ID:</span> <span class="text-text-primary">123456789</span></div>
+                  <div>&ensp;Validating... <span class="text-green-500">Bot connected!</span> @my_openmind_bot</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">4</div>
+              <h3 class="text-text-primary font-semibold">Start Chatting</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Run <code class="text-text-body">openmind</code> &mdash; it will launch in Telegram mode instead of terminal mode.</p>
+              <p>Open your bot in Telegram and send a message. You'll also get background alerts every 3 hours for:</p>
+              <ul class="space-y-1 ml-4">
+                <li>- Upcoming deadlines (sorted by priority)</li>
+                <li>- Grade changes</li>
+                <li>- New course announcements</li>
+                <li>- Unsubmitted assignments</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between mt-12 fade-in">
+          <a href="/guides/openrouter/" class="btn-secondary text-sm">&larr; OpenRouter</a>
+          <a href="/guides/gmail/" class="btn-primary text-sm">Next: Gmail &rarr;</a>
+        </div>
+
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Layout>

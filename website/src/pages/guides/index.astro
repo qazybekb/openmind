@@ -1,0 +1,118 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import '../../styles/global.css';
+
+const guides = [
+  {
+    slug: 'bcourses',
+    icon: '📘',
+    name: 'bCourses API Token',
+    description: 'Generate a Canvas access token from your bCourses profile to connect your courses, assignments, and grades.',
+    required: true,
+    time: '2 min',
+  },
+  {
+    slug: 'openrouter',
+    icon: '🤖',
+    name: 'OpenRouter API Key',
+    description: 'Create an OpenRouter account and get your API key to power OpenMind with any LLM model.',
+    required: true,
+    time: '3 min',
+  },
+  {
+    slug: 'telegram',
+    icon: '📱',
+    name: 'Telegram Bot',
+    description: 'Create a Telegram bot with BotFather and get push notifications for deadlines, grades, and announcements.',
+    required: false,
+    time: '5 min',
+  },
+  {
+    slug: 'gmail',
+    icon: '📧',
+    name: 'Gmail Integration',
+    description: 'Set up Google OAuth credentials to let OpenMind search your professor emails (read-only).',
+    required: false,
+    time: '10 min',
+  },
+  {
+    slug: 'calendar',
+    icon: '📆',
+    name: 'Google Calendar',
+    description: 'Connect Google Calendar to sync deadlines, block study time, and add events from the chat.',
+    required: false,
+    time: '10 min',
+  },
+  {
+    slug: 'slack',
+    icon: '💬',
+    name: 'Slack Integration',
+    description: 'Create a Slack app to let OpenMind search and read your course Slack channels (read-only).',
+    required: false,
+    time: '5 min',
+  },
+];
+---
+
+<Layout title="Setup Guides — OpenMind" description="Step-by-step guides to get your API keys and connect OpenMind to bCourses, OpenRouter, Telegram, Gmail, Calendar, and Slack.">
+  <Nav />
+  <main>
+    <section class="pt-28 pb-20 md:pt-36 md:pb-28">
+      <div class="container">
+        <div class="text-center mb-20 fade-in">
+          <div class="badge mb-5">Setup Guides</div>
+          <h1 class="text-3xl md:text-5xl font-bold text-text-primary tracking-tight mb-5">
+            Getting your<br/><span class="text-cal-gold">API keys.</span>
+          </h1>
+          <p class="text-text-body text-lg max-w-2xl mx-auto">
+            Step-by-step instructions for every service OpenMind connects to.
+            Two are required, the rest are optional.
+          </p>
+        </div>
+
+        <!-- Required -->
+        <p class="text-xs text-text-muted uppercase tracking-widest mb-4 fade-in">Required</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-12">
+          {guides.filter(g => g.required).map((guide, i) => (
+            <a href={`/guides/${guide.slug}/`} class="card glow fade-in group" style={`transition-delay: ${0.1 * (i + 1)}s`}>
+              <div class="flex items-start justify-between mb-3">
+                <div class="text-2xl">{guide.icon}</div>
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-semibold text-cal-gold uppercase tracking-widest">Required</span>
+                  <span class="text-xs text-text-muted">{guide.time}</span>
+                </div>
+              </div>
+              <h3 class="text-text-primary font-semibold mb-2 group-hover:text-cal-gold transition-colors">{guide.name}</h3>
+              <p class="text-sm text-text-secondary leading-relaxed">{guide.description}</p>
+            </a>
+          ))}
+        </div>
+
+        <!-- Optional -->
+        <p class="text-xs text-text-muted uppercase tracking-widest mb-4 fade-in">Optional integrations</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {guides.filter(g => !g.required).map((guide, i) => (
+            <a href={`/guides/${guide.slug}/`} class="card glow fade-in group" style={`transition-delay: ${0.1 * (i + 1)}s`}>
+              <div class="flex items-start justify-between mb-3">
+                <div class="text-2xl">{guide.icon}</div>
+                <span class="text-xs text-text-muted">{guide.time}</span>
+              </div>
+              <h3 class="text-text-primary font-semibold mb-2 group-hover:text-cal-gold transition-colors">{guide.name}</h3>
+              <p class="text-sm text-text-secondary leading-relaxed">{guide.description}</p>
+            </a>
+          ))}
+        </div>
+
+        <!-- Back to home -->
+        <div class="text-center mt-16 fade-in">
+          <a href="/#install" class="btn-secondary">
+            &larr; Back to Install
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Layout>

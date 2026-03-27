@@ -1,0 +1,134 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import '../../styles/global.css';
+---
+
+<Layout title="Set Up Slack — OpenMind" description="Connect Slack to let OpenMind search and read your course channels.">
+  <Nav />
+  <main>
+    <section class="pt-28 pb-20 md:pt-36 md:pb-28">
+      <div class="container max-w-3xl">
+
+        <div class="mb-12 fade-in">
+          <a href="/guides/" class="text-xs text-text-muted hover:text-text-primary transition-colors">&larr; All Guides</a>
+          <div class="flex items-center gap-3 mt-4 mb-2">
+            <span class="text-3xl">💬</span>
+            <div>
+              <h1 class="text-2xl md:text-4xl font-bold text-text-primary tracking-tight">Slack Integration</h1>
+              <div class="flex items-center gap-3 mt-1">
+                <span class="text-[10px] font-semibold text-text-muted uppercase tracking-widest">Optional</span>
+                <span class="text-xs text-text-muted">~5 minutes</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-text-body mt-4">
+            Connect your course Slack workspace to search messages, read channel history, and get context from class discussions. Read-only &mdash; OpenMind never posts to Slack.
+          </p>
+        </div>
+
+        <div class="card mb-8 fade-in">
+          <h3 class="text-text-primary font-semibold mb-2">What you'll need</h3>
+          <ul class="text-sm text-text-secondary space-y-1">
+            <li>- Access to your course Slack workspace</li>
+            <li>- Permission to create Slack apps (most workspaces allow this)</li>
+          </ul>
+        </div>
+
+        <div class="space-y-6">
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">1</div>
+              <h3 class="text-text-primary font-semibold">Create a Slack App</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Go to <a href="https://api.slack.com/apps" target="_blank" class="text-cal-gold underline underline-offset-2">api.slack.com/apps</a>.</p>
+              <p>Click <span class="text-text-primary font-medium">Create New App &rarr; From scratch</span>.</p>
+              <p>Name it <span class="text-text-primary">OpenMind</span> and select your course workspace.</p>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">2</div>
+              <h3 class="text-text-primary font-semibold">Add OAuth Scopes</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Go to <span class="text-text-primary font-medium">OAuth & Permissions</span> in the sidebar.</p>
+              <p>Under <span class="text-text-primary font-medium">User Token Scopes</span>, add these three scopes:</p>
+              <div class="bg-bg rounded-lg border border-border p-4 mt-2 space-y-2">
+                <div><code class="text-text-primary">channels:history</code> <span class="text-text-muted">&mdash; read channel messages</span></div>
+                <div><code class="text-text-primary">channels:read</code> <span class="text-text-muted">&mdash; list channels</span></div>
+                <div><code class="text-text-primary">search:read</code> <span class="text-text-muted">&mdash; search messages</span></div>
+              </div>
+              <p class="text-text-muted text-xs mt-2">These are all read-only scopes. OpenMind cannot post, delete, or modify anything in Slack.</p>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">3</div>
+              <h3 class="text-text-primary font-semibold">Install to Workspace & Get Token</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Scroll up to <span class="text-text-primary font-medium">Install to Workspace</span> and click it.</p>
+              <p>Authorize the app. You'll be redirected back to Slack's API page.</p>
+              <p>Copy the <span class="text-text-primary font-medium">User OAuth Token</span>:</p>
+              <div class="bg-bg rounded-lg border border-border p-4 mt-2">
+                <p class="text-xs text-text-muted mb-1">Your token will start with:</p>
+                <code class="text-text-primary text-sm">xoxp-1234567890-...</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">4</div>
+              <h3 class="text-text-primary font-semibold">Enter in OpenMind Setup</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <div class="terminal mt-2">
+                <div class="terminal-header">
+                  <div class="terminal-dot bg-[#ff5f57]"></div>
+                  <div class="terminal-dot bg-[#febc2e]"></div>
+                  <div class="terminal-dot bg-[#28c840]"></div>
+                </div>
+                <div class="terminal-body text-[13px] space-y-1.5">
+                  <div><span class="text-text-secondary">$</span> <span class="text-text-primary">openmind setup slack</span></div>
+                  <div><span class="text-text-secondary">Enable Slack? [y/n]:</span> <span class="text-text-primary">y</span></div>
+                  <div>&ensp;<span class="text-text-secondary">User OAuth Token (xoxp-...):</span> &bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</div>
+                  <div>&ensp;<span class="text-text-muted">Token: xoxp-1****0-...</span></div>
+                  <div>&ensp;<span class="text-green-500">Slack connected!</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-cal-gold/10 text-cal-gold font-bold text-sm flex items-center justify-center shrink-0">5</div>
+              <h3 class="text-text-primary font-semibold">What You Can Do</h3>
+            </div>
+            <div class="space-y-3 text-sm text-text-secondary">
+              <p>Once connected, try:</p>
+              <div class="space-y-2 ml-4">
+                <div><span class="text-text-primary">"Search Slack for midterm review session"</span></div>
+                <div><span class="text-text-primary">"What did the TA say about the homework in #cs188?"</span></div>
+                <div><span class="text-text-primary">"Show me recent messages in the NLP channel"</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between mt-12 fade-in">
+          <a href="/guides/calendar/" class="btn-secondary text-sm">&larr; Calendar</a>
+          <a href="/guides/" class="btn-primary text-sm">All Guides &rarr;</a>
+        </div>
+
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Layout>
