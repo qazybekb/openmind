@@ -254,8 +254,7 @@ def _execute_calendar_tool(name: str, args: ToolArgs, service: Any) -> str:
             }
         else:
             # All-day event — Google Calendar end date is exclusive
-            from datetime import datetime as dt, timedelta
-            next_day = (dt.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+            next_day = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
             event_body = {
                 "summary": title,
                 "start": {"date": date},
@@ -287,8 +286,7 @@ def _execute_calendar_tool(name: str, args: ToolArgs, service: Any) -> str:
                 continue
 
             try:
-                from datetime import datetime as dt, timedelta
-                a_next = (dt.strptime(a_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+                a_next = (datetime.strptime(a_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
                 event_body = {
                     "summary": f"\U0001f4da {a_title}",
                     "start": {"date": a_date},
