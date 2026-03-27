@@ -152,44 +152,32 @@ def run_first_setup() -> None:
     api_key = _setup_openrouter_key()
     cfg["openrouter_api_key"] = api_key
 
-    # Optional integrations — show what's available, let them skip or enable
-    console.print("\n[bold]Optional features[/bold] (press Enter to skip any)\n")
-
-    cfg["telegram"] = _setup_telegram()
-    cfg["gmail"] = _setup_gmail()
-    cfg["calendar"] = _setup_calendar()
-    cfg["slack"] = _setup_slack()
-    cfg["todoist"] = _setup_todoist()
-    cfg["obsidian"] = _setup_obsidian()
-
-    console.print()
-    if Confirm.ask("  Set up your academic profile? (major, interests, career goals)", default=False):
-        _setup_profile()
-
-    # Disable anything that wasn't explicitly enabled
+    # Default all integrations to disabled
     for integration in ("telegram", "todoist", "gmail", "calendar", "slack", "obsidian"):
         cfg.setdefault(integration, {"enabled": False})
 
     save_config(cfg)
 
-    # Summary
-    enabled = [name for name in ("telegram", "gmail", "calendar", "slack", "todoist", "obsidian")
-               if cfg.get(name, {}).get("enabled")]
-
-    # Summary
-    summary_lines = [f"\U0001f389 [bold]You're ready![/bold] {university.get('mascot', '')}{university.get('colors', '')}"]
-    summary_lines.append(f"\n  Model: {cfg.get('model', DEFAULT_MODEL)}")
-    if enabled:
-        summary_lines.append(f"  Integrations: {', '.join(enabled)}")
-    summary_lines.append("")
-    summary_lines.append("  [dim]Change anytime:[/dim]")
-    summary_lines.append("    [cyan]openmind setup model[/cyan]     \u2014 change your LLM")
-    summary_lines.append("    [cyan]openmind setup profile[/cyan]   \u2014 add your goals + interests")
-    summary_lines.append("    [cyan]openmind setup <name>[/cyan]    \u2014 add/change any integration")
-
+    # Welcome message
     console.print()
     console.print(Panel(
-        "\n".join(summary_lines),
+        f"\U0001f389 [bold]You're all set, {user_name}![/bold] {university.get('spirit', '')}\n"
+        f"\n"
+        f"  Model: {cfg.get('model', DEFAULT_MODEL)}\n"
+        f"  Courses: {len(courses)}\n"
+        f"\n"
+        f"[bold]Add more features anytime:[/bold]\n"
+        f"\n"
+        f"  [cyan]openmind setup telegram[/cyan]   \u2014 chat on your phone + push notifications\n"
+        f"  [cyan]openmind setup gmail[/cyan]      \u2014 search professor emails (read-only)\n"
+        f"  [cyan]openmind setup calendar[/cyan]   \u2014 sync deadlines to Google Calendar\n"
+        f"  [cyan]openmind setup slack[/cyan]      \u2014 search course Slack channels\n"
+        f"  [cyan]openmind setup todoist[/cyan]    \u2014 sync tasks\n"
+        f"  [cyan]openmind setup obsidian[/cyan]   \u2014 save notes to your vault\n"
+        f"  [cyan]openmind setup profile[/cyan]    \u2014 add your goals, interests, resume\n"
+        f"  [cyan]openmind setup model[/cyan]      \u2014 change your LLM\n"
+        f"\n"
+        f"  [dim]Guides: openmindbot.io/guides[/dim]",
         border_style="green",
         padding=(1, 2),
     ))

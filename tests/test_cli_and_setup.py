@@ -55,20 +55,12 @@ class SetupWizardTests(unittest.TestCase):
             "canvas_url": "https://bcourses.berkeley.edu",
         }
 
-        disabled = {"enabled": False}
         with (
             patch("openmind.setup_wizard.get_university", return_value=university),
             patch("openmind.setup_wizard.load_config", return_value={}),
             patch("openmind.setup_wizard._setup_canvas", return_value=("canvas-token", "Qazy", {"1": "NLP"})),
             patch("openmind.setup_wizard._setup_openrouter_key", return_value="or-key"),
-            patch("openmind.setup_wizard._setup_telegram", return_value=disabled),
-            patch("openmind.setup_wizard._setup_gmail", return_value=disabled),
-            patch("openmind.setup_wizard._setup_calendar", return_value=disabled),
-            patch("openmind.setup_wizard._setup_slack", return_value=disabled),
-            patch("openmind.setup_wizard._setup_todoist", return_value=disabled),
-            patch("openmind.setup_wizard._setup_obsidian", return_value=disabled),
             patch("openmind.setup_wizard.Prompt.ask", return_value="1"),
-            patch("openmind.setup_wizard.Confirm.ask", return_value=False),
             patch("openmind.setup_wizard.console.print"),
             patch("openmind.setup_wizard.save_config") as save_config,
         ):
