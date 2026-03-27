@@ -34,7 +34,7 @@ def run_repl(cfg: ConfigDict) -> None:
 
     print_banner(console)
     console.print(f"  Hey {user_name}! {spirit()}")
-    console.print("  [dim]Type your question, /help for commands, or /quit to exit.[/dim]")
+    console.print("  [dim]Ask me anything about your classes. /help for commands, /quit to exit.[/dim]")
 
     # Nudge personalization if profile is empty
     profile = load_profile()

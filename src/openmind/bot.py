@@ -113,24 +113,97 @@ def _build_application(cfg: ConfigDict) -> Application:
 
     llm_client = create_client(cfg)
 
-    async def _chat_with_typing(chat_id: int, messages: list[ChatMessage]) -> str:
-        """Run LLM chat with typing indicator. Shared by all handlers."""
-        typing_active = True
+    async def _chat_with_streaming(chat_id: int, messages: list[ChatMessage]) -> str:
+        """Run LLM chat with live message streaming in Telegram.
 
-        async def _keep_typing() -> None:
-            while typing_active:
+        Sends a placeholder message, then edits it as tokens arrive.
+        Falls back to typing indicator if streaming fails.
+        """
+        from openmind.llm import chat_stream
+
+        # Send initial placeholder
+        try:
+            placeholder = await application.bot.send_message(
+                chat_id=chat_id, text="\U0001f914 Thinking..."
+            )
+        except Exception:
+            # Fall back to non-streaming
+            return await asyncio.to_thread(chat, cfg, messages, client=llm_client)
+
+        collected: list[str] = []
+        last_edit_len = 0
+        edit_lock = asyncio.Lock()
+
+        async def _periodic_edit() -> None:
+            """Edit the placeholder message every ~1.5 seconds with new content."""
+            nonlocal last_edit_len
+            while True:
+                await asyncio.sleep(1.5)
+                current = "".join(collected)
+                if len(current) > last_edit_len + 20:  # Only edit if meaningful new content
+                    try:
+                        async with edit_lock:
+                            display = _sanitize_markdown(current)
+                            if len(display) > MESSAGE_CHUNK_SIZE:
+                                display = display[:MESSAGE_CHUNK_SIZE]
+                            await placeholder.edit_text(display + " \u2588", parse_mode="Markdown")
+                            last_edit_len = len(current)
+                    except Exception:
+                        try:
+                            async with edit_lock:
+                                await placeholder.edit_text(current[:MESSAGE_CHUNK_SIZE] + " \u2588")
+                                last_edit_len = len(current)
+                        except Exception:
+                            pass
+
+        def _on_token(text: str) -> None:
+            collected.append(text)
+
+        edit_task = asyncio.create_task(_periodic_edit())
+        try:
+            response = await asyncio.to_thread(
+                chat_stream, cfg, messages, client=llm_client, on_token=_on_token
+            )
+        except Exception:
+            # Fall back to non-streaming on error
+            edit_task.cancel()
+            try:
+                await placeholder.edit_text("Retrying...")
+            except Exception:
+                pass
+            response = await asyncio.to_thread(chat, cfg, messages, client=llm_client)
+        finally:
+            edit_task.cancel()
+
+        # Final edit with complete response (remove cursor block)
+        try:
+            final = _sanitize_markdown(response)
+            if len(final) <= MESSAGE_CHUNK_SIZE:
+                async with edit_lock:
+                    await placeholder.edit_text(
+                        final,
+                        parse_mode="Markdown",
+                        reply_markup=_after_response_keyboard(),
+                    )
+                return response  # Already sent via edit
+            else:
+                # Response too long for single message — delete placeholder, send chunked
                 try:
-                    await application.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+                    await placeholder.delete()
                 except Exception:
                     pass
-                await asyncio.sleep(4)
-
-        typing_task = asyncio.create_task(_keep_typing())
-        try:
-            return await asyncio.to_thread(chat, cfg, messages, client=llm_client)
-        finally:
-            typing_active = False
-            typing_task.cancel()
+                return response  # Will be sent by _send_response
+        except Exception:
+            # Markdown edit failed — try plain text
+            try:
+                async with edit_lock:
+                    await placeholder.edit_text(
+                        response[:MESSAGE_CHUNK_SIZE],
+                        reply_markup=_after_response_keyboard(),
+                    )
+                return response
+            except Exception:
+                return response
 
     async def _send_response(chat_id: int, response: str, reply_to: Any = None, show_buttons: bool = True) -> None:
         """Send a response, handling chunking, markdown, and PDFs."""
@@ -188,10 +261,15 @@ def _build_application(cfg: ConfigDict) -> Application:
         messages.append({"role": "user", "content": text})
 
         try:
-            response = await _chat_with_typing(update.effective_message.chat_id, messages)
+            chat_id = update.effective_message.chat_id
+            response = await _chat_with_streaming(chat_id, messages)
             messages.append({"role": "assistant", "content": response})
             _prune_conversation(messages)
-            await _send_response(update.effective_message.chat_id, response, reply_to=update.effective_message)
+            # Only send chunked if response was too long for streaming edit
+            if len(response) > MESSAGE_CHUNK_SIZE:
+                await _send_response(chat_id, response)
+            # Always check for generated PDFs
+            await _send_generated_pdfs(chat_id, response)
         except Exception as exc:
             logger.exception("Error handling message")
             err_msg = str(exc).lower()
@@ -247,10 +325,12 @@ def _build_application(cfg: ConfigDict) -> Application:
             messages.append({"role": "user", "content": user_msg})
 
             try:
-                response = await _chat_with_typing(chat_id, messages)
+                response = await _chat_with_streaming(chat_id, messages)
                 messages.append({"role": "assistant", "content": response})
                 _prune_conversation(messages)
-                await _send_response(chat_id, response, reply_to=update.effective_message)  # type: ignore[union-attr]
+                if len(response) > MESSAGE_CHUNK_SIZE:
+                    await _send_response(chat_id, response)
+                await _send_generated_pdfs(chat_id, response)
             except Exception:
                 messages.pop()  # Clean up on failure
                 raise
@@ -289,9 +369,10 @@ def _build_application(cfg: ConfigDict) -> Application:
         name = cfg.get("user_name", "there")
         keyboard = _quick_action_keyboard()
         await update.effective_message.reply_text(
-            f"Hey {name}! \U0001f43b\n"
-            f"I'm your Cal study buddy. Ask me anything or tap a button.\n\n"
-            f"Commands: /help /clear /menu",
+            f"Hey {name}! \U0001f43b\n\n"
+            f"I'm your Cal study buddy. Just chat with me like you'd text a friend \u2014 "
+            f"ask about deadlines, grades, assignments, or anything school-related.\n\n"
+            f"You can also tap the buttons below for quick actions, or type /help to see all commands.",
             reply_markup=keyboard,
         )
 
@@ -391,10 +472,11 @@ def _build_application(cfg: ConfigDict) -> Application:
             return
 
         try:
-            response = await _chat_with_typing(chat_id, messages)
+            response = await _chat_with_streaming(chat_id, messages)
             messages.append({"role": "assistant", "content": response})
             _prune_conversation(messages)
-            await _send_response(chat_id, response)
+            if len(response) > MESSAGE_CHUNK_SIZE:
+                await _send_response(chat_id, response)
         except Exception:
             logger.exception("Error handling button")
             await application.bot.send_message(
@@ -411,7 +493,7 @@ def _build_application(cfg: ConfigDict) -> Application:
         messages.append({"role": "user", "content": text})
         chat_id = update.effective_message.chat_id  # type: ignore[union-attr]
         try:
-            response = await _chat_with_typing(chat_id, messages)
+            response = await _chat_with_streaming(chat_id, messages)
             messages.append({"role": "assistant", "content": response})
             _prune_conversation(messages)
             await _send_response(chat_id, response, reply_to=update.effective_message)
@@ -563,7 +645,7 @@ def _build_application(cfg: ConfigDict) -> Application:
                     chat_id=int(allowed_user),
                     text=(
                         f"\U0001f43b Hey {name}! OpenMind is online.\n\n"
-                        f"Type anything or tap a button below."
+                        f"Just message me \u2014 ask anything about your classes."
                     ),
                     reply_markup=_quick_action_keyboard(),
                 )
