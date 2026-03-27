@@ -413,6 +413,31 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
             f"/courses/{course_id}/assignments",
             {"include[]": "submission", "order_by": "due_at"},
         )
+        # Flag upcoming deadlines so the LLM doesn't ignore them
+        if isinstance(data, list):
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc).isoformat()
+            upcoming = []
+            for a in data:
+                if not isinstance(a, dict):
+                    continue
+                due = a.get("due_at", "")
+                if not due or due < now:
+                    continue
+                sub = a.get("submission", {})
+                ws = sub.get("workflow_state", "") if isinstance(sub, dict) else ""
+                if ws not in ("submitted", "graded"):
+                    upcoming.append({
+                        "name": a.get("name", ""),
+                        "due_at": due,
+                        "points_possible": a.get("points_possible"),
+                        "submission_state": ws or "unsubmitted",
+                    })
+            return _json_result({
+                "all_assignments": data,
+                "UPCOMING_DEADLINES": upcoming,
+                "_note": "UPCOMING_DEADLINES lists future unsubmitted assignments. ALWAYS report these to the student.",
+            })
         return _json_result(data)
 
     if name == "get_grades":
