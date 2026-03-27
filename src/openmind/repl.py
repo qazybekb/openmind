@@ -185,6 +185,7 @@ def _handle_command(
             "  [bold]Session[/bold]\n"
             "  /new       \u2014 Save context + start fresh\n"
             "  /clear     \u2014 Nuke conversation history\n"
+            "  /setup     \u2014 Add integrations (telegram, gmail, etc.)\n"
             "  /config    \u2014 Show config path\n"
             "  /quit      \u2014 Exit\n"
         )
@@ -246,6 +247,30 @@ def _handle_command(
 
     if cmd == "/config":
         console.print(f"Config: {CONFIG_DIR}")
+        return True, None
+
+    # In-REPL setup commands — no need to exit
+    if cmd.startswith("/setup"):
+        arg = original_cmd[6:].strip()
+        try:
+            from openmind.setup_wizard import setup_single_integration
+            if arg:
+                setup_single_integration(arg)
+            else:
+                console.print(
+                    "\n[bold]Setup integrations:[/bold]\n"
+                    "  /setup telegram   \u2014 chat on your phone + notifications\n"
+                    "  /setup gmail      \u2014 search professor emails\n"
+                    "  /setup calendar   \u2014 sync deadlines to Google Calendar\n"
+                    "  /setup slack      \u2014 search course Slack channels\n"
+                    "  /setup todoist    \u2014 sync tasks\n"
+                    "  /setup obsidian   \u2014 save notes to your vault\n"
+                    "  /setup profile    \u2014 add your goals, interests, resume\n"
+                    "  /setup model      \u2014 change your LLM\n"
+                )
+        except Exception:
+            logger.warning("In-REPL setup failed", exc_info=True)
+            console.print("[red]Setup failed. Try running it from terminal: openmind setup " + (arg or "") + "[/red]")
         return True, None
 
     return False, None
