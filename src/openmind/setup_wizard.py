@@ -161,7 +161,7 @@ def run_first_setup() -> None:
     # Welcome message
     console.print()
     console.print(Panel(
-        f"\U0001f389 [bold]You're all set, {user_name}![/bold] {university.get('spirit', '')}\n"
+        f"\U0001f389 [bold]You're all set, {user_name}![/bold] Fiat Lux! \U0001f4a1\n"
         f"\n"
         f"  Model: {cfg.get('model', DEFAULT_MODEL)}\n"
         f"  Courses: {len(courses)}\n"
@@ -194,8 +194,7 @@ def run_full_setup() -> None:
     university = get_university()
 
     console.print(
-        f"\n[bold]{university.get('mascot', '')} OpenMind Setup[/bold] "
-        f"{university.get('spirit', '')} {university.get('colors', '')}"
+        "\n[bold]\U0001f43b OpenMind Setup[/bold] \U0001f499\U0001f49b"
     )
     console.print()
 
@@ -228,7 +227,7 @@ def run_full_setup() -> None:
 
     save_config(cfg)
     console.print(f"\n[green]Config saved to {CONFIG_DIR}[/green]")
-    console.print(f"\n[bold]\U0001f389 Setup complete! Go Bears![/bold] {university.get('mascot', '')}{university.get('colors', '')}\n")
+    console.print("\n[bold]\U0001f389 Setup complete! Fiat Lux! \U0001f4a1[/bold]\n")
 
 
 # ---------------------------------------------------------------------------

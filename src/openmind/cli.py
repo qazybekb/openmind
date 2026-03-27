@@ -86,8 +86,7 @@ def _run_interactive_session(cfg: ConfigDict) -> None:
     telegram_enabled = bool(cfg.get("telegram", {}).get("enabled"))
 
     if telegram_enabled:
-        uni = cfg.get("university", {})
-        console.print(f"\n{uni.get('mascot', '')} Starting Telegram in the background... {uni.get('spirit', '')}")
+        console.print("\n\U0001f43b Starting Telegram in the background...")
         console.print("[dim]Terminal REPL stays in the foreground. Telegram + heartbeat keep running in parallel.[/dim]\n")
         try:
             bot_service = _start_telegram_service(cfg)

@@ -25,7 +25,6 @@ console: Console = Console()
 
 def run_repl(cfg: ConfigDict) -> None:
     """Run the interactive terminal REPL."""
-    uni = cfg.get("university", {})
     user_name = cfg.get("user_name", "Student")
 
     from openmind.banner import print_banner
@@ -42,9 +41,9 @@ def run_repl(cfg: ConfigDict) -> None:
     has_profile = any(v for v in profile.values())
     if not has_profile:
         console.print()
-        console.print("  [dim]\U0001f4a1 Tip: Make OpenMind smarter about YOU:[/dim]")
-        console.print("  [dim]   openmind setup profile[/dim]  [dim]\u2014 add your major, goals, interests[/dim]")
-        console.print("  [dim]   Upload your resume for skill-gap analysis & tailored advice[/dim]")
+        console.print("  [dim]\U0001f4a1 Pro tip: I can give way better advice if I know you[/dim]")
+        console.print("  [dim]   Run [cyan]openmind setup profile[/cyan] \u2014 major, goals, interests[/dim]")
+        console.print("  [dim]   Drop your resume and I'll do skill-gap analysis[/dim]")
     console.print()
 
     # Consume pending resume import from setup wizard
@@ -85,7 +84,7 @@ def run_repl(cfg: ConfigDict) -> None:
         try:
             user_input = session.prompt("You \u2192 ").strip()
         except (KeyboardInterrupt, EOFError):
-            console.print("\nBye! \U0001f43b")
+            console.print("\nPeace! \U0001f43b")
             break
 
         if not user_input:
@@ -94,7 +93,7 @@ def run_repl(cfg: ConfigDict) -> None:
         # Slash commands
         if user_input.startswith("/"):
             if user_input.lower().strip() in ("/quit", "/exit", "/q"):
-                console.print(f"Bye! {uni.get('spirit', '')} {uni.get('mascot', '')}")
+                console.print("Later! \U0001f43b")
                 break
             handled, synthetic = _handle_command(user_input, cfg, messages)
             if handled:
@@ -137,11 +136,11 @@ def run_repl(cfg: ConfigDict) -> None:
             logger.exception("REPL request failed")
             err_type = type(exc).__name__
             if "timeout" in err_type.lower() or "Timeout" in str(exc):
-                console.print("[red]Request timed out. The AI model took too long to respond. Try again.[/red]")
+                console.print("[red]Timed out \u2014 the model's taking too long. Try again or try a shorter question.[/red]")
             elif "auth" in err_type.lower() or "401" in str(exc):
-                console.print("[red]Authentication error. Run: openmind setup model to check your API key.[/red]")
+                console.print("[red]Auth error \u2014 your API key might be off. Run: openmind setup model[/red]")
             else:
-                console.print("[red]Something went wrong. This might be a network issue \u2014 try again in a moment.[/red]")
+                console.print("[red]Something broke \u2014 probably a network thing. Give it another shot.[/red]")
             messages.pop()
             continue
 
@@ -158,17 +157,22 @@ def _handle_command(
 
     if cmd == "/help":
         console.print(
-            "\n[bold]Commands:[/bold]\n"
-            "  /help      \u2014 Show this help\n"
-            "  /learn     \u2014 Guided learning session (e.g. /learn binary search trees)\n"
-            "  /courses   \u2014 List your courses\n"
+            "\n[bold]\U0001f43b What can I do?[/bold]\n"
+            "\n"
+            "  [bold]Learning[/bold]\n"
+            "  /learn     \u2014 Socratic tutoring (e.g. /learn binary search trees)\n"
+            "  /study     \u2014 Generate study guide PDF (10-25 pages)\n"
+            "  /cheatsheet \u2014 Generate 2-page exam cheatsheet\n"
+            "\n"
+            "  [bold]Academics[/bold]\n"
             "  /grades    \u2014 Quick grade check\n"
-            "  /gpa       \u2014 Calculate your GPA (or /gpa 3.5 for target)\n"
-            "  /study     \u2014 Generate 10-25 page study guide PDF (learn a subject from scratch)\n"
-            "  /cheatsheet \u2014 Generate 2-page exam cheatsheet PDF (bring to open-note exam)\n"
-            "  /new       \u2014 Start a new conversation (saves context)\n"
-            "  /clear     \u2014 Clear conversation history\n"
+            "  /gpa       \u2014 GPA calculator (or /gpa 3.5 for target)\n"
+            "  /courses   \u2014 List your courses\n"
             "  /remind    \u2014 Set a reminder\n"
+            "\n"
+            "  [bold]Session[/bold]\n"
+            "  /new       \u2014 Save context + start fresh\n"
+            "  /clear     \u2014 Nuke conversation history\n"
             "  /config    \u2014 Show config path\n"
             "  /quit      \u2014 Exit\n"
         )
@@ -199,14 +203,14 @@ def _handle_command(
         if messages:
             consolidate_conversation(messages)
             messages.clear()
-            console.print("[dim]Conversation saved to memory and cleared. Starting fresh![/dim]")
+            console.print("[dim]Context saved. Fresh start \u2014 let's go.[/dim]")
         else:
-            console.print("[dim]Already a fresh conversation.[/dim]")
+            console.print("[dim]Already fresh.[/dim]")
         return True, None
 
     if cmd == "/clear":
         messages.clear()
-        console.print("[dim]Conversation cleared.[/dim]")
+        console.print("[dim]Cleared.[/dim]")
         return True, None
 
     if cmd.startswith("/study"):
