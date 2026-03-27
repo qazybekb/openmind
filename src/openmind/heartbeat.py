@@ -204,13 +204,13 @@ def _save_state(name: str, data: Mapping[str, Any]) -> None:
 
 def _parse_canvas_datetime(value: str) -> datetime | None:
     """Parse a Canvas timestamp and return `None` when it is invalid."""
-    if not value:
+    if not value or value == "None":
         return None
 
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        logger.warning("Failed to parse Canvas timestamp: %s", value)
+        logger.debug("Skipping unparseable Canvas timestamp: %s", value)
         return None
 
 

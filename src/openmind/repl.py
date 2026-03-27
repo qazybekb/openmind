@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from openmind.config import CONFIG_DIR, ConfigDict
-from openmind.llm import chat_stream, create_client
+from openmind.llm import chat, create_client
 from openmind.memory import consolidate_conversation
 
 logger = logging.getLogger(__name__)
@@ -108,29 +108,15 @@ def run_repl(cfg: ConfigDict) -> None:
             console.rule(style="dim")
             console.print()
 
-            collected: list[str] = []
-            streaming = False
-
-            def _on_token(text: str) -> None:
-                nonlocal streaming
-                if not streaming:
-                    streaming = True
-                collected.append(text)
-                console.print(text, end="", highlight=False)
-
             try:
                 with console.status("[dim]Thinking...[/dim]", spinner="dots"):
-                    response = chat_stream(cfg, messages, client=client, on_token=_on_token)
+                    response = chat(cfg, messages, client=client)
             except KeyboardInterrupt:
                 console.print("\n[dim]Cancelled.[/dim]")
                 messages.pop()
                 continue
 
-            # If we streamed, add a newline; if not, render as markdown
-            if streaming:
-                console.print()
-            else:
-                console.print(Markdown(response))
+            console.print(Markdown(response))
             console.print()
         except Exception as exc:
             logger.exception("REPL request failed")
