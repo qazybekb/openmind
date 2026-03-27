@@ -32,10 +32,12 @@ ALLOWED_CANVAS_HOSTS: Final[tuple[str, ...]] = (
 
 
 def validate_canvas_url(url: str) -> bool:
-    """Check that a Canvas URL points to a trusted Berkeley host."""
+    """Check that a Canvas URL points to a trusted Berkeley host over HTTPS."""
     from urllib.parse import urlparse
 
     parsed = urlparse(url)
+    if parsed.scheme.lower() != "https":
+        return False
     host = (parsed.hostname or "").lower().rstrip(".")
     return host in ALLOWED_CANVAS_HOSTS
 
@@ -68,8 +70,20 @@ def load_config() -> ConfigDict:
 
 
 def config_valid(cfg: Mapping[str, Any]) -> bool:
-    """Return whether all required config keys are present and non-empty."""
-    return all(cfg.get(k) for k in REQUIRED_KEYS)
+    """Return whether all required config keys are present, non-empty, and well-typed."""
+    if not all(cfg.get(k) for k in REQUIRED_KEYS):
+        return False
+
+    # Canvas URL must be HTTPS and trusted
+    canvas_url = str(cfg.get("canvas_url", ""))
+    if not validate_canvas_url(canvas_url):
+        return False
+
+    # Courses must be a dict
+    if not isinstance(cfg.get("courses"), dict):
+        return False
+
+    return True
 
 
 def save_config(cfg: Mapping[str, Any]) -> None:

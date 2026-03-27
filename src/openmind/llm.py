@@ -43,6 +43,10 @@ SENSITIVE_TOOL_KEYWORDS: Final[dict[str, tuple[str, ...]]] = {
 SENSITIVE_TOOL_ERROR: Final[str] = (
     "This integration is only available when the student explicitly asks about email, Slack, calendar, tasks, or notes."
 )
+TOOL_OUTPUT_INJECTION_ERROR: Final[str] = (
+    "Blocked: this tool was not authorized by the student's request. "
+    "Only tools relevant to the student's original question are allowed."
+)
 
 
 def _is_transient(exc: Exception) -> bool:
@@ -120,6 +124,33 @@ def _user_explicitly_requested_tool(name: str, conversation: list[ChatMessage]) 
     return any(any(keyword in message for keyword in keywords) for message in recent_messages)
 
 
+def _compute_authorized_tools(conversation: list[ChatMessage]) -> set[str]:
+    """Compute the set of tools authorized by the user's recent messages.
+
+    Core tools (Canvas, Berkeley, courses, profile, reminders, PDF, web) are
+    always authorized. Sensitive tools require explicit user mention.
+    This prevents tool-output-driven prompt injection from calling
+    unauthorized integrations in follow-up rounds.
+    """
+    authorized: set[str] = set()
+    for tool_name, keywords in SENSITIVE_TOOL_KEYWORDS.items():
+        recent = _recent_user_messages(conversation)
+        if any(any(kw in msg for kw in keywords) for msg in recent):
+            authorized.add(tool_name)
+    return authorized
+
+
+def _is_tool_authorized(name: str, authorized_sensitive: set[str]) -> bool:
+    """Check if a tool is authorized for this turn.
+
+    Non-sensitive tools are always allowed. Sensitive tools must be in
+    the authorized set computed from the user's message.
+    """
+    if name not in SENSITIVE_TOOL_KEYWORDS:
+        return True
+    return name in authorized_sensitive
+
+
 def chat(
     cfg: ConfigDict,
     messages: list[ChatMessage],
@@ -143,6 +174,9 @@ def chat(
     if len(conversation) > MAX_HISTORY + 1:
         conversation = [conversation[0], *conversation[-MAX_HISTORY:]]
 
+    # Compute authorized tools once from user's message (persists across tool rounds)
+    authorized_sensitive = _compute_authorized_tools(conversation)
+
     for _ in range(MAX_TOOL_ROUNDS):
         # LLM call with retry on transient errors
         response = None
@@ -163,6 +197,10 @@ def chat(
 
         if response is None:
             return "Sorry, I couldn't reach the AI model. Please try again."
+
+        if not response.choices:
+            logger.warning("LLM returned empty choices")
+            return "Sorry, the AI model returned an empty response. Please try again."
 
         choice = response.choices[0]
         message = choice.message
@@ -186,9 +224,9 @@ def chat(
             # Type-cast args to match schema
             fn_args = _cast_tool_args(fn_args, tools, fn_name)
 
-            if not _user_explicitly_requested_tool(fn_name, conversation):
-                logger.warning("Blocked tool '%s' because the student did not explicitly request that integration.", fn_name)
-                result = json.dumps({"error": SENSITIVE_TOOL_ERROR})
+            if not _is_tool_authorized(fn_name, authorized_sensitive):
+                logger.warning("Blocked tool '%s' — not authorized by user's request.", fn_name)
+                result = json.dumps({"error": TOOL_OUTPUT_INJECTION_ERROR})
             else:
                 try:
                     result = execute_tool(fn_name, fn_args, cfg)
@@ -232,6 +270,8 @@ def chat_stream(
 
     if len(conversation) > MAX_HISTORY + 1:
         conversation = [conversation[0], *conversation[-MAX_HISTORY:]]
+
+    authorized_sensitive = _compute_authorized_tools(conversation)
 
     for _ in range(MAX_TOOL_ROUNDS):
         try:
@@ -309,8 +349,8 @@ def chat_stream(
 
             fn_args = _cast_tool_args(fn_args, tools, fn_name)
 
-            if not _user_explicitly_requested_tool(fn_name, conversation):
-                result = json.dumps({"error": SENSITIVE_TOOL_ERROR})
+            if not _is_tool_authorized(fn_name, authorized_sensitive):
+                result = json.dumps({"error": TOOL_OUTPUT_INJECTION_ERROR})
             else:
                 try:
                     result = execute_tool(fn_name, fn_args, cfg)

@@ -44,12 +44,36 @@ def _ensure_private_state_dir() -> None:
     os.chmod(STATE_DIR, stat.S_IRWXU)
 
 
+def _acquire_heartbeat_lock() -> bool:
+    """Try to acquire a heartbeat PID lock. Returns False if another instance is running."""
+    lock_file = STATE_DIR / "heartbeat.pid"
+    try:
+        if lock_file.exists():
+            try:
+                old_pid = int(lock_file.read_text(encoding="utf-8").strip())
+                # Check if the process is still alive
+                os.kill(old_pid, 0)
+                return False  # Another instance is running
+            except (ValueError, ProcessLookupError, PermissionError):
+                pass  # Old process is dead, safe to take over
+
+        lock_file.write_text(str(os.getpid()), encoding="utf-8")
+        return True
+    except OSError:
+        logger.warning("Could not manage heartbeat lock", exc_info=True)
+        return True  # Fail open — better to double-notify than never notify
+
+
 def start_heartbeat(cfg: ConfigDict, bot_token: str, chat_id: str) -> None:
     """Run heartbeat checks in a loop."""
     try:
         _ensure_private_state_dir()
     except OSError:
         logger.exception("Failed to prepare heartbeat state directory at %s", STATE_DIR)
+        return
+
+    if not _acquire_heartbeat_lock():
+        logger.info("Another heartbeat is already running, skipping.")
         return
 
     time.sleep(INITIAL_STARTUP_DELAY_S)

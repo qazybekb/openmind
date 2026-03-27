@@ -38,7 +38,7 @@ pip install ".[all]"         # Everything
 openmind
 ```
 
-On first run, the wizard asks for just two things:
+On first run, the wizard asks for three things:
 
 ### Step 1: bCourses API Token
 

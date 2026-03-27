@@ -27,14 +27,16 @@ def _ensure_private_dir() -> None:
 
 
 def load_memory() -> list[dict[str, Any]]:
-    """Load conversation memory entries."""
+    """Load conversation memory entries with validation."""
     if not MEMORY_FILE.exists():
         return []
 
     try:
         data = json.loads(MEMORY_FILE.read_text(encoding="utf-8"))
-        if isinstance(data, list):
-            return data
+        if not isinstance(data, list):
+            return []
+        # Validate each entry is a dict with expected keys
+        return [entry for entry in data if isinstance(entry, dict) and "summary" in entry]
     except (OSError, json.JSONDecodeError):
         logger.warning("Failed to load memory", exc_info=True)
 

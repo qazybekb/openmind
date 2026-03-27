@@ -29,7 +29,7 @@ def run_repl(cfg: ConfigDict) -> None:
     user_name = cfg.get("user_name", "Student")
 
     from openmind.banner import print_banner
-    from openmind.tools.profile import load_profile
+    from openmind.tools.profile import load_profile, save_profile
 
     print_banner(console)
     console.print(f"  Hey {user_name}! {uni.get('spirit', '')}")
@@ -44,6 +44,28 @@ def run_repl(cfg: ConfigDict) -> None:
         console.print("  [dim]   openmind setup profile[/dim]  [dim]\u2014 add your major, goals, interests[/dim]")
         console.print("  [dim]   Upload your resume for skill-gap analysis & tailored advice[/dim]")
     console.print()
+
+    # Consume pending resume import from setup wizard
+    pending_resume = profile.get("_pending_resume")
+    if pending_resume:
+        from pathlib import Path as _Path
+        resume_path = _Path(str(pending_resume))
+        if resume_path.exists():
+            console.print(f"  [dim]Importing resume from {resume_path.name}...[/dim]")
+            try:
+                from openmind.tools.profile import execute_profile_tool
+                result = execute_profile_tool("import_resume", {"pdf_path": str(resume_path)}, cfg)
+                import json as _json
+                parsed = _json.loads(result)
+                if "error" not in parsed:
+                    console.print("  [green]Resume imported![/green] Skills and experience added to your profile.")
+                else:
+                    console.print(f"  [yellow]Resume import: {parsed.get('error', 'failed')}[/yellow]")
+            except Exception:
+                logger.warning("Failed to import pending resume", exc_info=True)
+            # Clear the pending flag
+            profile.pop("_pending_resume", None)
+            save_profile(profile)
 
     history_file = CONFIG_DIR / "repl_history"
     history_file.parent.mkdir(parents=True, exist_ok=True)
@@ -92,8 +114,13 @@ def run_repl(cfg: ConfigDict) -> None:
                 collected.append(text)
                 console.print(text, end="", highlight=False)
 
-            with console.status("[dim]Thinking...[/dim]", spinner="dots"):
-                response = chat_stream(cfg, messages, client=client, on_token=_on_token)
+            try:
+                with console.status("[dim]Thinking...[/dim]", spinner="dots"):
+                    response = chat_stream(cfg, messages, client=client, on_token=_on_token)
+            except KeyboardInterrupt:
+                console.print("\n[dim]Cancelled.[/dim]")
+                messages.pop()
+                continue
 
             # If we streamed, add a newline; if not, render as markdown
             if streaming:

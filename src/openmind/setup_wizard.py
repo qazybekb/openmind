@@ -566,6 +566,9 @@ def _setup_gmail() -> dict[str, Any]:
             logger.warning("Failed to copy Gmail credentials", exc_info=True)
             console.print("    [red]Failed to copy credentials.[/red]")
             return {"enabled": False}
+    else:
+        console.print("    [dim]Skipping — no credentials provided.[/dim]")
+        return {"enabled": False}
 
     return {"enabled": True}
 
@@ -595,6 +598,9 @@ def _setup_calendar() -> dict[str, Any]:
                 logger.warning("Failed to copy Calendar credentials", exc_info=True)
                 console.print("    [red]Failed to copy credentials.[/red]")
                 return {"enabled": False}
+        else:
+            console.print("    [dim]Skipping — no credentials provided.[/dim]")
+            return {"enabled": False}
 
     return {"enabled": True}
 

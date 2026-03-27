@@ -68,7 +68,10 @@ def _is_safe_url(url: str) -> str | None:
         try:
             resolved = socket.getaddrinfo(host, parsed.port or (443 if scheme == "https" else 80), type=socket.SOCK_STREAM)
         except socket.gaierror:
-            return None
+            return "Blocked: could not resolve hostname."
+
+        if not resolved:
+            return "Blocked: hostname did not resolve to any address."
 
         for result in resolved:
             resolved_host = result[4][0]

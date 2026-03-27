@@ -253,11 +253,13 @@ def _execute_calendar_tool(name: str, args: ToolArgs, service: Any) -> str:
                 "end": {"dateTime": end_dt.isoformat(), "timeZone": "America/Los_Angeles"},
             }
         else:
-            # All-day event
+            # All-day event — Google Calendar end date is exclusive
+            from datetime import datetime as dt, timedelta
+            next_day = (dt.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
             event_body = {
                 "summary": title,
                 "start": {"date": date},
-                "end": {"date": date},
+                "end": {"date": next_day},
             }
 
         created = service.events().insert(calendarId="primary", body=event_body).execute()
@@ -285,10 +287,12 @@ def _execute_calendar_tool(name: str, args: ToolArgs, service: Any) -> str:
                 continue
 
             try:
+                from datetime import datetime as dt, timedelta
+                a_next = (dt.strptime(a_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
                 event_body = {
                     "summary": f"\U0001f4da {a_title}",
                     "start": {"date": a_date},
-                    "end": {"date": a_date},
+                    "end": {"date": a_next},
                     "reminders": {
                         "useDefault": False,
                         "overrides": [
