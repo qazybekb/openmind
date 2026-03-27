@@ -1,4 +1,9 @@
-"""Generate professional study guide PDFs from course materials."""
+"""Generate professional study guide PDFs from course materials.
+
+Uses Claude Opus via OpenRouter for content generation — the most capable
+model for deep, structured educational writing. The student's default model
+is used for normal chat; Opus is used only for study guide generation.
+"""
 
 from __future__ import annotations
 
@@ -18,6 +23,7 @@ ToolArgs: TypeAlias = dict[str, Any]
 ToolDefinition: TypeAlias = dict[str, Any]
 
 OUTPUT_DIR: Final[Path] = CONFIG_DIR / "study_guides"
+OPUS_MODEL: Final[str] = "anthropic/claude-opus-4-6"
 
 STUDY_GUIDE_TOOLS: list[ToolDefinition] = [
     {
@@ -25,43 +31,32 @@ STUDY_GUIDE_TOOLS: list[ToolDefinition] = [
         "function": {
             "name": "generate_study_guide",
             "description": (
-                "Generate a professional two-column PDF study guide for a course or topic. "
-                "The student provides the course name and optional scope (e.g. 'midterm', 'final', 'weeks 1-5'). "
-                "You must provide the full LaTeX content — the tool handles compilation to PDF.\n\n"
-                "IMPORTANT: Generate comprehensive, detailed content. Aim for 10-25 pages.\n\n"
-                "LaTeX format rules:\n"
-                "- Use \\documentclass[10pt,letterpaper]{article}\n"
-                "- Use \\usepackage{multicol} with \\begin{multicols}{2}\n"
-                "- Use \\section{}, \\subsection{}, \\subsubsection{} for hierarchy\n"
-                "- Use \\textbf{} for key terms, \\textit{} for emphasis\n"
-                "- Use \\begin{tcolorbox} for exam tips and key concepts\n"
-                "- Use itemize/enumerate for lists\n"
-                "- Use \\begin{tabular} for comparison tables\n"
-                "- Structure should adapt to the subject (not fixed — CS, law, business, etc. all differ)\n\n"
-                "Adapt the structure to the subject:\n"
-                "- Law/policy: Frameworks → Cases → Synthesis → Exam Prep\n"
-                "- CS/engineering: Concepts → Algorithms → Code Patterns → Problem Sets\n"
-                "- Business: Theories → Frameworks → Case Studies → Application\n"
-                "- Science: Principles → Methods → Key Experiments → Problem Solving\n"
-                "- Humanities: Themes → Key Authors → Analysis → Essay Prep\n\n"
-                "Always include: exam tips, key comparisons, common mistakes, glossary."
+                "Generate a comprehensive study guide PDF for a course or topic. "
+                "This is a LEARNING document — not a cheatsheet. A reader should be able to "
+                "pick it up from scratch and learn the entire subject thoroughly.\n\n"
+                "Provide: course_name (required), scope (optional, e.g. 'midterm', 'weeks 1-5'), "
+                "and source_material (required — the actual course content to cover, from Canvas "
+                "modules/lectures/readings. Fetch these BEFORE calling this tool).\n\n"
+                "The tool uses Claude Opus to generate the content and compiles to PDF.\n"
+                "Output: 10-25 page two-column professional PDF saved to ~/.openmind/study_guides/"
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "title": {
+                    "course_name": {
                         "type": "string",
-                        "description": "Study guide title (e.g. 'Info 205 — Midterm Study Guide')",
+                        "description": "Course name (e.g. 'Info 205 — Information Law & Policy')",
                     },
-                    "latex_content": {
+                    "scope": {
                         "type": "string",
-                        "description": (
-                            "Complete LaTeX document content starting from \\documentclass. "
-                            "Must be a full compilable LaTeX document. 10-25 pages recommended."
-                        ),
+                        "description": "What to cover: 'midterm', 'final', 'weeks 1-5', 'all' (default: all)",
+                    },
+                    "source_material": {
+                        "type": "string",
+                        "description": "The actual course content — lecture notes, readings, module content from Canvas. The more detail, the better the guide.",
                     },
                 },
-                "required": ["title", "latex_content"],
+                "required": ["course_name", "source_material"],
             },
         },
     },
@@ -163,18 +158,100 @@ def _compile_latex(latex_content: str, title: str) -> str | None:
         return str(output_path)
 
 
+_OPUS_SYSTEM_PROMPT = """You are an expert educator creating a comprehensive study guide.
+
+Your goal: produce a document that a student can read from scratch and LEARN the entire subject.
+This is NOT a cheatsheet or reference card. This is a teaching document.
+
+Writing principles:
+- EXPLAIN concepts thoroughly — assume the reader is encountering them for the first time
+- Use concrete examples for every abstract idea
+- Show the reasoning behind conclusions, not just the conclusions
+- Connect ideas across topics — show how they relate and build on each other
+- Include "why this matters" for every concept
+- Add exam tips, common mistakes, and practice questions throughout
+- Use analogies to make complex ideas accessible
+- Bold key terms on first use and define them clearly
+
+Structure: Adapt to the subject. Do NOT use a fixed template. Consider:
+- Law/policy: Frameworks & theories → Case analysis → Cross-cutting themes → Exam prep
+- CS/engineering: Core concepts → Algorithms with examples → Code patterns → Problem-solving strategies
+- Business: Foundational theories → Analytical frameworks → Case applications → Strategic thinking
+- Sciences: Fundamental principles → Methods & experiments → Quantitative tools → Problem sets
+- Humanities: Key thinkers & arguments → Thematic analysis → Critical connections → Essay preparation
+
+Always end with: key comparisons/contrasts, common exam mistakes, glossary of terms.
+
+LaTeX formatting:
+- Full document with \\documentclass[10pt,letterpaper]{article}
+- Two-column layout with \\usepackage{multicol}, \\begin{multicols}{2}
+- Use the provided preamble (tcolorbox for exam tips, section/subsection hierarchy)
+- Tables for comparisons, itemize for lists, bold for key terms
+- Target 10-25 pages of dense, high-quality content
+- Every section should TEACH, not just list
+
+Return ONLY the complete LaTeX document. No commentary outside the LaTeX."""
+
+
+def _generate_content_with_opus(cfg: ConfigDict, course_name: str, scope: str, source_material: str) -> str | None:
+    """Call Claude Opus via OpenRouter to generate study guide LaTeX content."""
+    api_key = str(cfg.get("openrouter_api_key", ""))
+    if not api_key:
+        return None
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+            timeout=300.0,  # 5 min — Opus needs time for long content
+        )
+
+        scope_text = f" (scope: {scope})" if scope else ""
+        user_prompt = (
+            f"Create a comprehensive study guide for: {course_name}{scope_text}\n\n"
+            f"Use this LaTeX preamble (copy it exactly as the start of your document):\n"
+            f"{_LATEX_PREAMBLE}\n"
+            f"\\begin{{document}}\n\n"
+            f"Now here is the source material from the course. Use ALL of it:\n\n"
+            f"{source_material[:80000]}\n\n"  # Cap at 80K chars to stay in context
+            f"Generate the complete LaTeX document now. Remember: this must TEACH, not just list."
+        )
+
+        response = client.chat.completions.create(
+            model=OPUS_MODEL,
+            messages=[
+                {"role": "system", "content": _OPUS_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=16000,
+        )
+
+        if not response.choices:
+            return None
+
+        content = response.choices[0].message.content or ""
+        return content.strip()
+
+    except Exception:
+        logger.exception("Failed to generate study guide content with Opus")
+        return None
+
+
 def execute_study_guide_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
     """Execute the study guide generation tool."""
     if name != "generate_study_guide":
         return json.dumps({"error": f"Unknown tool: {name}"})
 
-    title = str(args.get("title", "")).strip()
-    latex_content = str(args.get("latex_content", "")).strip()
+    course_name = str(args.get("course_name", "")).strip()
+    scope = str(args.get("scope", "")).strip()
+    source_material = str(args.get("source_material", "")).strip()
 
-    if not title:
-        return json.dumps({"error": "Missing required argument: title."})
-    if not latex_content:
-        return json.dumps({"error": "Missing required argument: latex_content."})
+    if not course_name:
+        return json.dumps({"error": "Missing required argument: course_name."})
+    if not source_material:
+        return json.dumps({"error": "Missing required argument: source_material. Fetch course content from Canvas first (modules, lectures, readings)."})
 
     # Check if pdflatex is available
     try:
@@ -184,19 +261,41 @@ def execute_study_guide_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
             "error": "pdflatex is not installed. Install LaTeX: brew install --cask mactex-no-gui (macOS) or apt install texlive-full (Linux)."
         })
 
-    # If the LLM didn't include a full document, wrap it with our preamble
+    # Generate content with Opus
+    logger.info("Generating study guide with Claude Opus for: %s", course_name)
+    latex_content = _generate_content_with_opus(cfg, course_name, scope, source_material)
+
+    if not latex_content:
+        return json.dumps({"error": "Failed to generate study guide content. Check your OpenRouter API key and try again."})
+
+    # Clean up — extract just the LaTeX if Opus wrapped it in markdown code blocks
+    if "```latex" in latex_content:
+        latex_content = latex_content.split("```latex", 1)[1].rsplit("```", 1)[0]
+    elif "```" in latex_content:
+        latex_content = latex_content.split("```", 1)[1].rsplit("```", 1)[0]
+
+    # If Opus didn't include the preamble, prepend it
     if r"\documentclass" not in latex_content:
         latex_content = _LATEX_PREAMBLE + r"\begin{document}" + "\n" + latex_content + "\n" + r"\end{document}"
 
+    title = f"{course_name} — {scope.capitalize() + ' ' if scope else ''}Study Guide"
     output_path = _compile_latex(latex_content, title)
+
     if output_path is None:
+        # Save the raw LaTeX for debugging
+        debug_path = OUTPUT_DIR / "last_failed.tex"
+        try:
+            _ensure_output_dir()
+            debug_path.write_text(latex_content, encoding="utf-8")
+        except OSError:
+            pass
         return json.dumps({
-            "error": "LaTeX compilation failed. The content may have syntax errors. Try simplifying the LaTeX."
+            "error": f"LaTeX compilation failed. Raw LaTeX saved to {debug_path} for debugging."
         })
 
     return json.dumps({
         "result": f"Study guide generated: {title}",
         "path": output_path,
-        "pages": "Check the PDF for page count",
-        "message": f"Your study guide is ready at: {output_path}",
+        "message": f"Your study guide is ready! Open it at: {output_path}",
+        "model": OPUS_MODEL,
     })
