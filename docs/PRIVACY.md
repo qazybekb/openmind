@@ -17,9 +17,14 @@ There is no OpenMind server. But your data does leave your machine when you chat
 | API tokens (Canvas, OpenRouter, Telegram, Slack, Google) | `~/.openmind/config.json` | **Yes, but only to the service they authenticate with** — never to the LLM as prompt content |
 | Student profile (major, interests, career goals) | `~/.openmind/profile.json` | **Fields are included** in every LLM request as context when present |
 | Resume PDF (if imported) | Your filesystem | **Never** — only extracted text passes through LLM once |
-| Heartbeat state (seen deadlines, grades) | `~/.openmind/state/*.json` | **Never** |
+| Heartbeat state (deadlines, grades, submissions, announcements) | `~/.openmind/state/deadlines.json`, `grades.json`, etc. | **Never** |
+| Email check state | `~/.openmind/state/emails.json` | **Never** |
+| Morning briefing state | `~/.openmind/state/briefing.json` | **Never** |
+| Conversation memory (topic summaries) | `~/.openmind/memory.json` | **Summaries included** in system prompt for context |
+| Reminders | `~/.openmind/reminders.json` | **Never** — checked locally by heartbeat |
+| Generated study guides / cheatsheets | `~/.openmind/study_guides/*.pdf` | **Never** — stored locally |
 | Terminal command history | `~/.openmind/repl_history` | **Never** |
-| Google OAuth tokens | `~/.openmind/gmail/` | **Yes, to Google APIs only** — never to the LLM as prompt content |
+| Google OAuth tokens | `~/.openmind/gmail/` | **Yes, to Google APIs only** — never to the LLM |
 | Course catalog (11K courses) | Bundled in package | **Never** — searched locally |
 
 ## What goes to external services

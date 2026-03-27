@@ -44,7 +44,17 @@ On first run, the wizard asks for three things:
 
 The wizard validates your token immediately, greets you by name, and discovers your active courses.
 
-### Step 2: OpenRouter API Key
+### Step 2: Choose your LLM model
+
+Pick the AI model that powers OpenMind:
+
+1. **xiaomi/mimo-v2-pro** — reliable + affordable, $1/$3 per 1M tokens (default)
+2. **anthropic/claude-sonnet-4-6** — best reasoning, $3/$15 per 1M tokens
+3. **openai/gpt-5.4** — GPT ecosystem, $2.50/$15 per 1M tokens
+
+Or type any OpenRouter model ID. You can change this later with `/setup model`.
+
+### Step 3: OpenRouter API Key
 
 1. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
 2. Create an account (free credits available for new users)

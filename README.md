@@ -3,7 +3,7 @@
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/github/actions/workflow/status/qazybekb/openmind/ci.yml?branch=main&style=for-the-badge" alt="CI" />
   <img src="https://img.shields.io/badge/License-MIT-FDB515?style=for-the-badge" alt="MIT License" />
-  <img src="https://img.shields.io/badge/Tools-38-22c55e?style=for-the-badge" alt="38 Tools" />
+  <img src="https://img.shields.io/badge/Tools-43-22c55e?style=for-the-badge" alt="43 Tools" />
 </p>
 
 <h1 align="center">🐻 OpenMind</h1>
@@ -19,7 +19,7 @@ pip install git+https://github.com/qazybekb/openmind.git
 openmind
 ```
 
-First run asks for two things — your bCourses token and an OpenRouter key. Then you're chatting:
+First run asks for three things — your bCourses token, a model choice, and an OpenRouter key. Then you're chatting:
 
 ```
 🐻 Hey Oski! Go Bears! 💙💛
@@ -38,12 +38,12 @@ You could knock out the outline at a Moffitt table tonight.
 
 | Category | Features |
 |----------|----------|
-| **Academics** | Smart deadlines (priority scoring), grade calculator, PDF summarizer, guided teaching mode, flashcards |
+| **Academics** | Smart deadlines (priority scoring), GPA calculator, PDF summarizer, study guide + cheatsheet generator, guided Socratic tutoring |
 | **Personalization** | Student profile, skill gap analysis, career-aware course recommendations |
 | **Course Catalog** | 11,000+ Berkeley courses (undergrad + graduate) searchable by subject, level, keyword |
 | **Campus** | Live events from events.berkeley.edu, library hours, study room booking links |
 | **Integrations** | Telegram, Gmail, Google Calendar, Slack, Todoist, Obsidian |
-| **Alerts** | Background heartbeat every 3 hours: deadline warnings, grade changes, submission checks, announcements |
+| **Alerts** | Morning briefing (8am), deadline warnings, grade changes, email alerts, reminders, deadline change detection |
 
 **43 tools total** — 30 always-on, 13 from optional integrations.
 
@@ -67,19 +67,28 @@ OpenMind — Any LLM via OpenRouter
 ## Commands
 
 ```bash
-openmind                    # Start (Telegram bot or terminal REPL)
-openmind chat               # Terminal REPL only
+openmind                    # Start (REPL + Telegram if enabled)
+openmind chat               # Terminal REPL only (no Telegram)
 openmind config             # Show configuration
 openmind profile            # View your student profile
 openmind privacy            # What stays local vs what goes to the LLM
-
 openmind setup              # Full setup (all settings)
 openmind setup telegram     # Add Telegram alerts
-openmind setup gmail        # Add Gmail integration
-openmind setup calendar     # Add Google Calendar
-openmind setup slack        # Add Slack (read course channels)
-openmind setup profile      # Set up your academic profile
 openmind setup model        # Change your LLM model
+```
+
+**In-chat commands** (type these in the REPL or Telegram):
+
+```
+/learn [topic]      — Guided Socratic tutoring (uses Gemini 2.5 Pro)
+/study [course]     — Generate 10-25 page study guide PDF (uses Claude Opus)
+/cheatsheet [course] — Generate 2-page exam cheatsheet PDF (uses Claude Opus)
+/grades             — Quick grade check
+/gpa [target]       — GPA calculator with what-if
+/remind [text]      — Set a reminder
+/new                — Save context + start fresh
+/setup [name]       — Set up integrations without leaving the chat
+/help               — All commands
 ```
 
 ## Install

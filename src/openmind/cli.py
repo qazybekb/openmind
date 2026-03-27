@@ -278,7 +278,10 @@ def privacy() -> None:
     console.print(Panel(
         "[green]\u2705[/green] ~/.openmind/config.json (API tokens, settings)\n"
         "[green]\u2705[/green] ~/.openmind/profile.json (academic profile)\n"
-        "[green]\u2705[/green] ~/.openmind/state/ (heartbeat state)\n"
+        "[green]\u2705[/green] ~/.openmind/memory.json (conversation summaries)\n"
+        "[green]\u2705[/green] ~/.openmind/reminders.json (scheduled reminders)\n"
+        "[green]\u2705[/green] ~/.openmind/state/ (heartbeat: deadlines, grades, emails, briefing)\n"
+        "[green]\u2705[/green] ~/.openmind/study_guides/ (generated PDFs)\n"
         "[green]\u2705[/green] ~/.openmind/repl_history (terminal history)\n"
         "[green]\u2705[/green] Resume PDF (never uploaded)",
         title="[green]Stays on your machine[/green]",
