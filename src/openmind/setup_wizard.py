@@ -9,6 +9,8 @@ import shutil
 from pathlib import Path
 from typing import Any, Final
 
+import sys
+
 import httpx
 from rich.console import Console
 from rich.panel import Panel
@@ -34,6 +36,42 @@ def _mask_key(key: str) -> str:
     if len(key) <= 12:
         return key[:3] + "****"
     return key[:6] + "****" + key[-4:]
+
+
+def _secret_prompt(label: str) -> str:
+    """Prompt for a secret, showing asterisks as the user types."""
+    try:
+        import tty
+        import termios
+
+        console.print(f"  {label}: ", end="")
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        chars: list[str] = []
+        try:
+            tty.setraw(fd)
+            while True:
+                ch = sys.stdin.read(1)
+                if ch in ("\r", "\n"):
+                    break
+                if ch in ("\x7f", "\x08"):  # backspace
+                    if chars:
+                        chars.pop()
+                        sys.stdout.write("\b \b")
+                        sys.stdout.flush()
+                    continue
+                if ch == "\x03":  # ctrl+c
+                    raise KeyboardInterrupt
+                chars.append(ch)
+                sys.stdout.write("*")
+                sys.stdout.flush()
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        console.print()  # newline after input
+        return "".join(chars)
+    except (ImportError, OSError):
+        # Fallback for non-Unix or piped input
+        return Prompt.ask(f"  {label}", password=True)
 
 
 def _ensure_private_dir(path: Path) -> None:
@@ -253,7 +291,7 @@ def _setup_canvas(canvas_url: str) -> tuple[str, str, dict[str, str]]:
     """Validate Canvas token and discover courses."""
     user_name = "Bear"
     while True:
-        token = Prompt.ask("  Paste your bCourses token", password=True)
+        token = _secret_prompt("Paste your bCourses token")
         if not token.strip():
             console.print("  [red]Token cannot be empty.[/red]")
             continue
@@ -315,7 +353,7 @@ def _setup_canvas(canvas_url: str) -> tuple[str, str, dict[str, str]]:
 def _setup_openrouter_key() -> str:
     """Validate OpenRouter key only."""
     while True:
-        api_key = Prompt.ask("  Paste your OpenRouter key", password=True)
+        api_key = _secret_prompt("Paste your OpenRouter key")
         if not api_key.strip():
             console.print("  [red]Key cannot be empty.[/red]")
             continue
@@ -453,7 +491,7 @@ def _setup_telegram() -> dict[str, Any]:
     console.print()
 
     while True:
-        bot_token = Prompt.ask("    Bot token", password=True)
+        bot_token = _secret_prompt("  Bot token")
         if not bot_token.strip():
             console.print("    [red]Token cannot be empty.[/red]")
             continue
@@ -491,7 +529,7 @@ def _setup_todoist() -> dict[str, Any]:
     console.print("    Go to: todoist.com/app/settings/integrations/developer")
     console.print("    Copy your API token.")
     console.print()
-    token = Prompt.ask("    Paste your API token", password=True)
+    token = _secret_prompt("  Paste your API token")
     if not token.strip():
         console.print("    [dim]Skipping Todoist.[/dim]")
         return {"enabled": False}
@@ -582,7 +620,7 @@ def _setup_slack() -> dict[str, Any]:
     console.print("    3. Install to Workspace \u2192 Copy the User OAuth Token (starts with xoxp-)")
     console.print("    [dim]Detailed guide: openmindbot.io/guides/slack[/dim]")
     console.print()
-    token = Prompt.ask("    Paste your User OAuth Token (xoxp-...)", password=True)
+    token = _secret_prompt("  Paste your User OAuth Token (xoxp-...)")
     if token.strip():
         console.print(f"    [dim]Token: {_mask_key(token)}[/dim]")
     if not token.strip():
