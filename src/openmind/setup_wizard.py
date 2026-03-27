@@ -90,13 +90,14 @@ def run_first_setup() -> None:
     console.print("    [cyan]2[/cyan]  xiaomi/mimo-v2-pro              — smart, very cheap")
     console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     — excellent reasoning")
     console.print("    [dim]Or type any OpenRouter model ID[/dim]")
+    console.print()
 
     _model_choices = {
         "1": "google/gemini-2.5-pro",
         "2": "xiaomi/mimo-v2-pro",
         "3": "anthropic/claude-sonnet-4-6",
     }
-    choice = Prompt.ask("\n  Model", default="1")
+    choice = Prompt.ask("  Enter 1, 2, 3, or a model ID", default="1")
     cfg["model"] = _model_choices.get(choice, choice)
 
     api_key = _setup_openrouter_key()
@@ -346,7 +347,7 @@ def _setup_openrouter_full() -> tuple[str, str]:
         "2": "xiaomi/mimo-v2-pro",
         "3": "anthropic/claude-sonnet-4-6",
     }
-    choice = Prompt.ask("\n  Model", default="1")
+    choice = Prompt.ask("\n  Enter 1, 2, 3, or a model ID", default="1")
     model = _model_choices.get(choice, choice)
     return api_key, model
 
@@ -367,7 +368,7 @@ def _setup_model_change(cfg: ConfigDict) -> None:
         "2": "xiaomi/mimo-v2-pro",
         "3": "anthropic/claude-sonnet-4-6",
     }
-    choice = Prompt.ask("\n  New model", default="1")
+    choice = Prompt.ask("\n  Enter 1, 2, 3, or a model ID", default="1")
     cfg["model"] = _model_choices.get(choice, choice)
     save_config(cfg)
     console.print(f"  Model changed to: [bold]{model}[/bold]")
