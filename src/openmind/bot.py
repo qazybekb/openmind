@@ -120,4 +120,4 @@ def run_bot(cfg: ConfigDict) -> None:
     application.add_handler(CommandHandler("start", cmd_start))
     application.add_handler(CommandHandler("clear", cmd_clear))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.run_polling(drop_pending_updates=True)
+    application.run_polling()
