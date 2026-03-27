@@ -51,21 +51,24 @@ def run_repl(cfg: ConfigDict) -> None:
         from pathlib import Path as _Path
         resume_path = _Path(str(pending_resume))
         if resume_path.exists():
-            console.print(f"  [dim]Importing resume from {resume_path.name}...[/dim]")
+            console.print(f"  [dim]Extracting resume from {resume_path.name}...[/dim]")
             try:
-                from openmind.tools.profile import execute_profile_tool
-                result = execute_profile_tool("import_resume", {"pdf_path": str(resume_path)}, cfg)
-                import json as _json
-                parsed = _json.loads(result)
-                if "error" not in parsed:
-                    console.print("  [green]Resume imported![/green] Skills and experience added to your profile.")
+                import pymupdf
+                pdf_doc = pymupdf.open(str(resume_path))
+                resume_text = "\n".join(page.get_text() for page in pdf_doc)
+                pdf_doc.close()
+
+                if resume_text.strip():
+                    # Store raw text — the LLM will parse it on first interaction via import_resume tool
+                    profile["_resume_text"] = resume_text[:20000]
+                    console.print("  [green]Resume extracted![/green] I'll analyze your skills on first chat.")
                 else:
-                    console.print(f"  [yellow]Resume import: {parsed.get('error', 'failed')}[/yellow]")
+                    console.print("  [yellow]Could not extract text from resume PDF.[/yellow]")
             except Exception:
-                logger.warning("Failed to import pending resume", exc_info=True)
-            # Clear the pending flag
-            profile.pop("_pending_resume", None)
-            save_profile(profile)
+                logger.warning("Failed to extract pending resume", exc_info=True)
+        # Clear the pending flag
+        profile.pop("_pending_resume", None)
+        save_profile(profile)
 
     history_file = CONFIG_DIR / "repl_history"
     history_file.parent.mkdir(parents=True, exist_ok=True)

@@ -157,9 +157,15 @@ def execute_gpa_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
     current_gpa = round(total_points / total_units, 2) if total_units else 0.0
 
     result: dict[str, Any] = {
-        "current_gpa": current_gpa,
+        "estimated_gpa": current_gpa,
         "courses": course_grades,
         "total_courses": total_units,
+        "disclaimer": (
+            "This is an ESTIMATE based on Canvas percentages mapped to a standard 4.0 scale. "
+            "It assumes equal weight per course and a standard letter-grade cutoff. "
+            "Your official GPA may differ based on units, grading basis (P/NP, S/U), "
+            "and your department's scale. Check CalCentral for your official GPA."
+        ),
     }
 
     # What-if: what's needed to hit target GPA

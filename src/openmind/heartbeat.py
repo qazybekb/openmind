@@ -29,6 +29,7 @@ EMAIL_QUERY: Final[str] = "is:unread from:berkeley.edu newer_than:3h"
 CANVAS_TIMEOUT_S: Final[float] = 30.0
 DEADLINE_LOOKAHEAD_DAYS: Final[int] = 7
 HEARTBEAT_INTERVAL: Final[int] = 3 * 60 * 60
+TICK_INTERVAL: Final[int] = 60 * 60  # Check reminders/briefing every hour
 INITIAL_STARTUP_DELAY_S: Final[int] = 30
 RECENT_SUBMISSION_WINDOW_HOURS: Final[int] = 24
 STATE_DIR: Final[Path] = CONFIG_DIR / "state"
@@ -79,29 +80,36 @@ def start_heartbeat(cfg: ConfigDict, bot_token: str, chat_id: str) -> None:
 
     time.sleep(INITIAL_STARTUP_DELAY_S)
 
+    tick_count = 0
     while True:
         try:
-            notifications: list[str] = []
-            notifications.extend(_check_deadlines(cfg))
-            notifications.extend(_check_submissions(cfg))
-            notifications.extend(_check_grades(cfg))
-            notifications.extend(_check_announcements(cfg))
-            notifications.extend(_check_emails(cfg))
-            notifications.extend(_check_reminders())
-
-            # Morning briefing — once per day at ~8am PT
+            # Lightweight checks every hour (reminders, briefing)
             briefing = _check_morning_briefing(cfg)
             if briefing:
                 _send_telegram(bot_token, chat_id, briefing)
 
-            if notifications:
-                summary = "\n\n".join(notifications)
-                if _should_notify(summary):
-                    _send_telegram(bot_token, chat_id, summary)
+            reminder_notifications = _check_reminders()
+            if reminder_notifications:
+                _send_telegram(bot_token, chat_id, "\n\n".join(reminder_notifications))
+
+            # Full Canvas checks every 3 hours (every 3rd tick)
+            if tick_count % 3 == 0:
+                notifications: list[str] = []
+                notifications.extend(_check_deadlines(cfg))
+                notifications.extend(_check_submissions(cfg))
+                notifications.extend(_check_grades(cfg))
+                notifications.extend(_check_announcements(cfg))
+                notifications.extend(_check_emails(cfg))
+
+                if notifications:
+                    summary = "\n\n".join(notifications)
+                    if _should_notify(summary):
+                        _send_telegram(bot_token, chat_id, summary)
         except Exception:
             logger.exception("Heartbeat cycle failed")
 
-        time.sleep(HEARTBEAT_INTERVAL)
+        tick_count += 1
+        time.sleep(TICK_INTERVAL)
 
 
 def _canvas_get(

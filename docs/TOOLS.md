@@ -93,7 +93,7 @@ OpenMind uses LLM function calling (tool use) to interact with external services
 | `todoist_add_task` | `content` (required), `due_string` (optional) | Create a task with optional due date. |
 | `todoist_list_tasks` | — | List active tasks (max 30). |
 
-### Gmail — 2 tools (enable: `openmind setup gmail`, requires `pip install ".[gmail]"`)
+### Gmail — 2 tools (enable: `openmind setup gmail`)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
@@ -108,7 +108,7 @@ OpenMind uses LLM function calling (tool use) to interact with external services
 | `slack_read_channel` | `channel` (required), `limit` (optional) | Read recent messages. Resolves channel names to IDs. |
 | `slack_list_channels` | — | List accessible channels with topics. |
 
-### Google Calendar — 3 tools (enable: `openmind setup calendar`, requires `pip install ".[calendar]"`)
+### Google Calendar — 3 tools (enable: `openmind setup calendar`)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|

@@ -45,7 +45,7 @@ You could knock out the outline at a Moffitt table tonight.
 | **Integrations** | Telegram, Gmail, Google Calendar, Slack, Todoist, Obsidian |
 | **Alerts** | Background heartbeat every 3 hours: deadline warnings, grade changes, submission checks, announcements |
 
-**38 tools total** — 25 always-on, 13 from optional integrations.
+**43 tools total** — 30 always-on, 13 from optional integrations.
 
 ## How It Works
 
@@ -107,13 +107,7 @@ brew install pipx
 pipx install openmind-berkeley
 ```
 
-**With optional integrations (from a local clone):**
-```bash
-pip install ".[telegram]"   # Telegram bot + alerts
-pip install ".[gmail]"      # Gmail search + read
-pip install ".[calendar]"   # Google Calendar sync
-pip install ".[all]"        # Everything
-```
+All integrations (Telegram, Gmail, Calendar) are included by default. No extras needed.
 
 ## Requirements
 
@@ -188,7 +182,7 @@ src/openmind/
 | [Setup Guide](docs/SETUP.md) | Detailed installation and configuration |
 | [Features](docs/FEATURES.md) | Everything you can do with OpenMind |
 | [Architecture](docs/ARCHITECTURE.md) | Technical design, data flow, module reference |
-| [Tools Reference](docs/TOOLS.md) | All 38 tools with parameters |
+| [Tools Reference](docs/TOOLS.md) | All 43 tools with parameters |
 | [Privacy & Security](docs/PRIVACY.md) | What data goes where |
 | [Contributing](docs/CONTRIBUTING.md) | How to add tools and features |
 | [Distribution](docs/DISTRIBUTION.md) | PyPI, pipx, and release workflow |
@@ -203,7 +197,7 @@ We welcome contributions! See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detail
 ```bash
 git clone https://github.com/qazybekb/openmind.git
 cd openmind
-pip install -e ".[all]"
+pip install -e .
 openmind --help
 ```
 

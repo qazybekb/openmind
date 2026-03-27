@@ -405,7 +405,7 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
         return _json_result(data)
 
     if name == "get_course_assignments":
-        course_id = _required_str(args, "course_id")
+        course_id = _safe_id(args, "course_id")
         if course_id is None:
             return _error_result("Missing required argument: course_id.")
         data = _get_paginated(
@@ -416,7 +416,7 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
         return _json_result(data)
 
     if name == "get_grades":
-        course_id = _required_str(args, "course_id")
+        course_id = _safe_id(args, "course_id")
         if course_id is None:
             return _error_result("Missing required argument: course_id.")
         data = _get(cfg, f"/courses/{course_id}/enrollments", {"user_id": "self"})
@@ -445,8 +445,8 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
         return _json_result(results)
 
     if name == "get_assignment_details":
-        course_id = _required_str(args, "course_id")
-        assignment_id = _required_str(args, "assignment_id")
+        course_id = _safe_id(args, "course_id")
+        assignment_id = _safe_id(args, "assignment_id")
         if course_id is None:
             return _error_result("Missing required argument: course_id.")
         if assignment_id is None:
@@ -455,31 +455,34 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
         return _json_result(data)
 
     if name == "get_assignment_groups":
-        course_id = _required_str(args, "course_id")
+        course_id = _safe_id(args, "course_id")
         if course_id is None:
             return _error_result("Missing required argument: course_id.")
         data = _get(cfg, f"/courses/{course_id}/assignment_groups")
         return _json_result(data)
 
     if name == "get_modules":
-        course_id = _required_str(args, "course_id")
+        course_id = _safe_id(args, "course_id")
         if course_id is None:
             return _error_result("Missing required argument: course_id.")
         data = _get_paginated(cfg, f"/courses/{course_id}/modules", {"include[]": "items"})
         return _json_result(data)
 
     if name == "get_page_content":
-        course_id = _required_str(args, "course_id")
+        course_id = _safe_id(args, "course_id")
         page_url = _required_str(args, "page_url")
         if course_id is None:
             return _error_result("Missing required argument: course_id.")
         if page_url is None:
             return _error_result("Missing required argument: page_url.")
-        data = _get(cfg, f"/courses/{course_id}/pages/{page_url}")
+        # URL-encode page_url to prevent path traversal
+        from urllib.parse import quote
+        safe_page_url = quote(page_url, safe="")
+        data = _get(cfg, f"/courses/{course_id}/pages/{safe_page_url}")
         return _json_result(data)
 
     if name == "get_course_files":
-        course_id = _required_str(args, "course_id")
+        course_id = _safe_id(args, "course_id")
         if course_id is None:
             return _error_result("Missing required argument: course_id.")
 
@@ -501,14 +504,14 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
         return _json_result(data)
 
     if name == "get_syllabus":
-        course_id = _required_str(args, "course_id")
+        course_id = _safe_id(args, "course_id")
         if course_id is None:
             return _error_result("Missing required argument: course_id.")
         data = _get(cfg, f"/courses/{course_id}", {"include[]": "syllabus_body"})
         return _json_result(data)
 
     if name == "get_discussion_topics":
-        course_id = _required_str(args, "course_id")
+        course_id = _safe_id(args, "course_id")
         if course_id is None:
             return _error_result("Missing required argument: course_id.")
         data = _get_paginated(cfg, f"/courses/{course_id}/discussion_topics")

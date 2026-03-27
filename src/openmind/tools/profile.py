@@ -190,6 +190,22 @@ def _execute_profile_tool(name: str, args: ToolArgs) -> str:
         if value is None:
             return _error_result("Missing required argument: value.")
 
+        # Allowlist writable fields to prevent prompt injection via profile
+        _ALLOWED_FIELDS = {
+            "level", "major", "school", "year", "expected_graduation",
+            "interests", "career_goals", "dream_companies", "gpa_goal",
+            "strengths", "areas_to_improve", "preferences",
+        }
+        if field not in _ALLOWED_FIELDS:
+            return _error_result(f"Cannot update field '{field}'. Allowed: {', '.join(sorted(_ALLOWED_FIELDS))}")
+
+        # Sanitize string values — strip control characters and cap length
+        if isinstance(value, str):
+            value = "".join(c for c in value if c.isprintable() or c in "\n\t")
+            value = value[:500]
+        elif isinstance(value, list):
+            value = [str(v)[:200] for v in value[:20]]
+
         profile = load_profile()
         profile[field] = value
         save_profile(profile)

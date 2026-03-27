@@ -23,14 +23,7 @@ pip install .
 pip install git+https://github.com/qazybekb/openmind.git
 ```
 
-### With optional integrations
-
-```bash
-pip install ".[telegram]"    # Telegram bot + background alerts
-pip install ".[gmail]"       # Gmail search + read
-pip install ".[calendar]"    # Google Calendar sync
-pip install ".[all]"         # Everything
-```
+All integrations (Telegram, Gmail, Calendar, Slack, Todoist, Obsidian) are included by default.
 
 ## Step 2: Run the setup wizard
 

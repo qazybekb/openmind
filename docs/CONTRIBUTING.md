@@ -5,7 +5,7 @@
 ```bash
 git clone https://github.com/qazybekb/openmind.git
 cd openmind
-pip install -e ".[all]"
+pip install -e .
 openmind --help
 ```
 
