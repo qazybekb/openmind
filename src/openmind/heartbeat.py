@@ -629,7 +629,7 @@ def _check_emails(cfg: ConfigDict) -> list[str]:
         return []
 
     try:
-        from openmind.tools.gmail import _get_gmail_service, _headers_map
+        from openmind.tools.gmail import _get_gmail_service, _headers_map, _extract_body
     except ImportError:
         return []
 
@@ -665,14 +665,15 @@ def _check_emails(cfg: ConfigDict) -> list[str]:
             msg = service.users().messages().get(
                 userId="me",
                 id=msg_id,
-                format="metadata",
-                metadataHeaders=["From", "Subject"],
+                format="full",
+                metadataHeaders=["From", "Subject", "Date"],
             ).execute()
         except Exception:
             logger.warning("Failed to fetch email %s", msg_id, exc_info=True)
             continue
 
-        headers = _headers_map(msg.get("payload", {}).get("headers", []))
+        payload = msg.get("payload", {})
+        headers = _headers_map(payload.get("headers", []))
         sender = headers.get("From", "Unknown")
         subject = headers.get("Subject", "(no subject)")
 
@@ -680,7 +681,22 @@ def _check_emails(cfg: ConfigDict) -> list[str]:
         if "<" in sender:
             sender = sender.split("<")[0].strip().strip('"')
 
-        new_items.append(f"\u2709\ufe0f {sender} \u2014 {subject}")
+        # Extract body preview
+        try:
+            body = _extract_body(payload) if isinstance(payload, dict) else ""
+            # Strip HTML tags for preview
+            import re
+            preview = re.sub(r'<[^>]+>', '', body).strip()
+            preview = " ".join(preview.split())[:150]
+        except Exception:
+            preview = ""
+
+        # Format notification
+        line = f"\u2709\ufe0f {sender} \u2014 {subject}"
+        if preview:
+            line += f"\n   [dim]{preview}[/dim]" if len(new_items) < 3 else ""
+
+        new_items.append(line)
 
     # Cap seen set to prevent unbounded growth
     if len(all_ids) > 500:
@@ -688,7 +704,7 @@ def _check_emails(cfg: ConfigDict) -> list[str]:
     _save_state("emails", {"seen": sorted(all_ids)})
 
     if new_items:
-        return ["New emails from Berkeley \U0001f43b\n" + "\n".join(new_items)]
+        return ["New Berkeley emails \U0001f43b\n" + "\n".join(new_items)]
     return []
 
 
