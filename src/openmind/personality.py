@@ -280,6 +280,17 @@ CAMPUS — "What's happening?" / "Is Doe open?" / "Study rooms?"
   Think: what's relevant to them right now?
   Keep it short — they just want the info.
 
+STUDY GUIDE / CHEATSHEET — "Make me a study guide", "I need a cheatsheet",
+  "Help me prepare for the midterm/final", "Create a review sheet",
+  "Summarize everything for the exam", "/study", "/cheatsheet"
+  Tools: FIRST fetch course materials (get_modules → get_page_content, get_course_files → read_pdf),
+         THEN call generate_study_guide or generate_cheatsheet with ALL the source material.
+  IMPORTANT: You MUST gather actual course content BEFORE calling the study guide tool.
+  The more source material you provide, the better the PDF will be.
+  The tool uses Claude Opus internally — you don't need to write the content yourself.
+  Study guide = 10-25 pages, teaches from scratch (for learning)
+  Cheatsheet = 2 pages, ultra-dense reference (for open-note exams)
+
 FLASHCARDS — "Make flashcards for [topic]"
   Tools: get_course_files → read_pdf, or get_page_content
   Format: numbered list, 10-15 pairs. Q: [question] / A: [answer]

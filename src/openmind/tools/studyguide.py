@@ -38,14 +38,13 @@ STUDY_GUIDE_TOOLS: list[ToolDefinition] = [
         "function": {
             "name": "generate_study_guide",
             "description": (
-                "Generate a comprehensive study guide PDF for a course or topic. "
-                "This is a LEARNING document — not a cheatsheet. A reader should be able to "
-                "pick it up from scratch and learn the entire subject thoroughly.\n\n"
-                "Provide: course_name (required), scope (optional, e.g. 'midterm', 'weeks 1-5'), "
-                "and source_material (required — the actual course content to cover, from Canvas "
-                "modules/lectures/readings. Fetch these BEFORE calling this tool).\n\n"
-                "The tool uses Claude Opus to generate the content and compiles to PDF.\n"
-                "Output: 10-25 page two-column professional PDF saved to ~/.openmind/study_guides/"
+                "Generate a comprehensive study guide PDF. Call this when the student asks for "
+                "a study guide, review sheet, exam prep document, or wants to prepare for a "
+                "midterm/final. This produces a 10-25 page teaching document.\n\n"
+                "BEFORE calling: fetch course materials using get_modules, get_page_content, "
+                "get_course_files, read_pdf. Pass ALL fetched content as source_material.\n\n"
+                "The tool uses Claude Opus internally to write the content and compiles to PDF.\n"
+                "Output: professional two-column PDF saved to ~/.openmind/study_guides/"
             ),
             "parameters": {
                 "type": "object",
@@ -72,15 +71,11 @@ STUDY_GUIDE_TOOLS: list[ToolDefinition] = [
         "function": {
             "name": "generate_cheatsheet",
             "description": (
-                "Generate a dense 2-page exam cheatsheet PDF. Unlike a study guide, this is a "
-                "REFERENCE document — maximum information in minimum space. Designed to be printed "
-                "and brought to an open-note exam.\n\n"
-                "Format: 2 columns, 7pt font, ultra-tight margins, no wasted space. "
-                "Every concept compressed to 1-2 lines. Key terms in bold. "
-                "Includes: frameworks, key definitions, case briefs (1-2 lines each), "
-                "comparisons, exam tips, author→concept maps, common mistakes.\n\n"
-                "Fetch course materials from Canvas BEFORE calling this tool.\n"
-                "Uses Claude Opus. Output: 2-page PDF at ~/.openmind/study_guides/"
+                "Generate a dense 2-page exam cheatsheet PDF. Call this when the student asks "
+                "for a cheatsheet, reference sheet, crib sheet, or formula sheet for an exam.\n\n"
+                "BEFORE calling: fetch course materials using get_modules, get_page_content, "
+                "get_course_files, read_pdf. Pass ALL fetched content as source_material.\n\n"
+                "Uses Claude Opus internally. Output: ultra-dense 2-page PDF at ~/.openmind/study_guides/"
             ),
             "parameters": {
                 "type": "object",
