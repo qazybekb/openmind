@@ -36,22 +36,21 @@ def run_repl(cfg: ConfigDict) -> None:
     console.print(f"  Hey {user_name}! {spirit()}")
     console.print("  [dim]Ask me anything about your classes. /help for commands, /quit to exit.[/dim]")
 
-    # Show tips — integrations and personalization
+    # Show tips — all integrations that aren't set up yet
     profile = load_profile()
     has_profile = any(v for v in profile.values())
-    tg_enabled = cfg.get("telegram", {}).get("enabled")
-    gmail_enabled = cfg.get("gmail", {}).get("enabled")
-    calendar_enabled = cfg.get("calendar", {}).get("enabled")
 
-    tips: list[str] = []
-    if not has_profile:
-        tips.append("[cyan]/setup profile[/cyan]  \u2014 add your major, goals, resume for personalized advice")
-    if not tg_enabled:
-        tips.append("[cyan]/setup telegram[/cyan] \u2014 chat from your phone + push notifications")
-    if not gmail_enabled:
-        tips.append("[cyan]/setup gmail[/cyan]    \u2014 search professor emails")
-    if not calendar_enabled:
-        tips.append("[cyan]/setup calendar[/cyan] \u2014 sync deadlines to Google Calendar")
+    all_tips = [
+        ("profile", has_profile, "[cyan]/setup profile[/cyan]  \u2014 add your major, goals, resume for personalized advice"),
+        ("telegram", cfg.get("telegram", {}).get("enabled"), "[cyan]/setup telegram[/cyan] \u2014 chat from your phone + push notifications"),
+        ("gmail", cfg.get("gmail", {}).get("enabled"), "[cyan]/setup gmail[/cyan]    \u2014 search professor emails"),
+        ("calendar", cfg.get("calendar", {}).get("enabled"), "[cyan]/setup calendar[/cyan] \u2014 sync deadlines to Google Calendar"),
+        ("slack", cfg.get("slack", {}).get("enabled"), "[cyan]/setup slack[/cyan]    \u2014 search course Slack channels"),
+        ("todoist", cfg.get("todoist", {}).get("enabled"), "[cyan]/setup todoist[/cyan]  \u2014 sync tasks"),
+        ("obsidian", cfg.get("obsidian", {}).get("enabled"), "[cyan]/setup obsidian[/cyan] \u2014 save notes to your vault"),
+    ]
+
+    tips = [tip for _, enabled, tip in all_tips if not enabled]
 
     if tips:
         console.print()
