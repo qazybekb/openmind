@@ -29,11 +29,13 @@ MODEL_CHOICES: Final[dict[str, str]] = {
     "1": "xiaomi/mimo-v2-pro",
     "2": "anthropic/claude-sonnet-4-6",
     "3": "openai/gpt-5.4",
+    "4": "google/gemini-2.5-pro",
 }
 MODEL_DESCRIPTIONS: Final[list[tuple[str, str, str]]] = [
     ("1", "xiaomi/mimo-v2-pro", "reliable + affordable, $1/$3 per 1M"),
     ("2", "anthropic/claude-sonnet-4-6", "best reasoning, $3/$15 per 1M"),
     ("3", "openai/gpt-5.4", "GPT ecosystem, $2.50/$15 per 1M"),
+    ("4", "google/gemini-2.5-pro", "1M context, strong Canvas analysis, $1.25/$10 per 1M"),
 ]
 OPENROUTER_MODELS_URL: Final[str] = "https://openrouter.ai/api/v1/models"
 REQUEST_TIMEOUT_S: Final[float] = 15.0
@@ -50,7 +52,7 @@ def _prompt_model_choice(show_default: bool = True) -> str:
         console.print(f"    [cyan]{num}[/cyan]  {model_id:<30s} \u2014 {desc}{default_tag}")
     console.print("    [dim]Or type any OpenRouter model ID[/dim]")
     console.print()
-    choice = Prompt.ask("  Enter 1, 2, 3, or a model ID", default="1")
+    choice = Prompt.ask("  Enter 1-4 or a model ID", default="1")
     return MODEL_CHOICES.get(choice, choice)
 
 
