@@ -528,7 +528,7 @@ def _setup_todoist() -> dict[str, Any]:
     console.print("    Validating...", end=" ")
     try:
         resp = httpx.get(
-            "https://api.todoist.com/rest/v2/projects",
+            "https://api.todoist.com/api/v1/projects",
             headers={"Authorization": f"Bearer {token}"},
             timeout=REQUEST_TIMEOUT_S,
         )

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 ToolArgs: TypeAlias = dict[str, Any]
 ToolDefinition: TypeAlias = dict[str, Any]
 
-API_BASE: Final[str] = "https://api.todoist.com/rest/v2"
+API_BASE: Final[str] = "https://api.todoist.com/api/v1"
 MAX_LISTED_TASKS: Final[int] = 30
 REQUEST_TIMEOUT_S: Final[float] = 15.0
 
