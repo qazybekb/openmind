@@ -17,33 +17,35 @@
     </h1>
 
     <!-- Tagline -->
-    <p class="text-sm md:text-base uppercase tracking-[0.25em] text-text-muted font-medium mb-8">
-      The AI study buddy that knows your campus.
-    </p>
-
-    <!-- Description -->
-    <p class="text-lg md:text-xl text-text-body max-w-2xl mx-auto mb-12 leading-relaxed">
-      Connects to bCourses, reads your lectures, tracks your deadlines, and talks like a Bear.<br class="hidden md:block"/>
-      Any LLM via OpenRouter. Runs on your machine.
+    <p class="text-lg md:text-xl text-text-body max-w-2xl mx-auto mb-6 leading-relaxed">
+      Know what's due. Check your grades in seconds. Get personalized study plans.<br class="hidden md:block"/>
+      All from your actual bCourses data. Free, private, runs on your machine.
     </p>
 
     <!-- Badge -->
-    <div class="badge mb-12">
+    <div class="badge mb-10">
       <span>🐻</span>
       Built at the School of Information, UC Berkeley
     </div>
 
     <!-- CTAs -->
-    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-20">
-      <button id="copy-btn" class="btn-primary flex items-center gap-2.5 text-base px-7 py-3">
-        <code class="font-mono font-medium">pip install git+https://github.com/qazybekb/openmind.git</code>
-        <svg class="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-        </svg>
-      </button>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
+      <a href="/#install" class="btn-primary text-base px-8 py-3 font-semibold">
+        Get Started &mdash; 5 minutes &rarr;
+      </a>
       <a href="https://github.com/qazybekb/openmind" target="_blank" class="btn-secondary text-base px-7 py-3">
         View on GitHub &rarr;
       </a>
+    </div>
+
+    <!-- Install command (secondary) -->
+    <div class="flex items-center justify-center gap-2 mb-20">
+      <code id="install-cmd" class="text-xs text-text-muted font-mono">pip install git+https://github.com/qazybekb/openmind.git</code>
+      <button id="copy-btn" class="text-text-muted hover:text-text-primary transition-colors" title="Copy">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Hero terminal -->

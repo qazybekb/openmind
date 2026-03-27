@@ -1,0 +1,35 @@
+---
+const prompts = [
+  { q: "What's due this week?", a: "NLP midterm report (Fri, 30% of grade) — start with the outline tonight." },
+  { q: "What do I need on the final for an A?", a: "You need 91% on the final. Currently at 87.3%. Doable." },
+  { q: "Teach me contextual integrity", a: "What do you already know? Let's start from your understanding..." },
+  { q: "Make me a study guide for the midterm", a: "Reading your course materials... generating 15-page PDF now." },
+  { q: "What skills am I missing for AI PM?", a: "Strong: Python, NLP. Gap: UX design — take INFO 214." },
+  { q: "Remind me about office hours Thursday", a: "Reminder set: Thursday 2pm — office hours. I'll ping you on Telegram." },
+];
+---
+<section class="section-sm">
+  <div class="container">
+    <div class="text-center mb-12 fade-in">
+      <div class="badge mb-5">Try asking</div>
+      <h2 class="text-3xl md:text-4xl font-bold text-text-primary tracking-tight mb-5">
+        What can you ask <span class="text-cal-gold">OpenMind?</span>
+      </h2>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+      {prompts.map((p, i) => (
+        <div class={`card fade-in`} style={`transition-delay: ${0.08 * (i + 1)}s`}>
+          <p class="text-text-primary font-medium text-sm mb-2">"{p.q}"</p>
+          <p class="text-text-muted text-xs leading-relaxed">{p.a}</p>
+        </div>
+      ))}
+    </div>
+
+    <p class="text-center mt-8 fade-in">
+      <a href="/use-cases/" class="text-text-secondary text-sm underline underline-offset-2 hover:text-text-primary transition-colors">
+        See 80+ example prompts &rarr;
+      </a>
+    </p>
+  </div>
+</section>
