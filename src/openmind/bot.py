@@ -501,7 +501,9 @@ def _build_application(cfg: ConfigDict) -> Application:
             response = await _chat_with_streaming(chat_id, messages, model_override=model_override)
             messages.append({"role": "assistant", "content": response})
             _prune_conversation(messages)
-            await _send_response(chat_id, response, reply_to=update.effective_message)
+            if len(response) > MESSAGE_CHUNK_SIZE:
+                await _send_response(chat_id, response)
+            await _send_generated_pdfs(chat_id, response)
         except Exception:
             logger.exception("Error handling slash command")
             await update.effective_message.reply_text(  # type: ignore[union-attr]

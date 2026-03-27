@@ -23,12 +23,35 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL: Final[str] = "xiaomi/mimo-v2-pro"
 MAX_COURSE_NICKNAME_LENGTH: Final[int] = 35
+
+# Shared model registry — single source of truth for all setup paths
+MODEL_CHOICES: Final[dict[str, str]] = {
+    "1": "xiaomi/mimo-v2-pro",
+    "2": "anthropic/claude-sonnet-4-6",
+    "3": "openai/gpt-5.4",
+}
+MODEL_DESCRIPTIONS: Final[list[tuple[str, str, str]]] = [
+    ("1", "xiaomi/mimo-v2-pro", "reliable + affordable, $1/$3 per 1M"),
+    ("2", "anthropic/claude-sonnet-4-6", "best reasoning, $3/$15 per 1M"),
+    ("3", "openai/gpt-5.4", "GPT ecosystem, $2.50/$15 per 1M"),
+]
 OPENROUTER_MODELS_URL: Final[str] = "https://openrouter.ai/api/v1/models"
 REQUEST_TIMEOUT_S: Final[float] = 15.0
 TELEGRAM_API_BASE: Final[str] = "https://api.telegram.org"
 TELEGRAM_VALIDATE_TIMEOUT_S: Final[float] = 10.0
 
 console: Console = Console()
+
+
+def _prompt_model_choice(show_default: bool = True) -> str:
+    """Display model menu and return chosen model ID."""
+    for num, model_id, desc in MODEL_DESCRIPTIONS:
+        default_tag = " [dim](default)[/dim]" if num == "1" and show_default else ""
+        console.print(f"    [cyan]{num}[/cyan]  {model_id:<30s} \u2014 {desc}{default_tag}")
+    console.print("    [dim]Or type any OpenRouter model ID[/dim]")
+    console.print()
+    choice = Prompt.ask("  Enter 1, 2, 3, or a model ID", default="1")
+    return MODEL_CHOICES.get(choice, choice)
 
 
 def _mask_key(key: str) -> str:
@@ -126,19 +149,7 @@ def run_first_setup() -> None:
         padding=(1, 2),
     ))
 
-    console.print("    [cyan]1[/cyan]  xiaomi/mimo-v2-pro           \u2014 reliable + affordable, $1/$3 per 1M [dim](default)[/dim]")
-    console.print("    [cyan]2[/cyan]  anthropic/claude-sonnet-4-6  \u2014 best reasoning, $3/$15 per 1M")
-    console.print("    [cyan]3[/cyan]  openai/gpt-5.4              \u2014 GPT ecosystem, $2.50/$15 per 1M")
-    console.print("    [dim]Or type any OpenRouter model ID[/dim]")
-    console.print()
-
-    _model_choices = {
-        "1": "xiaomi/mimo-v2-pro",
-        "2": "anthropic/claude-sonnet-4-6",
-        "3": "openai/gpt-5.4",
-    }
-    choice = Prompt.ask("  Enter 1, 2, 3, or a model ID", default="1")
-    cfg["model"] = _model_choices.get(choice, choice)
+    cfg["model"] = _prompt_model_choice()
 
     # Step 3: OpenRouter API key
     console.print(Panel(
@@ -384,20 +395,8 @@ def _setup_openrouter_full() -> tuple[str, str]:
     """Validate OpenRouter key + choose model."""
     api_key = _setup_openrouter_key()
 
-    console.print("\n  [bold]Choose your LLM model[/bold]")
-    console.print("  [dim]All models below support tool calling (required for OpenMind)[/dim]\n")
-    console.print("    [cyan]1[/cyan]  xiaomi/mimo-v2-pro           \u2014 reliable + affordable, $1/$3 per 1M [dim](default)[/dim]")
-    console.print("    [cyan]2[/cyan]  anthropic/claude-sonnet-4-6  \u2014 best reasoning, $3/$15 per 1M")
-    console.print("    [cyan]3[/cyan]  openai/gpt-5.4              \u2014 GPT ecosystem, $2.50/$15 per 1M")
-    console.print("    [dim]Or type any OpenRouter model ID[/dim]")
-
-    _model_choices = {
-        "1": "xiaomi/mimo-v2-pro",
-        "2": "anthropic/claude-sonnet-4-6",
-        "3": "openai/gpt-5.4",
-    }
-    choice = Prompt.ask("\n  Enter 1, 2, 3, or a model ID", default="1")
-    model = _model_choices.get(choice, choice)
+    console.print("\n  [bold]Choose your LLM model[/bold]\n")
+    model = _prompt_model_choice()
     return api_key, model
 
 
@@ -405,19 +404,7 @@ def _setup_model_change(cfg: ConfigDict) -> None:
     """Change the LLM model."""
     current = cfg.get("model", DEFAULT_MODEL)
     console.print(f"\n  Current model: [bold]{current}[/bold]\n")
-    console.print("  [bold]Choose your LLM model[/bold]\n")
-    console.print("    [cyan]1[/cyan]  xiaomi/mimo-v2-pro           \u2014 reliable + affordable, $1/$3 per 1M")
-    console.print("    [cyan]2[/cyan]  anthropic/claude-sonnet-4-6  \u2014 best reasoning, $3/$15 per 1M")
-    console.print("    [cyan]3[/cyan]  openai/gpt-5.4              \u2014 GPT ecosystem, $2.50/$15 per 1M")
-    console.print("    [dim]Or type any OpenRouter model ID[/dim]")
-
-    _model_choices = {
-        "1": "xiaomi/mimo-v2-pro",
-        "2": "anthropic/claude-sonnet-4-6",
-        "3": "openai/gpt-5.4",
-    }
-    choice = Prompt.ask("\n  Enter 1, 2, 3, or a model ID", default="1")
-    cfg["model"] = _model_choices.get(choice, choice)
+    cfg["model"] = _prompt_model_choice(show_default=False)
     save_config(cfg)
     console.print(f"  Model changed to: [bold]{cfg['model']}[/bold]")
 
