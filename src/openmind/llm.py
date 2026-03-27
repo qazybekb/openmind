@@ -157,6 +157,7 @@ def chat(
     *,
     client: OpenAI | None = None,
     model_override: str | None = None,
+    on_tool_call: Any | None = None,
 ) -> str:
     """Send messages to the LLM, execute tool calls, and return the final reply."""
     if client is None:
@@ -215,6 +216,8 @@ def chat(
         # Execute each tool call and append results
         for tool_call in message.tool_calls:
             fn_name = tool_call.function.name
+            if on_tool_call:
+                on_tool_call(fn_name)
             try:
                 fn_args = json.loads(tool_call.function.arguments)
                 if not isinstance(fn_args, dict):

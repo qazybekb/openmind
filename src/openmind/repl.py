@@ -33,9 +33,17 @@ def run_repl(cfg: ConfigDict) -> None:
 
     from openmind.universities import spirit
 
+    import time as _time
+
     print_banner(console)
+
+    # #3: Session greeting with context
+    model = cfg.get("model", "unknown")
+    num_courses = len(cfg.get("courses", {}))
+    tg_status = "Telegram active" if cfg.get("telegram", {}).get("enabled") else "Terminal only"
     console.print(f"  Hey {user_name}! {spirit()}")
-    console.print("  [dim]Ask me anything about your classes. /help for commands, /quit to exit.[/dim]")
+    console.print(f"  [dim]{num_courses} courses \u00b7 {model} \u00b7 {tg_status}[/dim]")
+    console.print("  [dim]Ask me anything. /help for commands, /quit to exit.[/dim]")
 
     # Show tips — all integrations that aren't set up yet
     profile = load_profile()
@@ -60,6 +68,13 @@ def run_repl(cfg: ConfigDict) -> None:
         console.print("  [dim]\U0001f4a1 Make OpenMind even better:[/dim]")
         for tip in tips:
             console.print(f"  [dim]   {tip}[/dim]")
+
+    # #2: First-time example prompts
+    console.print()
+    console.print("  [dim]Try asking:[/dim]")
+    console.print("  [dim]   \u2192 What's due this week?[/dim]")
+    console.print("  [dim]   \u2192 How are my grades?[/dim]")
+    console.print("  [dim]   \u2192 Teach me about [topic][/dim]")
     console.print()
 
     # Consume pending resume import from setup wizard
@@ -168,14 +183,56 @@ def run_repl(cfg: ConfigDict) -> None:
             console.print()
 
             try:
-                with console.status("[dim]Thinking...[/dim]", spinner="dots"):
-                    response = chat(cfg, messages, client=client)
+                start_time = _time.time()
+                tool_count = 0
+                status = console.status("[dim]Thinking...[/dim]", spinner="dots")
+
+                # #1: Show tool call progress
+                _TOOL_LABELS = {
+                    "get_upcoming_assignments": "Checking deadlines",
+                    "get_course_assignments": "Reading assignments",
+                    "get_grades": "Checking grades",
+                    "get_all_grades": "Checking all grades",
+                    "get_assignment_details": "Reading assignment details",
+                    "get_modules": "Reading modules",
+                    "get_page_content": "Reading page",
+                    "get_course_files": "Listing files",
+                    "get_announcements": "Checking announcements",
+                    "get_syllabus": "Reading syllabus",
+                    "get_discussion_topics": "Reading discussions",
+                    "gpa_calculator": "Calculating GPA",
+                    "berkeley_course_search": "Searching courses",
+                    "web_fetch": "Fetching web page",
+                    "web_search": "Searching the web",
+                    "read_pdf": "Reading PDF",
+                    "get_profile": "Reading your profile",
+                    "gmail_search": "Searching emails",
+                    "generate_study_guide": "Generating study guide (Opus)",
+                    "generate_cheatsheet": "Generating cheatsheet (Opus)",
+                }
+
+                def _on_tool(name: str) -> None:
+                    nonlocal tool_count
+                    tool_count += 1
+                    label = _TOOL_LABELS.get(name, name.replace("_", " "))
+                    status.update(f"[dim]{label}...[/dim]")
+
+                status.start()
+                try:
+                    response = chat(cfg, messages, client=client, on_tool_call=_on_tool)
+                finally:
+                    status.stop()
+                elapsed = _time.time() - start_time
             except KeyboardInterrupt:
                 console.print("\n[dim]Cancelled.[/dim]")
                 messages.pop()
                 continue
 
             console.print(Markdown(response))
+
+            # #4: Response time + tool count
+            tool_info = f" \u00b7 {tool_count} tool calls" if tool_count else ""
+            console.print(f"  [dim]{elapsed:.1f}s \u00b7 {cfg.get('model', '?')}{tool_info}[/dim]")
             console.print()
         except Exception as exc:
             logger.exception("REPL request failed")
