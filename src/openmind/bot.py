@@ -29,6 +29,8 @@ ChatMessage: TypeAlias = dict[str, Any]
 
 MAX_CONVERSATION_MESSAGES: Final[int] = 60
 MESSAGE_CHUNK_SIZE: Final[int] = 4_000
+STARTUP_TIMEOUT_S: Final[float] = 20.0
+SHUTDOWN_TIMEOUT_S: Final[float] = 10.0
 
 console: Console = Console()
 logger = logging.getLogger(__name__)
@@ -99,20 +101,15 @@ def _prune_conversation(messages: list[ChatMessage]) -> None:
         del messages[: len(messages) - MAX_CONVERSATION_MESSAGES]
 
 
-def run_bot(cfg: ConfigDict) -> None:
-    """Start the Telegram bot with a background heartbeat thread."""
+def _build_application(cfg: ConfigDict) -> Application:
+    """Build the Telegram application and register all handlers."""
     tg = cfg.get("telegram", {})
     bot_token = str(tg.get("bot_token", ""))
     allowed_user = str(tg.get("user_id", ""))
     uni = cfg.get("university", {})
 
     if not bot_token:
-        console.print("[red]Telegram bot token not configured.[/red] Run: openmind setup")
-        return
-
-    console.print(f"\n{uni.get('mascot', '')} Starting bot... {uni.get('spirit', '')}")
-    console.print(f"[dim]Telegram bot active. Heartbeat every {HEARTBEAT_INTERVAL // 3600} hours.[/dim]")
-    console.print("[dim]Press Ctrl+C to stop.[/dim]\n")
+        raise ValueError("Telegram bot token not configured. Run: openmind setup")
 
     llm_client = create_client(cfg)
 
@@ -540,14 +537,6 @@ def run_bot(cfg: ConfigDict) -> None:
                 reply_markup=_quick_action_keyboard(),
             )
 
-    # Background heartbeat
-    heartbeat_thread = threading.Thread(
-        target=start_heartbeat,
-        args=(cfg, bot_token, allowed_user),
-        daemon=True,
-    )
-    heartbeat_thread.start()
-
     # Telegram application
     application = Application.builder().token(bot_token).build()
     application.add_handler(CommandHandler("start", cmd_start))
@@ -566,11 +555,11 @@ def run_bot(cfg: ConfigDict) -> None:
     application.add_handler(MessageHandler((filters.TEXT | filters.Document.ALL) & ~filters.COMMAND, handle_message))
 
     # Send welcome message before polling starts
-    async def _send_welcome() -> None:
+    async def _send_welcome(app: Application) -> None:
         if allowed_user:
             try:
                 name = cfg.get("user_name", "there")
-                await application.bot.send_message(
+                await app.bot.send_message(
                     chat_id=int(allowed_user),
                     text=(
                         f"\U0001f43b Hey {name}! OpenMind is online. {uni.get('spirit', '')}\n\n"
@@ -582,4 +571,192 @@ def run_bot(cfg: ConfigDict) -> None:
                 logger.warning("Failed to send startup message", exc_info=True)
 
     application.post_init = _send_welcome  # type: ignore[assignment]
-    application.run_polling()
+    return application
+
+
+async def _run_application_callback(application: Application, name: str) -> None:
+    """Run an optional PTB lifecycle callback when one is configured."""
+    callback = getattr(application, name, None)
+    if callback is not None:
+        await callback(application)
+
+
+class TelegramBotService:
+    """Run the Telegram bot on its own asyncio loop in a background thread."""
+
+    def __init__(self, cfg: ConfigDict) -> None:
+        tg = cfg.get("telegram", {})
+        self._cfg = cfg
+        self._bot_token = str(tg.get("bot_token", ""))
+        self._allowed_user = str(tg.get("user_id", ""))
+        if not self._bot_token:
+            raise ValueError("Telegram bot token not configured. Run: openmind setup")
+
+        self._application: Application | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread = threading.Thread(
+            target=self._thread_main,
+            name="openmind-telegram",
+            daemon=True,
+        )
+        self._heartbeat_stop = threading.Event()
+        self._heartbeat_thread: threading.Thread | None = None
+        self._startup_complete = threading.Event()
+        self._stopped = threading.Event()
+        self._exception: BaseException | None = None
+        self._initialized = False
+        self._polling_started = False
+        self._application_started = False
+
+    @property
+    def running(self) -> bool:
+        """Return whether the bot thread is still alive without a fatal exception."""
+        return self._thread.is_alive() and self._exception is None
+
+    def start(self, timeout: float = STARTUP_TIMEOUT_S) -> None:
+        """Start the Telegram bot thread and wait for startup to complete."""
+        if self._thread.is_alive():
+            return
+
+        self._thread.start()
+        if not self._startup_complete.wait(timeout):
+            raise RuntimeError("Telegram bot did not finish starting within the timeout.")
+        if self._exception is not None:
+            raise RuntimeError("Telegram bot failed to start.") from self._exception
+        if not self._thread.is_alive():
+            raise RuntimeError("Telegram bot exited unexpectedly during startup.")
+
+    def stop(self, timeout: float = SHUTDOWN_TIMEOUT_S) -> None:
+        """Stop the Telegram bot and wait briefly for the thread to finish."""
+        self._heartbeat_stop.set()
+        loop = self._loop
+        if loop is not None and not loop.is_closed():
+            try:
+                loop.call_soon_threadsafe(loop.stop)
+            except RuntimeError:
+                logger.debug("Telegram event loop was already closing.")
+
+        if self._thread.is_alive():
+            self._thread.join(timeout)
+            if self._thread.is_alive():
+                logger.warning("Timed out waiting for the Telegram bot thread to stop cleanly.")
+
+    def wait(self) -> None:
+        """Block until the Telegram bot thread exits."""
+        self._thread.join()
+        if self._exception is not None:
+            raise RuntimeError("Telegram bot stopped unexpectedly.") from self._exception
+
+    def _start_heartbeat(self) -> None:
+        """Start the heartbeat thread when a Telegram target chat is configured."""
+        if not self._allowed_user:
+            logger.info("Telegram heartbeat disabled because no Telegram user_id is configured.")
+            return
+
+        self._heartbeat_thread = threading.Thread(
+            target=start_heartbeat,
+            args=(self._cfg, self._bot_token, self._allowed_user, self._heartbeat_stop),
+            name="openmind-heartbeat",
+            daemon=True,
+        )
+        self._heartbeat_thread.start()
+
+    async def _async_start(self) -> None:
+        """Initialize PTB and start polling on the thread-local event loop."""
+        application = self._application
+        if application is None:
+            raise RuntimeError("Telegram application was not built.")
+        if application.updater is None:
+            raise RuntimeError("Telegram polling is unavailable because no updater was created.")
+
+        await application.initialize()
+        self._initialized = True
+        await _run_application_callback(application, "post_init")
+        await application.updater.start_polling()
+        self._polling_started = True
+        await application.start()
+        self._application_started = True
+
+    async def _async_shutdown(self) -> None:
+        """Shut PTB down in the reverse order of startup."""
+        application = self._application
+        if application is None:
+            return
+
+        if self._polling_started and application.updater is not None:
+            await application.updater.stop()
+            self._polling_started = False
+
+        if self._application_started:
+            await application.stop()
+            self._application_started = False
+            await _run_application_callback(application, "post_stop")
+
+        if self._initialized:
+            await application.shutdown()
+            self._initialized = False
+            await _run_application_callback(application, "post_shutdown")
+
+    def _thread_main(self) -> None:
+        """Own the bot event loop for the lifetime of the service thread."""
+        loop = asyncio.new_event_loop()
+        self._loop = loop
+        asyncio.set_event_loop(loop)
+        try:
+            self._application = _build_application(self._cfg)
+            loop.run_until_complete(self._async_start())
+            self._start_heartbeat()
+            self._startup_complete.set()
+            loop.run_forever()
+        except Exception as exc:
+            self._exception = exc
+            logger.exception("Telegram bot runtime failed")
+            self._startup_complete.set()
+        finally:
+            self._heartbeat_stop.set()
+            try:
+                loop.run_until_complete(self._async_shutdown())
+            except Exception:
+                logger.exception("Failed to shut down Telegram bot cleanly")
+            finally:
+                if self._heartbeat_thread is not None and self._heartbeat_thread.is_alive():
+                    self._heartbeat_thread.join(timeout=2.0)
+
+                pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                loop.close()
+                self._stopped.set()
+
+
+def start_bot_service(cfg: ConfigDict) -> TelegramBotService:
+    """Start the Telegram bot service in the background."""
+    service = TelegramBotService(cfg)
+    service.start()
+    return service
+
+
+def run_bot(cfg: ConfigDict) -> None:
+    """Run the Telegram bot as a standalone blocking process."""
+    uni = cfg.get("university", {})
+
+    try:
+        service = start_bot_service(cfg)
+    except Exception:
+        logger.exception("Telegram bot failed to start")
+        console.print("[red]Telegram bot failed to start.[/red] Run: openmind setup telegram")
+        return
+
+    console.print(f"\n{uni.get('mascot', '')} Starting bot... {uni.get('spirit', '')}")
+    console.print(f"[dim]Telegram bot active. Heartbeat every {HEARTBEAT_INTERVAL // 3600} hours.[/dim]")
+    console.print("[dim]Press Ctrl+C to stop.[/dim]\n")
+
+    try:
+        service.wait()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        service.stop()

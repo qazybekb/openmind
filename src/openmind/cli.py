@@ -66,32 +66,58 @@ def _ensure_config() -> ConfigDict:
     return cfg
 
 
+def _run_repl(cfg: ConfigDict) -> None:
+    """Import and run the terminal REPL lazily."""
+    from openmind.repl import run_repl
+
+    run_repl(cfg)
+
+
+def _start_telegram_service(cfg: ConfigDict) -> object:
+    """Import and start the Telegram bot service lazily."""
+    from openmind.bot import start_bot_service
+
+    return start_bot_service(cfg)
+
+
+def _run_interactive_session(cfg: ConfigDict) -> None:
+    """Run the main REPL, with Telegram in the background when enabled."""
+    bot_service: object | None = None
+    telegram_enabled = bool(cfg.get("telegram", {}).get("enabled"))
+
+    if telegram_enabled:
+        uni = cfg.get("university", {})
+        console.print(f"\n{uni.get('mascot', '')} Starting Telegram in the background... {uni.get('spirit', '')}")
+        console.print("[dim]Terminal REPL stays in the foreground. Telegram + heartbeat keep running in parallel.[/dim]\n")
+        try:
+            bot_service = _start_telegram_service(cfg)
+        except ImportError:
+            logger.warning("Telegram dependency missing.", exc_info=True)
+            console.print("[yellow]Telegram failed to load. Falling back to terminal chat only.[/yellow]")
+        except Exception:
+            logger.exception("Telegram service failed to start")
+            console.print("[yellow]Telegram failed to start. Continuing with terminal chat only.[/yellow]")
+
+    try:
+        _run_repl(cfg)
+    finally:
+        if bot_service is not None:
+            stop = getattr(bot_service, "stop", None)
+            if callable(stop):
+                stop()
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
     version: bool = typer.Option(False, "--version", "-v", callback=_version_callback, is_eager=True, help="Show version and exit"),
 ) -> None:
-    """Launch openmind. Runs setup on first use, then starts the bot."""
+    """Launch openmind. Runs setup on first use, then starts the REPL and optional Telegram bot."""
     if ctx.invoked_subcommand is not None:
         return
 
     cfg = _ensure_config()
-
-    if cfg.get("telegram", {}).get("enabled"):
-        try:
-            from openmind.bot import run_bot
-
-            run_bot(cfg)
-        except ImportError:
-            logger.warning("Telegram dependency missing.", exc_info=True)
-            console.print("[yellow]Telegram failed to load.[/yellow]")
-            from openmind.repl import run_repl
-
-            run_repl(cfg)
-    else:
-        from openmind.repl import run_repl
-
-        run_repl(cfg)
+    _run_interactive_session(cfg)
 
 
 @app.command()
@@ -181,9 +207,7 @@ def config() -> None:
 def chat() -> None:
     """Start the terminal REPL (no Telegram, local only)."""
     cfg = _ensure_config()
-    from openmind.repl import run_repl
-
-    run_repl(cfg)
+    _run_repl(cfg)
 
 
 @app.command()

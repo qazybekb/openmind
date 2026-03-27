@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from typer.testing import CliRunner
 
-from openmind.cli import app
+from openmind.cli import _run_interactive_session, app
 from openmind.setup_wizard import DEFAULT_MODEL, run_first_setup
 
 runner = CliRunner()
@@ -40,6 +41,54 @@ class CliTests(unittest.TestCase):
         self.assertIn("no openmind server", out)
         self.assertIn("sent to your llm provider", out)
         self.assertIn("never sent to the llm", out)
+
+    def test_interactive_session_runs_repl_and_background_bot_together(self) -> None:
+        """Start Telegram in the background while keeping the REPL in the foreground."""
+        cfg = {
+            "telegram": {"enabled": True},
+            "university": {"mascot": "Bear", "spirit": "Go Bears!"},
+        }
+        service = SimpleNamespace(stop=unittest.mock.Mock())
+
+        with (
+            patch("openmind.cli._start_telegram_service", return_value=service) as start_service,
+            patch("openmind.cli._run_repl") as run_repl,
+            patch("openmind.cli.console.print"),
+        ):
+            _run_interactive_session(cfg)
+
+        start_service.assert_called_once_with(cfg)
+        run_repl.assert_called_once_with(cfg)
+        service.stop.assert_called_once_with()
+
+    def test_interactive_session_keeps_repl_when_telegram_start_fails(self) -> None:
+        """Fall back to terminal chat when Telegram cannot start."""
+        cfg = {"telegram": {"enabled": True}}
+
+        with (
+            patch("openmind.cli._start_telegram_service", side_effect=RuntimeError("boom")) as start_service,
+            patch("openmind.cli._run_repl") as run_repl,
+            patch("openmind.cli.console.print"),
+        ):
+            _run_interactive_session(cfg)
+
+        start_service.assert_called_once_with(cfg)
+        run_repl.assert_called_once_with(cfg)
+
+    def test_interactive_session_stops_background_bot_when_repl_exits(self) -> None:
+        """Always stop the background bot service even when the REPL errors out."""
+        cfg = {"telegram": {"enabled": True}}
+        service = SimpleNamespace(stop=unittest.mock.Mock())
+
+        with (
+            patch("openmind.cli._start_telegram_service", return_value=service),
+            patch("openmind.cli._run_repl", side_effect=RuntimeError("repl stopped")),
+            patch("openmind.cli.console.print"),
+        ):
+            with self.assertRaises(RuntimeError):
+                _run_interactive_session(cfg)
+
+        service.stop.assert_called_once_with()
 
 
 class SetupWizardTests(unittest.TestCase):

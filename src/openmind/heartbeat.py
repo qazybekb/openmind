@@ -7,7 +7,7 @@ import logging
 import os
 import stat
 import tempfile
-import time
+import threading
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -66,8 +66,26 @@ def _acquire_heartbeat_lock() -> bool:
         return True  # Fail open — better to double-notify than never notify
 
 
-def start_heartbeat(cfg: ConfigDict, bot_token: str, chat_id: str) -> None:
+def _release_heartbeat_lock() -> None:
+    """Release the heartbeat PID lock when it belongs to this process."""
+    lock_file = STATE_DIR / "heartbeat.pid"
+    try:
+        if not lock_file.exists():
+            return
+        if lock_file.read_text(encoding="utf-8").strip() == str(os.getpid()):
+            lock_file.unlink(missing_ok=True)
+    except OSError:
+        logger.warning("Could not release heartbeat lock", exc_info=True)
+
+
+def start_heartbeat(
+    cfg: ConfigDict,
+    bot_token: str,
+    chat_id: str,
+    stop_event: threading.Event | None = None,
+) -> None:
     """Run heartbeat checks in a loop."""
+    stop_signal = stop_event or threading.Event()
     try:
         _ensure_private_state_dir()
     except OSError:
@@ -78,38 +96,43 @@ def start_heartbeat(cfg: ConfigDict, bot_token: str, chat_id: str) -> None:
         logger.info("Another heartbeat is already running, skipping.")
         return
 
-    time.sleep(INITIAL_STARTUP_DELAY_S)
+    try:
+        if stop_signal.wait(INITIAL_STARTUP_DELAY_S):
+            return
 
-    tick_count = 0
-    while True:
-        try:
-            # Lightweight checks every hour (reminders, briefing)
-            briefing = _check_morning_briefing(cfg)
-            if briefing:
-                _send_telegram(bot_token, chat_id, briefing)
+        tick_count = 0
+        while not stop_signal.is_set():
+            try:
+                # Lightweight checks every hour (reminders, briefing)
+                briefing = _check_morning_briefing(cfg)
+                if briefing:
+                    _send_telegram(bot_token, chat_id, briefing)
 
-            reminder_notifications = _check_reminders()
-            if reminder_notifications:
-                _send_telegram(bot_token, chat_id, "\n\n".join(reminder_notifications))
+                reminder_notifications = _check_reminders()
+                if reminder_notifications:
+                    _send_telegram(bot_token, chat_id, "\n\n".join(reminder_notifications))
 
-            # Full Canvas checks every 3 hours (every 3rd tick)
-            if tick_count % 3 == 0:
-                notifications: list[str] = []
-                notifications.extend(_check_deadlines(cfg))
-                notifications.extend(_check_submissions(cfg))
-                notifications.extend(_check_grades(cfg))
-                notifications.extend(_check_announcements(cfg))
-                notifications.extend(_check_emails(cfg))
+                # Full Canvas checks every 3 hours (every 3rd tick)
+                if tick_count % 3 == 0:
+                    notifications: list[str] = []
+                    notifications.extend(_check_deadlines(cfg))
+                    notifications.extend(_check_submissions(cfg))
+                    notifications.extend(_check_grades(cfg))
+                    notifications.extend(_check_announcements(cfg))
+                    notifications.extend(_check_emails(cfg))
 
-                if notifications:
-                    summary = "\n\n".join(notifications)
-                    if _should_notify(summary):
-                        _send_telegram(bot_token, chat_id, summary)
-        except Exception:
-            logger.exception("Heartbeat cycle failed")
+                    if notifications:
+                        summary = "\n\n".join(notifications)
+                        if _should_notify(summary):
+                            _send_telegram(bot_token, chat_id, summary)
+            except Exception:
+                logger.exception("Heartbeat cycle failed")
 
-        tick_count += 1
-        time.sleep(TICK_INTERVAL)
+            tick_count += 1
+            if stop_signal.wait(TICK_INTERVAL):
+                break
+    finally:
+        _release_heartbeat_lock()
 
 
 def _canvas_get(
