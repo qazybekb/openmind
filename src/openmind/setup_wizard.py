@@ -119,7 +119,7 @@ def run_first_setup() -> None:
     # Step 2: Choose model
     console.print(Panel(
         "Pick the AI model that will power OpenMind.\n"
-        "All models below support tool calling (required).\n"
+        "All models below can read your Canvas data and call tools in real time.\n"
         "You can change this later with: [cyan]openmind setup model[/cyan]",
         title="[bold]Step 2 of 3[/bold] \u2014 Choose your LLM",
         border_style="yellow",
@@ -300,8 +300,13 @@ def _setup_canvas(canvas_url: str) -> tuple[str, str, dict[str, str]]:
                 console.print(f"[green]Connected![/green] Hey {user_name} \U0001f43b")
                 break
             console.print(_canvas_status_message(response.status_code))
+            if response.status_code == 401:
+                console.print("  [dim]Generate a new token: bCourses \u2192 Profile \u2192 Settings \u2192 + New Access Token[/dim]")
         except httpx.HTTPError:
-            console.print("[red]Connection error. Check your network.[/red]")
+            console.print("[red]Connection error. Check your network and try again.[/red]")
+
+        if not Confirm.ask("  Try again?", default=True):
+            raise SystemExit("Setup cancelled.")
 
     # Discover courses
     console.print("  Finding your courses...", end=" ")
@@ -332,6 +337,11 @@ def _setup_canvas(canvas_url: str) -> tuple[str, str, dict[str, str]]:
     except httpx.HTTPError:
         console.print("[yellow]Could not fetch courses.[/yellow]")
 
+    if not courses:
+        console.print("  [yellow]No active courses found.[/yellow]")
+        console.print("  [dim]This might happen if you're between semesters or haven't enrolled yet.[/dim]")
+        console.print("  [dim]You can still use OpenMind — courses will appear when you enroll.[/dim]")
+
     return token, user_name, courses
 
 
@@ -359,9 +369,16 @@ def _setup_openrouter_key() -> str:
             if response.status_code == 200:
                 console.print("[green]OK[/green]")
                 return api_key
-            console.print(f"[red]Failed (HTTP {response.status_code})[/red]")
+            if response.status_code == 401:
+                console.print("[red]Invalid API key.[/red]")
+                console.print("  [dim]Double-check your key at openrouter.ai/keys[/dim]")
+            else:
+                console.print(f"[red]Failed (HTTP {response.status_code}). OpenRouter may be temporarily down.[/red]")
         except httpx.HTTPError:
-            console.print("[red]Connection error.[/red]")
+            console.print("[red]Connection error. Check your network.[/red]")
+
+        if not Confirm.ask("  Try again?", default=True):
+            raise SystemExit("Setup cancelled.")
 
 
 def _setup_openrouter_full() -> tuple[str, str]:
@@ -446,14 +463,17 @@ def _setup_profile() -> None:
     if goals:
         profile["career_goals"] = [g.strip() for g in goals.split(",") if g.strip()]
 
-    resume_path = Prompt.ask("  Resume PDF path (for skill extraction, or Enter to skip)", default="")
-    if resume_path:
+    while True:
+        resume_path = Prompt.ask("  Resume PDF path (for skill extraction, or Enter to skip)", default="")
+        if not resume_path:
+            break
         resolved = Path(resume_path).expanduser()
         if resolved.exists() and resolved.suffix.lower() == ".pdf":
             profile["_pending_resume"] = str(resolved)
             console.print("  [green]Resume noted![/green] Skills will be extracted on your first chat.")
-        elif resume_path.strip():
-            console.print(f"  [yellow]File not found or not a PDF: {resolved}[/yellow]")
+            break
+        console.print(f"  [yellow]File not found or not a PDF: {resolved}[/yellow]")
+        console.print("  [dim]Check the path and try again, or press Enter to skip.[/dim]")
 
     # Only save if the user actually entered something
     meaningful_keys = [k for k, v in profile.items() if v]
@@ -535,10 +555,12 @@ def _setup_todoist() -> dict[str, Any]:
         if resp.status_code == 200:
             console.print("[green]OK[/green]")
             return {"enabled": True, "token": token}
-        console.print(f"[red]Failed (HTTP {resp.status_code})[/red]")
+        console.print(f"[red]Failed (HTTP {resp.status_code}). Check your token at todoist.com/app/settings/integrations/developer[/red]")
     except httpx.HTTPError:
         console.print("[red]Connection error.[/red]")
 
+    if Confirm.ask("    Try again?", default=True):
+        return _setup_todoist()
     return {"enabled": False}
 
 
@@ -630,6 +652,8 @@ def _setup_slack() -> dict[str, Any]:
                 console.print(f"    [green]Connected to {data.get('team', '?')} as {data.get('user', '?')}[/green]")
             else:
                 console.print(f"    [yellow]Validation failed: {data.get('error', 'unknown')}[/yellow]")
+                if Confirm.ask("    Try again?", default=True):
+                    return _setup_slack()
                 return {"enabled": False}
     except httpx.HTTPError:
         console.print("    [yellow]Could not validate token.[/yellow]")

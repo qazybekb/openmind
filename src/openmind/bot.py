@@ -128,11 +128,16 @@ def run_bot(cfg: ConfigDict) -> None:
 
             # Send any generated PDFs (study guides, cheatsheets)
             await _send_generated_pdfs(update.effective_message.chat_id, response)
-        except Exception:
+        except Exception as exc:
             logger.exception("Error handling message")
-            await update.effective_message.reply_text(
-                "Something went wrong while handling that request. Try again in a sec."
-            )
+            err_msg = str(exc).lower()
+            if "timeout" in err_msg:
+                reply = "The AI model took too long to respond. Try a shorter question or try again."
+            elif "401" in err_msg or "auth" in err_msg:
+                reply = "Authentication error with your AI model. Check your OpenRouter key."
+            else:
+                reply = "Something went wrong \u2014 this might be a network issue. Try again in a moment."
+            await update.effective_message.reply_text(reply)
             messages.pop()
 
     async def _handle_pdf(update: Update, user_id: str, doc: Any) -> None:

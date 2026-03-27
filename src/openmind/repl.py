@@ -128,9 +128,15 @@ def run_repl(cfg: ConfigDict) -> None:
             else:
                 console.print(Markdown(response))
             console.print()
-        except Exception:
+        except Exception as exc:
             logger.exception("REPL request failed")
-            console.print("[red]Something went wrong while handling that request.[/red]")
+            err_type = type(exc).__name__
+            if "timeout" in err_type.lower() or "Timeout" in str(exc):
+                console.print("[red]Request timed out. The AI model took too long to respond. Try again.[/red]")
+            elif "auth" in err_type.lower() or "401" in str(exc):
+                console.print("[red]Authentication error. Run: openmind setup model to check your API key.[/red]")
+            else:
+                console.print("[red]Something went wrong. This might be a network issue \u2014 try again in a moment.[/red]")
             messages.pop()
             continue
 
@@ -152,8 +158,8 @@ def _handle_command(
             "  /courses   \u2014 List your courses\n"
             "  /grades    \u2014 Quick grade check\n"
             "  /gpa       \u2014 Calculate your GPA (or /gpa 3.5 for target)\n"
-            "  /study     \u2014 Generate study guide PDF (10-25 pages, teaches from scratch)\n"
-            "  /cheatsheet \u2014 Generate 2-page exam cheatsheet PDF (ultra-dense reference)\n"
+            "  /study     \u2014 Generate 10-25 page study guide PDF (learn a subject from scratch)\n"
+            "  /cheatsheet \u2014 Generate 2-page exam cheatsheet PDF (bring to open-note exam)\n"
             "  /new       \u2014 Start a new conversation (saves context)\n"
             "  /clear     \u2014 Clear conversation history\n"
             "  /remind    \u2014 Set a reminder\n"
