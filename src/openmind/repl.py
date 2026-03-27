@@ -152,6 +152,7 @@ def _handle_command(
             "  /courses   \u2014 List your courses\n"
             "  /grades    \u2014 Quick grade check\n"
             "  /gpa       \u2014 Calculate your GPA (or /gpa 3.5 for target)\n"
+            "  /study     \u2014 Generate a study guide PDF (e.g. /study NLP midterm)\n"
             "  /new       \u2014 Start a new conversation (saves context)\n"
             "  /clear     \u2014 Clear conversation history\n"
             "  /remind    \u2014 Set a reminder\n"
@@ -188,6 +189,12 @@ def _handle_command(
         messages.clear()
         console.print("[dim]Conversation cleared.[/dim]")
         return True, None
+
+    if cmd.startswith("/study"):
+        topic = cmd[6:].strip()
+        if topic:
+            return False, f"Generate a comprehensive study guide PDF for: {topic}. Read my course materials first, then create a detailed two-column LaTeX study guide (10-25 pages). Adapt the structure to the subject."
+        return False, "Which course or topic should I make a study guide for?"
 
     if cmd.startswith("/remind"):
         # Pass to LLM as a natural language reminder request

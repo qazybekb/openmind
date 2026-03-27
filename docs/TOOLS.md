@@ -1,8 +1,8 @@
 # OpenMind — Tools Reference
 
-OpenMind uses LLM function calling (tool use) to interact with external services. The LLM decides which tools to call based on the student's question. This document describes all 41 tools.
+OpenMind uses LLM function calling (tool use) to interact with external services. The LLM decides which tools to call based on the student's question. This document describes all 42 tools.
 
-## Core Tools (28 — always available)
+## Core Tools (29 — always available)
 
 ### Canvas API — 13 tools
 
@@ -59,6 +59,12 @@ OpenMind uses LLM function calling (tool use) to interact with external services
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `gpa_calculator` | `target_gpa` (optional) | Calculate current GPA and what-if scenarios for target GPA. |
+
+### Study Guide Generator — 1 tool
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `generate_study_guide` | `title`, `latex_content` (required) | Generate a professional two-column PDF study guide. LLM provides full LaTeX content adapted to the subject. Requires pdflatex. |
 
 ### Reminders — 2 tools
 
