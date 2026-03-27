@@ -306,19 +306,21 @@ def run_bot(cfg: ConfigDict) -> None:
             return
         await update.effective_message.reply_text(
             "\U0001f43b *OpenMind Commands*\n\n"
-            "/start \u2014 Welcome + quick actions\n"
-            "/menu \u2014 Show action buttons\n"
-            "/clear \u2014 Clear conversation history\n"
-            "/help \u2014 This help message\n\n"
-            "*What you can ask:*\n"
-            "\u2022 What's due this week?\n"
-            "\u2022 Show my grades\n"
-            "\u2022 Calculate my GPA\n"
-            "\u2022 Teach me about [topic]\n"
-            "\u2022 Make a study guide for [course]\n"
-            "\u2022 Make a cheatsheet for [exam]\n"
-            "\u2022 Remind me about [thing] on [date]\n"
-            "\u2022 Send a PDF to summarize it\n\n"
+            "*Learning:*\n"
+            "/learn [topic] \u2014 Guided Socratic tutoring\n"
+            "/study [course] \u2014 Generate study guide PDF\n"
+            "/cheatsheet [course] \u2014 Generate exam cheatsheet PDF\n\n"
+            "*Academics:*\n"
+            "/grades \u2014 All course grades\n"
+            "/gpa [target] \u2014 GPA calculator\n"
+            "/courses \u2014 List your courses\n"
+            "/remind [text] \u2014 Set a reminder\n\n"
+            "*Session:*\n"
+            "/new \u2014 Save context + start fresh\n"
+            "/clear \u2014 Clear conversation\n"
+            "/menu \u2014 Quick action buttons\n"
+            "/help \u2014 This message\n\n"
+            "Or just type naturally! Send a PDF to summarize it.\n"
             "Guides: openmindbot.io/guides",
             parse_mode="Markdown",
             reply_markup=_quick_action_keyboard(),
@@ -404,6 +406,140 @@ def run_bot(cfg: ConfigDict) -> None:
             )
             messages.pop()
 
+    async def _route_slash_to_llm(update: Update, user_id: str, text: str) -> None:
+        """Route a slash command as an LLM query — mirrors REPL behavior."""
+        if user_id not in _conversations:
+            _conversations[user_id] = []
+        messages = _conversations[user_id]
+        messages.append({"role": "user", "content": text})
+        chat_id = update.effective_message.chat_id  # type: ignore[union-attr]
+        try:
+            response = await _chat_with_typing(chat_id, messages)
+            messages.append({"role": "assistant", "content": response})
+            _prune_conversation(messages)
+            await _send_response(chat_id, response, reply_to=update.effective_message)
+        except Exception:
+            logger.exception("Error handling slash command")
+            await update.effective_message.reply_text(  # type: ignore[union-attr]
+                "Something went wrong. Try again in a moment."
+            )
+            messages.pop()
+
+    async def cmd_grades(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        await _route_slash_to_llm(update, user_id, "What are my grades across all courses?")
+
+    async def cmd_gpa(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        text = update.effective_message.text or ""
+        target = text.replace("/gpa", "").strip()
+        if target:
+            query = f"Calculate my GPA and what I need to get a {target} GPA."
+        else:
+            query = "Calculate my current GPA across all courses."
+        await _route_slash_to_llm(update, user_id, query)
+
+    async def cmd_learn(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        text = update.effective_message.text or ""
+        topic = text.replace("/learn", "").strip()
+        if topic:
+            query = f"I want to learn about: {topic}. Teach me step by step using the Socratic method. Start by asking what I already know, then guide me through it. Use my course materials."
+        else:
+            query = "I want to study something. What topic should we work on? Pick from my courses."
+        await _route_slash_to_llm(update, user_id, query)
+
+    async def cmd_study(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        text = update.effective_message.text or ""
+        topic = text.replace("/study", "").strip()
+        if topic:
+            query = f"Generate a comprehensive study guide PDF for: {topic}. Read my course materials first, then create a detailed two-column LaTeX study guide (10-25 pages). Adapt the structure to the subject."
+        else:
+            query = "Which course or topic should I make a study guide for?"
+        await _route_slash_to_llm(update, user_id, query)
+
+    async def cmd_cheatsheet(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        text = update.effective_message.text or ""
+        topic = text.replace("/cheatsheet", "").strip()
+        if topic:
+            query = f"Generate a dense 2-page exam cheatsheet PDF for: {topic}. Read my course materials first, then create an ultra-compact reference sheet."
+        else:
+            query = "Which course or topic should I make a cheatsheet for?"
+        await _route_slash_to_llm(update, user_id, query)
+
+    async def cmd_courses(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        courses = cfg.get("courses", {})
+        if not courses:
+            await update.effective_message.reply_text("No courses configured.")
+            return
+        lines = [f"`{cid}` | {name}" for cid, name in courses.items()]
+        await update.effective_message.reply_text(
+            "\U0001f4da *Your courses:*\n\n" + "\n".join(lines),
+            parse_mode="Markdown",
+        )
+
+    async def cmd_remind(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        text = update.effective_message.text or ""
+        reminder = text.replace("/remind", "").strip()
+        if reminder:
+            query = f"Set a reminder: {reminder}"
+        else:
+            query = "I want to set a reminder. Ask me what and when."
+        await _route_slash_to_llm(update, user_id, query)
+
+    async def cmd_new(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        messages = _conversations.get(user_id, [])
+        if messages:
+            from openmind.memory import consolidate_conversation
+            consolidate_conversation(messages)
+            _conversations.pop(user_id, None)
+            await update.effective_message.reply_text(
+                "Conversation saved to memory and cleared. Starting fresh! \U0001f43b",
+                reply_markup=_quick_action_keyboard(),
+            )
+        else:
+            await update.effective_message.reply_text(
+                "Already a fresh conversation.",
+                reply_markup=_quick_action_keyboard(),
+            )
+
     # Background heartbeat
     heartbeat_thread = threading.Thread(
         target=start_heartbeat,
@@ -418,6 +554,14 @@ def run_bot(cfg: ConfigDict) -> None:
     application.add_handler(CommandHandler("help", cmd_help))
     application.add_handler(CommandHandler("menu", cmd_menu))
     application.add_handler(CommandHandler("clear", cmd_clear))
+    application.add_handler(CommandHandler("new", cmd_new))
+    application.add_handler(CommandHandler("grades", cmd_grades))
+    application.add_handler(CommandHandler("gpa", cmd_gpa))
+    application.add_handler(CommandHandler("learn", cmd_learn))
+    application.add_handler(CommandHandler("study", cmd_study))
+    application.add_handler(CommandHandler("cheatsheet", cmd_cheatsheet))
+    application.add_handler(CommandHandler("courses", cmd_courses))
+    application.add_handler(CommandHandler("remind", cmd_remind))
     application.add_handler(CallbackQueryHandler(handle_button))
     application.add_handler(MessageHandler((filters.TEXT | filters.Document.ALL) & ~filters.COMMAND, handle_message))
 
