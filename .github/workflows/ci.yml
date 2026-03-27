@@ -30,8 +30,8 @@ jobs:
 
       - name: Verify tool counts
         run: |
-          PYTHONPATH=src python -c "from openmind.tools import get_all_tools; assert len(get_all_tools({})) == 29"
-          PYTHONPATH=src python -c "from openmind.tools import get_all_tools; assert len(get_all_tools({'obsidian':{'enabled':True},'todoist':{'enabled':True},'gmail':{'enabled':True},'slack':{'enabled':True},'calendar':{'enabled':True}})) == 42"
+          PYTHONPATH=src python -c "from openmind.tools import get_all_tools; assert len(get_all_tools({})) == 30"
+          PYTHONPATH=src python -c "from openmind.tools import get_all_tools; assert len(get_all_tools({'obsidian':{'enabled':True},'todoist':{'enabled':True},'gmail':{'enabled':True},'slack':{'enabled':True},'calendar':{'enabled':True}})) == 43"
 
       - name: Verify CLI help
         run: |

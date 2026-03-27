@@ -60,6 +60,41 @@ STUDY_GUIDE_TOOLS: list[ToolDefinition] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_cheatsheet",
+            "description": (
+                "Generate a dense 2-page exam cheatsheet PDF. Unlike a study guide, this is a "
+                "REFERENCE document — maximum information in minimum space. Designed to be printed "
+                "and brought to an open-note exam.\n\n"
+                "Format: 2 columns, 7pt font, ultra-tight margins, no wasted space. "
+                "Every concept compressed to 1-2 lines. Key terms in bold. "
+                "Includes: frameworks, key definitions, case briefs (1-2 lines each), "
+                "comparisons, exam tips, author→concept maps, common mistakes.\n\n"
+                "Fetch course materials from Canvas BEFORE calling this tool.\n"
+                "Uses Claude Opus. Output: 2-page PDF at ~/.openmind/study_guides/"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "course_name": {
+                        "type": "string",
+                        "description": "Course name",
+                    },
+                    "scope": {
+                        "type": "string",
+                        "description": "What to cover: 'midterm', 'final', etc.",
+                    },
+                    "source_material": {
+                        "type": "string",
+                        "description": "Course content from Canvas — lectures, readings, notes.",
+                    },
+                },
+                "required": ["course_name", "source_material"],
+            },
+        },
+    },
 ]
 
 _LATEX_PREAMBLE = r"""\documentclass[10pt,letterpaper]{article}
@@ -114,6 +149,62 @@ _LATEX_PREAMBLE = r"""\documentclass[10pt,letterpaper]{article}
 \rfoot{\small\thepage}
 \renewcommand{\headrulewidth}{0pt}
 """
+
+_CHEATSHEET_PREAMBLE = r"""\documentclass[8pt,twocolumn]{article}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[hidelinks]{hyperref}
+
+% Ultra-tight margins for cheatsheet
+\usepackage[letterpaper,top=0.55cm,bottom=0.55cm,left=0.65cm,right=0.65cm]{geometry}
+\setlength{\columnsep}{0.35cm}
+\setlength{\parskip}{1pt}
+\setlength{\parindent}{0pt}
+
+% Compact sections
+\titleformat{\section}{\normalfont\bfseries\footnotesize}{\thesection}{0.3em}{}
+\titlespacing*{\section}{0pt}{4pt}{1pt}
+\titleformat{\subsection}{\normalfont\bfseries\scriptsize}{\thesubsection}{0.2em}{}
+\titlespacing*{\subsection}{0pt}{2pt}{0.5pt}
+
+% Compact lists
+\setlist{nosep,leftmargin=0.9em,topsep=0pt,parsep=0pt,partopsep=0pt,itemsep=0.5pt}
+
+\pagestyle{empty}
+\raggedbottom
+"""
+
+_CHEATSHEET_OPUS_PROMPT = """You are creating an ultra-dense 2-page exam cheatsheet.
+
+This is NOT a study guide. This is a REFERENCE SHEET for an open-note exam.
+Every pixel of space matters. The goal: maximum information in exactly 2 pages.
+
+Writing rules:
+- Compress every concept to 1-2 lines maximum
+- Use bold for key terms, no unnecessary words
+- Abbreviate where clear (gov't, req't, etc.)
+- Use → for implications, ≈ for equivalences, = for definitions
+- Case briefs: Facts (1 line), Holding (1 line), Key point (1 line)
+- Frameworks: Name — core idea — key components (all one line if possible)
+- Use numbered lists, not paragraphs
+- Include: author→concept maps, key comparisons, exam tips, common mistakes
+- Include a glossary of key definitions (1 line each)
+- NO explanations, NO examples unless critical for the exam
+- Every line must be exam-relevant
+
+LaTeX rules:
+- Use the provided preamble exactly (8pt, two-column, ultra-tight margins)
+- Font: \\fontsize{7.2pt}{8.5pt}\\selectfont at start of document
+- Use \\section{} and \\subsection{} for organization
+- Use \\textbf{} for key terms, \\textit{} for emphasis
+- MUST fit in exactly 2 pages — no more, no less
+
+Return ONLY the complete LaTeX document. No commentary."""
 
 
 def _ensure_output_dir() -> None:
@@ -193,8 +284,8 @@ LaTeX formatting:
 Return ONLY the complete LaTeX document. No commentary outside the LaTeX."""
 
 
-def _generate_content_with_opus(cfg: ConfigDict, course_name: str, scope: str, source_material: str) -> str | None:
-    """Call Claude Opus via OpenRouter to generate study guide LaTeX content."""
+def _generate_content_with_opus(cfg: ConfigDict, course_name: str, scope: str, source_material: str, *, cheatsheet: bool = False) -> str | None:
+    """Call Claude Opus via OpenRouter to generate LaTeX content."""
     api_key = str(cfg.get("openrouter_api_key", ""))
     if not api_key:
         return None
@@ -209,23 +300,40 @@ def _generate_content_with_opus(cfg: ConfigDict, course_name: str, scope: str, s
         )
 
         scope_text = f" (scope: {scope})" if scope else ""
-        user_prompt = (
-            f"Create a comprehensive study guide for: {course_name}{scope_text}\n\n"
-            f"Use this LaTeX preamble (copy it exactly as the start of your document):\n"
-            f"{_LATEX_PREAMBLE}\n"
-            f"\\begin{{document}}\n\n"
-            f"Now here is the source material from the course. Use ALL of it:\n\n"
-            f"{source_material[:80000]}\n\n"  # Cap at 80K chars to stay in context
-            f"Generate the complete LaTeX document now. Remember: this must TEACH, not just list."
-        )
+
+        if cheatsheet:
+            system_prompt = _CHEATSHEET_OPUS_PROMPT
+            preamble = _CHEATSHEET_PREAMBLE
+            max_tokens = 8000
+            instruction = (
+                f"Create an ultra-dense 2-page cheatsheet for: {course_name}{scope_text}\n\n"
+                f"Use this LaTeX preamble (copy it exactly):\n{preamble}\n"
+                f"\\begin{{document}}\n"
+                f"\\fontsize{{7.2pt}}{{8.5pt}}\\selectfont\n\n"
+                f"Source material:\n\n{source_material[:80000]}\n\n"
+                f"Generate the complete LaTeX document. MUST fit in exactly 2 pages."
+            )
+        else:
+            system_prompt = _OPUS_SYSTEM_PROMPT
+            preamble = _LATEX_PREAMBLE
+            max_tokens = 16000
+            instruction = (
+                f"Create a comprehensive study guide for: {course_name}{scope_text}\n\n"
+                f"Use this LaTeX preamble (copy it exactly as the start of your document):\n"
+                f"{preamble}\n"
+                f"\\begin{{document}}\n\n"
+                f"Now here is the source material from the course. Use ALL of it:\n\n"
+                f"{source_material[:80000]}\n\n"
+                f"Generate the complete LaTeX document now. Remember: this must TEACH, not just list."
+            )
 
         response = client.chat.completions.create(
             model=OPUS_MODEL,
             messages=[
-                {"role": "system", "content": _OPUS_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": instruction},
             ],
-            max_tokens=16000,
+            max_tokens=max_tokens,
         )
 
         if not response.choices:
@@ -240,8 +348,8 @@ def _generate_content_with_opus(cfg: ConfigDict, course_name: str, scope: str, s
 
 
 def execute_study_guide_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
-    """Execute the study guide generation tool."""
-    if name != "generate_study_guide":
+    """Execute study guide or cheatsheet generation."""
+    if name not in ("generate_study_guide", "generate_cheatsheet"):
         return json.dumps({"error": f"Unknown tool: {name}"})
 
     course_name = str(args.get("course_name", "")).strip()
@@ -262,8 +370,10 @@ def execute_study_guide_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
         })
 
     # Generate content with Opus
-    logger.info("Generating study guide with Claude Opus for: %s", course_name)
-    latex_content = _generate_content_with_opus(cfg, course_name, scope, source_material)
+    is_cheatsheet = name == "generate_cheatsheet"
+    doc_type = "cheatsheet" if is_cheatsheet else "study guide"
+    logger.info("Generating %s with Claude Opus for: %s", doc_type, course_name)
+    latex_content = _generate_content_with_opus(cfg, course_name, scope, source_material, cheatsheet=is_cheatsheet)
 
     if not latex_content:
         return json.dumps({"error": "Failed to generate study guide content. Check your OpenRouter API key and try again."})
@@ -276,9 +386,11 @@ def execute_study_guide_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
 
     # If Opus didn't include the preamble, prepend it
     if r"\documentclass" not in latex_content:
-        latex_content = _LATEX_PREAMBLE + r"\begin{document}" + "\n" + latex_content + "\n" + r"\end{document}"
+        preamble = _CHEATSHEET_PREAMBLE if is_cheatsheet else _LATEX_PREAMBLE
+        latex_content = preamble + r"\begin{document}" + "\n" + latex_content + "\n" + r"\end{document}"
 
-    title = f"{course_name} — {scope.capitalize() + ' ' if scope else ''}Study Guide"
+    label = "Cheatsheet" if is_cheatsheet else "Study Guide"
+    title = f"{course_name} — {scope.capitalize() + ' ' if scope else ''}{label}"
     output_path = _compile_latex(latex_content, title)
 
     if output_path is None:

@@ -1,8 +1,8 @@
 # OpenMind — Tools Reference
 
-OpenMind uses LLM function calling (tool use) to interact with external services. The LLM decides which tools to call based on the student's question. This document describes all 42 tools.
+OpenMind uses LLM function calling (tool use) to interact with external services. The LLM decides which tools to call based on the student's question. This document describes all 43 tools.
 
-## Core Tools (29 — always available)
+## Core Tools (30 — always available)
 
 ### Canvas API — 13 tools
 
@@ -60,11 +60,12 @@ OpenMind uses LLM function calling (tool use) to interact with external services
 |------|-----------|-------------|
 | `gpa_calculator` | `target_gpa` (optional) | Calculate current GPA and what-if scenarios for target GPA. |
 
-### Study Guide Generator — 1 tool
+### Study Guide & Cheatsheet Generator — 2 tools
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `generate_study_guide` | `title`, `latex_content` (required) | Generate a professional two-column PDF study guide. LLM provides full LaTeX content adapted to the subject. Requires pdflatex. |
+| `generate_study_guide` | `course_name`, `source_material` (required), `scope` (optional) | Generate a 10-25 page teaching-quality study guide PDF. Uses Claude Opus. |
+| `generate_cheatsheet` | `course_name`, `source_material` (required), `scope` (optional) | Generate a 2-page ultra-dense exam cheatsheet PDF. Uses Claude Opus. |
 
 ### Reminders — 2 tools
 
