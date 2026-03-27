@@ -12,6 +12,7 @@ from openmind.tools.berkeley import BERKELEY_TOOLS, execute_berkeley_tool
 from openmind.tools.calendar import CALENDAR_TOOLS, execute_calendar_tool
 from openmind.tools.canvas import CANVAS_TOOLS, execute_canvas_tool
 from openmind.tools.courses import COURSE_TOOLS, execute_course_tool
+from openmind.tools.gpa import GPA_TOOLS, execute_gpa_tool
 from openmind.tools.gmail import GMAIL_TOOLS, execute_gmail_tool
 from openmind.tools.obsidian import OBSIDIAN_TOOLS, execute_obsidian_tool
 from openmind.tools.pdf import PDF_TOOLS, execute_pdf_tool
@@ -31,6 +32,7 @@ _TOOL_GROUPS: dict[str, tuple[list[ToolDefinition], ToolExecutor]] = {
     "canvas": (CANVAS_TOOLS, execute_canvas_tool),
     "berkeley": (BERKELEY_TOOLS, execute_berkeley_tool),
     "courses": (COURSE_TOOLS, execute_course_tool),
+    "gpa": (GPA_TOOLS, execute_gpa_tool),
     "pdf": (PDF_TOOLS, execute_pdf_tool),
     "profile": (PROFILE_TOOLS, execute_profile_tool),
     "reminders": (REMINDER_TOOLS, execute_reminder_tool),
@@ -45,7 +47,7 @@ _TOOL_GROUPS: dict[str, tuple[list[ToolDefinition], ToolExecutor]] = {
 
 def get_all_tools(cfg: ConfigDict) -> list[ToolDefinition]:
     """Return tool definitions for the integrations enabled in config."""
-    tools: list[ToolDefinition] = [*CANVAS_TOOLS, *BERKELEY_TOOLS, *COURSE_TOOLS, *PROFILE_TOOLS, *REMINDER_TOOLS, *PDF_TOOLS, *WEB_TOOLS]
+    tools: list[ToolDefinition] = [*CANVAS_TOOLS, *BERKELEY_TOOLS, *COURSE_TOOLS, *GPA_TOOLS, *PROFILE_TOOLS, *REMINDER_TOOLS, *PDF_TOOLS, *WEB_TOOLS]
 
     if cfg.get("obsidian", {}).get("enabled"):
         tools.extend(OBSIDIAN_TOOLS)

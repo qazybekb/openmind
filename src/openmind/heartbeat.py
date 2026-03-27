@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 JsonObject: TypeAlias = dict[str, Any]
 
 ANNOUNCEMENT_LOOKBACK_HOURS: Final[int] = 3
+BRIEFING_HOUR: Final[int] = 8  # 8am PT
 EMAIL_LOOKBACK_HOURS: Final[int] = 3
 EMAIL_MAX_RESULTS: Final[int] = 10
 EMAIL_QUERY: Final[str] = "is:unread from:berkeley.edu newer_than:3h"
@@ -87,6 +88,11 @@ def start_heartbeat(cfg: ConfigDict, bot_token: str, chat_id: str) -> None:
             notifications.extend(_check_announcements(cfg))
             notifications.extend(_check_emails(cfg))
             notifications.extend(_check_reminders())
+
+            # Morning briefing — once per day at ~8am PT
+            briefing = _check_morning_briefing(cfg)
+            if briefing:
+                _send_telegram(bot_token, chat_id, briefing)
 
             if notifications:
                 summary = "\n\n".join(notifications)
@@ -435,6 +441,109 @@ def _check_announcements(cfg: ConfigDict) -> list[str]:
     if new_items:
         return ["New announcements \U0001f43b\n" + "\n".join(new_items)]
     return []
+
+
+def _check_morning_briefing(cfg: ConfigDict) -> str:
+    """Build and return a morning briefing if it's ~8am and hasn't been sent today."""
+    try:
+        from zoneinfo import ZoneInfo
+        now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
+    except ImportError:
+        now_pt = datetime.now()
+
+    # Only send between 8:00-8:59am (heartbeat runs every 3h, so we'll hit this window once)
+    if now_pt.hour != BRIEFING_HOUR:
+        return ""
+
+    # Check if already sent today
+    state = _load_state("briefing")
+    last_date = state.get("last_date", "")
+    today = now_pt.strftime("%Y-%m-%d")
+    if last_date == today:
+        return ""
+
+    # Build the briefing
+    user_name = cfg.get("user_name", "Bear")
+    day_name = now_pt.strftime("%A")
+    lines = [f"\u2600\ufe0f Good morning {user_name}! Here's your {day_name}:\n"]
+
+    # Deadlines
+    now_utc = datetime.now(timezone.utc)
+    try:
+        events = _canvas_get(cfg, "/users/self/upcoming_events")
+        if isinstance(events, list):
+            today_items: list[str] = []
+            week_items: list[str] = []
+            for event in events:
+                assignment = event.get("assignment")
+                if not isinstance(assignment, dict):
+                    continue
+                submission = assignment.get("submission", {})
+                if isinstance(submission, dict) and submission.get("workflow_state") in ("submitted", "graded"):
+                    continue
+                title = str(event.get("title", ""))
+                due = str(event.get("end_at") or event.get("start_at") or "")
+                due_dt = _parse_canvas_datetime(due)
+                if due_dt is None:
+                    continue
+                days = (due_dt - now_utc).total_seconds() / 86400
+                due_str = due_dt.strftime("%a, %b %d")
+                if 0 <= days <= 1:
+                    today_items.append(f"  \U0001f6a8 {title} (due TODAY)")
+                elif 1 < days <= 7:
+                    week_items.append(f"  \U0001f4cb {title} (due {due_str})")
+
+            if today_items:
+                lines.append("\U0001f4cc Due today:")
+                lines.extend(today_items)
+            else:
+                lines.append("\U0001f4cc Nothing due today \u2014 you're clear!")
+
+            if week_items:
+                lines.append("\n\U0001f4da Coming this week:")
+                lines.extend(week_items)
+    except Exception:
+        logger.warning("Briefing: failed to fetch deadlines", exc_info=True)
+
+    # Grades summary — just count courses and flag any below 80%
+    try:
+        courses = _normalise_courses(cfg)
+        low_grades: list[str] = []
+        for course_id, course_name in courses.items():
+            enrollments = _canvas_get(cfg, f"/courses/{course_id}/enrollments", {"user_id": "self"})
+            if not isinstance(enrollments, list):
+                continue
+            for enrollment in enrollments:
+                if not isinstance(enrollment, dict):
+                    continue
+                score = _as_float(enrollment.get("grades", {}).get("current_score"))
+                if score is not None and score < 80:
+                    low_grades.append(f"  \u26a0\ufe0f {course_name}: {score:.0f}%")
+        if low_grades:
+            lines.append("\n\U0001f4ca Grades needing attention:")
+            lines.extend(low_grades)
+    except Exception:
+        logger.warning("Briefing: failed to fetch grades", exc_info=True)
+
+    # Unread emails count
+    if cfg.get("gmail", {}).get("enabled"):
+        try:
+            from openmind.tools.gmail import _get_gmail_service
+            service = _get_gmail_service(cfg)
+            if service:
+                result = service.users().messages().list(
+                    userId="me", q="is:unread from:berkeley.edu", maxResults=1
+                ).execute()
+                count = result.get("resultSizeEstimate", 0)
+                if count:
+                    lines.append(f"\n\u2709\ufe0f {count} unread Berkeley email{'s' if count != 1 else ''}")
+        except Exception:
+            pass
+
+    lines.append("\nHave a great day! \U0001f43b")
+
+    _save_state("briefing", {"last_date": today})
+    return "\n".join(lines)
 
 
 def _check_reminders() -> list[str]:

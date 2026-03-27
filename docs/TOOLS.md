@@ -1,8 +1,8 @@
 # OpenMind — Tools Reference
 
-OpenMind uses LLM function calling (tool use) to interact with external services. The LLM decides which tools to call based on the student's question. This document describes all 40 tools.
+OpenMind uses LLM function calling (tool use) to interact with external services. The LLM decides which tools to call based on the student's question. This document describes all 41 tools.
 
-## Core Tools (27 — always available)
+## Core Tools (28 — always available)
 
 ### Canvas API — 13 tools
 
@@ -53,6 +53,12 @@ OpenMind uses LLM function calling (tool use) to interact with external services
 | `read_pdf` | `url` (required) | Download a PDF and extract text. SSRF protected. |
 | `web_fetch` | `url` (required) | Fetch a web page. SSRF protected. Redirects PDF to read_pdf. |
 | `web_search` | `query` (required) | Search DuckDuckGo. |
+
+### GPA Calculator — 1 tool
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `gpa_calculator` | `target_gpa` (optional) | Calculate current GPA and what-if scenarios for target GPA. |
 
 ### Reminders — 2 tools
 

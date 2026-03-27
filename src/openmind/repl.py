@@ -151,6 +151,7 @@ def _handle_command(
             "  /help      \u2014 Show this help\n"
             "  /courses   \u2014 List your courses\n"
             "  /grades    \u2014 Quick grade check\n"
+            "  /gpa       \u2014 Calculate your GPA (or /gpa 3.5 for target)\n"
             "  /new       \u2014 Start a new conversation (saves context)\n"
             "  /clear     \u2014 Clear conversation history\n"
             "  /remind    \u2014 Set a reminder\n"
@@ -167,6 +168,12 @@ def _handle_command(
 
     if cmd == "/grades":
         return False, "What are my grades across all courses?"
+
+    if cmd == "/gpa" or cmd.startswith("/gpa "):
+        target = cmd[4:].strip()
+        if target:
+            return False, f"Calculate my GPA and what I need to get a {target} GPA."
+        return False, "Calculate my current GPA across all courses."
 
     if cmd == "/new":
         if messages:

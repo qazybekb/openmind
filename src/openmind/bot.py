@@ -7,9 +7,10 @@ import logging
 import threading
 from typing import Any, Final, TypeAlias
 
-from telegram import ChatAction, Update
+from telegram import ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -30,6 +31,22 @@ logger = logging.getLogger(__name__)
 
 # Per-user conversation state
 _conversations: dict[str, list[ChatMessage]] = {}
+
+
+def _quick_action_keyboard() -> InlineKeyboardMarkup:
+    """Build the inline keyboard with quick-action buttons."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("\U0001f4cc Deadlines", callback_data="deadlines"),
+            InlineKeyboardButton("\U0001f4ca Grades", callback_data="grades"),
+            InlineKeyboardButton("\U0001f393 GPA", callback_data="gpa"),
+        ],
+        [
+            InlineKeyboardButton("\U0001f4d6 Study Plan", callback_data="study_plan"),
+            InlineKeyboardButton("\U0001f4e2 Announcements", callback_data="announcements"),
+            InlineKeyboardButton("\u2753 Help", callback_data="help"),
+        ],
+    ])
 
 
 def run_bot(cfg: ConfigDict) -> None:
@@ -112,9 +129,11 @@ def run_bot(cfg: ConfigDict) -> None:
         if allowed_user and user_id != allowed_user:
             return
         name = cfg.get("user_name", "there")
+        keyboard = _quick_action_keyboard()
         await update.effective_message.reply_text(
             f"Hey {name}! {uni.get('spirit', '')} {uni.get('mascot', '')}\n"
-            f"I'm your {uni.get('name', '')} study buddy. Ask me anything!"
+            f"I'm your {uni.get('name', '')} study buddy. Ask me anything!",
+            reply_markup=keyboard,
         )
 
     async def cmd_clear(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -124,6 +143,67 @@ def run_bot(cfg: ConfigDict) -> None:
         user_id = str(update.effective_user.id)
         _conversations.pop(user_id, None)
         await update.effective_message.reply_text("Conversation cleared \u2705")
+
+    async def handle_button(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle inline keyboard button presses."""
+        query = update.callback_query
+        if query is None:
+            return
+        await query.answer()
+
+        user_id = str(query.from_user.id) if query.from_user else ""
+        if allowed_user and user_id != allowed_user:
+            return
+
+        button_queries = {
+            "deadlines": "What's due this week? Show urgency and grade weight.",
+            "grades": "Show all my grades across every course.",
+            "gpa": "Calculate my current GPA across all courses.",
+            "study_plan": "Create a study plan for this week based on my deadlines and priorities.",
+            "announcements": "Any new announcements from my courses?",
+            "help": "What can you help me with? Show examples.",
+        }
+
+        text = button_queries.get(str(query.data), "")
+        if not text:
+            return
+
+        # Simulate a regular message
+        if user_id not in _conversations:
+            _conversations[user_id] = []
+        messages = _conversations[user_id]
+        messages.append({"role": "user", "content": text})
+
+        chat_id = query.message.chat_id if query.message else None
+        if not chat_id:
+            return
+
+        typing_active = True
+
+        async def _keep_typing() -> None:
+            while typing_active:
+                try:
+                    await application.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+                except Exception:
+                    pass
+                await asyncio.sleep(4)
+
+        typing_task = asyncio.create_task(_keep_typing())
+
+        try:
+            response = await asyncio.to_thread(chat, cfg, messages, client=llm_client)
+        finally:
+            typing_active = False
+            typing_task.cancel()
+
+        messages.append({"role": "assistant", "content": response})
+
+        for i in range(0, len(response), MESSAGE_CHUNK_SIZE):
+            chunk = response[i : i + MESSAGE_CHUNK_SIZE]
+            try:
+                await application.bot.send_message(chat_id=chat_id, text=chunk, parse_mode="Markdown")
+            except Exception:
+                await application.bot.send_message(chat_id=chat_id, text=chunk)
 
     # Background heartbeat
     heartbeat_thread = threading.Thread(
@@ -137,6 +217,7 @@ def run_bot(cfg: ConfigDict) -> None:
     application = Application.builder().token(bot_token).build()
     application.add_handler(CommandHandler("start", cmd_start))
     application.add_handler(CommandHandler("clear", cmd_clear))
+    application.add_handler(CallbackQueryHandler(handle_button))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     # Use explicit async lifecycle so this works in a background thread
