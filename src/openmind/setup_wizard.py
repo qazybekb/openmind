@@ -454,6 +454,7 @@ def _setup_profile() -> None:
         resume_path = Prompt.ask("  Resume PDF path (for skill extraction, or Enter to skip)", default="")
         if not resume_path:
             break
+        resume_path = resume_path.strip().strip("'\"").replace("\\ ", " ")
         resolved = Path(resume_path).expanduser()
         if resolved.exists() and resolved.suffix.lower() == ".pdf":
             profile["_pending_resume"] = str(resolved)
@@ -565,6 +566,7 @@ def _setup_gmail() -> dict[str, Any]:
     creds_path = Prompt.ask("    Path to credentials.json (or Enter to skip)", default="")
 
     if creds_path:
+        creds_path = creds_path.strip().strip("'\"").replace("\\ ", " ")
         _ensure_private_dir(GMAIL_CREDS_DIR)
         try:
             destination = GMAIL_CREDS_DIR / "credentials.json"
@@ -598,6 +600,7 @@ def _setup_calendar() -> dict[str, Any]:
         console.print()
         creds_path = Prompt.ask("    Path to credentials.json (or Enter to skip)", default="")
         if creds_path:
+            creds_path = creds_path.strip().strip("'\"").replace("\\ ", " ")
             _ensure_private_dir(GMAIL_CREDS_DIR)
             try:
                 shutil.copy(Path(creds_path).expanduser(), creds_file)
@@ -659,6 +662,8 @@ def _setup_obsidian() -> dict[str, Any]:
     console.print("    [dim]This is the folder that contains your .obsidian/ directory.[/dim]")
     console.print()
     vault_path = Prompt.ask("    Vault path", default="~/Documents/Obsidian")
+    # Strip quotes and unescape backslash-spaces from terminal paste
+    vault_path = vault_path.strip().strip("'\"").replace("\\ ", " ")
     resolved = Path(vault_path).expanduser()
     if not resolved.exists():
         console.print(f"    [yellow]Path not found: {resolved}[/yellow]")
