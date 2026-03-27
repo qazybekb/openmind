@@ -653,15 +653,16 @@ def _setup_slack() -> dict[str, Any]:
             data = resp.json()
             if isinstance(data, dict) and data.get("ok"):
                 console.print(f"    [green]Connected to {data.get('team', '?')} as {data.get('user', '?')}[/green]")
-            else:
-                console.print(f"    [yellow]Validation failed: {data.get('error', 'unknown')}[/yellow]")
-                if Confirm.ask("    Try again?", default=True):
-                    return _setup_slack()
-                return {"enabled": False}
+                return {"enabled": True, "token": token}
+            console.print(f"    [yellow]Validation failed: {data.get('error', 'unknown')}[/yellow]")
+        else:
+            console.print(f"    [yellow]Validation failed (HTTP {resp.status_code})[/yellow]")
     except httpx.HTTPError:
-        console.print("    [yellow]Could not validate token.[/yellow]")
+        console.print("    [yellow]Could not validate token. Check your network.[/yellow]")
 
-    return {"enabled": True, "token": token}
+    if Confirm.ask("    Try again?", default=True):
+        return _setup_slack()
+    return {"enabled": False}
 
 
 def _setup_obsidian() -> dict[str, Any]:

@@ -80,6 +80,31 @@ def run_repl(cfg: ConfigDict) -> None:
     client = create_client(cfg)
     messages: list[ChatMessage] = []
 
+    # If resume was extracted, have the LLM parse it on first run
+    resume_text = profile.get("_resume_text", "")
+    if resume_text:
+        console.print("  [dim]Analyzing your resume...[/dim]")
+        try:
+            messages.append({
+                "role": "user",
+                "content": (
+                    "I just uploaded my resume. Extract my skills, experience, projects, and education "
+                    "and save them to my profile using the import_resume tool. Here's the text:\n\n"
+                    + resume_text
+                ),
+            })
+            with console.status("[dim]Reading resume...[/dim]", spinner="dots"):
+                response = chat(cfg, messages, client=client)
+            messages.append({"role": "assistant", "content": response})
+            console.print(Markdown(response))
+            console.print()
+            # Clear the resume text from profile
+            profile.pop("_resume_text", None)
+            save_profile(profile)
+        except Exception:
+            logger.warning("Failed to process resume on first chat", exc_info=True)
+            messages.clear()
+
     while True:
         try:
             user_input = session.prompt("You \u2192 ").strip()
@@ -139,7 +164,8 @@ def _handle_command(
     messages: list[ChatMessage],
 ) -> tuple[bool, str | None]:
     """Handle a slash command and return whether it consumed the input."""
-    cmd = cmd.lower().strip()
+    original_cmd = cmd.strip()
+    cmd = original_cmd.lower()
 
     if cmd == "/help":
         console.print(
@@ -171,7 +197,7 @@ def _handle_command(
         return True, None
 
     if cmd.startswith("/learn"):
-        topic = cmd[6:].strip()
+        topic = original_cmd[6:].strip()
         if topic:
             return False, f"I want to learn about: {topic}. Teach me step by step using the Socratic method. Start by asking what I already know, then guide me through it — don't just explain. Use my course materials."
         return False, "I want to study something. What topic should we work on? Pick from my courses."
@@ -180,7 +206,7 @@ def _handle_command(
         return False, "What are my grades across all courses?"
 
     if cmd == "/gpa" or cmd.startswith("/gpa "):
-        target = cmd[4:].strip()
+        target = original_cmd[4:].strip()
         if target:
             return False, f"Calculate my GPA and what I need to get a {target} GPA."
         return False, "Calculate my current GPA across all courses."
@@ -200,20 +226,20 @@ def _handle_command(
         return True, None
 
     if cmd.startswith("/study"):
-        topic = cmd[6:].strip()
+        topic = original_cmd[6:].strip()
         if topic:
             return False, f"Generate a comprehensive study guide PDF for: {topic}. Read my course materials first, then create a detailed two-column LaTeX study guide (10-25 pages). Adapt the structure to the subject."
         return False, "Which course or topic should I make a study guide for?"
 
     if cmd.startswith("/cheatsheet"):
-        topic = cmd[11:].strip()
+        topic = original_cmd[11:].strip()
         if topic:
             return False, f"Generate a dense 2-page exam cheatsheet PDF for: {topic}. Read my course materials first, then create an ultra-compact reference sheet."
         return False, "Which course or topic should I make a cheatsheet for?"
 
     if cmd.startswith("/remind"):
         # Pass to LLM as a natural language reminder request
-        reminder_text = cmd[7:].strip()
+        reminder_text = original_cmd[7:].strip()
         if reminder_text:
             return False, f"Set a reminder: {reminder_text}"
         return False, "I want to set a reminder. Ask me what and when."

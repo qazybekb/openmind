@@ -122,7 +122,15 @@ def execute_reminder_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
             return json.dumps({"error": "Missing required argument: due_at."})
 
         try:
-            datetime.fromisoformat(due_at)
+            parsed_dt = datetime.fromisoformat(due_at)
+            # Normalize naive datetimes to Pacific time (Berkeley)
+            if parsed_dt.tzinfo is None:
+                try:
+                    from zoneinfo import ZoneInfo
+                    parsed_dt = parsed_dt.replace(tzinfo=ZoneInfo("America/Los_Angeles"))
+                except ImportError:
+                    parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
+                due_at = parsed_dt.isoformat()
         except ValueError:
             return json.dumps({"error": f"Invalid datetime format: {due_at}. Use ISO 8601."})
 

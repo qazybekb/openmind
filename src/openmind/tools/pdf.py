@@ -65,10 +65,10 @@ def execute_pdf_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
 
     try:
         with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp_file:
-            # Validate redirects for SSRF safety, then stream
+            # Validate redirects for SSRF safety, then stream from the final URL
             resolved_resp = _safe_get(url, timeout=PDF_DOWNLOAD_TIMEOUT_S)
-            resolved_url = str(resolved_resp.url) if resolved_resp.is_redirect else url
-            with httpx.stream("GET", resolved_url, timeout=PDF_DOWNLOAD_TIMEOUT_S, follow_redirects=False) as response:
+            final_url = str(resolved_resp.url)
+            with httpx.stream("GET", final_url, timeout=PDF_DOWNLOAD_TIMEOUT_S, follow_redirects=False) as response:
                 response.raise_for_status()
                 content_type = response.headers.get("content-type", "").lower()
                 if "pdf" not in content_type and not url.lower().endswith(".pdf"):

@@ -179,7 +179,7 @@ def _execute_profile_tool(name: str, args: ToolArgs) -> str:
         result: dict[str, Any] = {"profile": profile}
         if missing:
             result["missing_fields"] = missing
-            result["hint"] = f"Ask the student about: {', '.join(missing)}. Or suggest: openmind profile"
+            result["hint"] = f"Ask the student about: {', '.join(missing)}. Or suggest: openmind setup profile"
         return _json_result(result)
 
     if name == "update_profile":
