@@ -206,6 +206,7 @@ def _check_deadlines(cfg: ConfigDict) -> list[str]:
 
     now = datetime.now(timezone.utc)
     notifications: list[str] = []
+    deadline_changes: list[str] = []
     new_state: dict[str, str] = {}
 
     for event in events:
@@ -239,18 +240,42 @@ def _check_deadlines(cfg: ConfigDict) -> list[str]:
         assignment_id = str(assignment.get("id", ""))
         context_code = str(event.get("context_code", ""))
         key = f"{context_code}:{assignment_id}" if assignment_id else f"{context_code}:{title.strip()}"
-        new_state[key] = level
+        due_iso = due_dt.isoformat()
+        new_state[key] = f"{level}|{due_iso}"
 
-        previous_level = str(previous_state.get(key, ""))
+        # Parse previous state (format: "level|due_iso" or just "level" for backwards compat)
+        prev_raw = str(previous_state.get(key, ""))
+        if "|" in prev_raw:
+            previous_level, prev_due_iso = prev_raw.split("|", 1)
+        else:
+            previous_level = prev_raw
+            prev_due_iso = ""
+
+        # Check for deadline date changes
+        if prev_due_iso and prev_due_iso != due_iso:
+            prev_due_dt = _parse_canvas_datetime(prev_due_iso)
+            if prev_due_dt:
+                old_str = prev_due_dt.strftime("%b %d")
+                new_str = due_dt.strftime("%b %d")
+                diff_days = (due_dt - prev_due_dt).total_seconds() / 86400
+                if diff_days > 0:
+                    deadline_changes.append(f"\U0001f4c5 {title}: {old_str} \u2192 {new_str} (extended {int(diff_days)}d)")
+                else:
+                    deadline_changes.append(f"\U0001f4c5 {title}: {old_str} \u2192 {new_str} (moved earlier by {int(abs(diff_days))}d)")
+
+        # Check for urgency escalation
         if not previous_level or _URGENCY_ORDER.get(level, 0) > _URGENCY_ORDER.get(previous_level, -1):
             due_str = due_dt.strftime("%b %d")
             days_str = f"{int(days)}d" if days >= 1 else "TODAY"
             notifications.append(f"{emoji} {title} (due {due_str}, {days_str})")
 
     _save_state("deadlines", new_state)
+    results: list[str] = []
+    if deadline_changes:
+        results.append("Deadline changed \U0001f43b\n" + "\n".join(deadline_changes))
     if notifications:
-        return ["Deadline update \U0001f43b\n" + "\n".join(notifications)]
-    return []
+        results.append("Deadline update \U0001f43b\n" + "\n".join(notifications))
+    return results
 
 
 def _check_submissions(cfg: ConfigDict) -> list[str]:
