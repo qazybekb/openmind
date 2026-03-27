@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 ChatMessage: TypeAlias = dict[str, Any]
 
-DEFAULT_MODEL: Final[str] = "google/gemini-2.5-pro"
+DEFAULT_MODEL: Final[str] = "google/gemini-3.1-pro-preview"
 MAX_TOOL_OUTPUT_CHARS: Final[int] = 16_000
 MAX_TOOL_ROUNDS: Final[int] = 10
 MAX_HISTORY: Final[int] = 40

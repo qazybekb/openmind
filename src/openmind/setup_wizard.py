@@ -21,7 +21,7 @@ from openmind.universities import get_university
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL: Final[str] = "google/gemini-2.5-pro"
+DEFAULT_MODEL: Final[str] = "google/gemini-3.1-pro-preview"
 MAX_COURSE_NICKNAME_LENGTH: Final[int] = 35
 OPENROUTER_MODELS_URL: Final[str] = "https://openrouter.ai/api/v1/models"
 REQUEST_TIMEOUT_S: Final[float] = 15.0
@@ -126,15 +126,15 @@ def run_first_setup() -> None:
         padding=(1, 2),
     ))
 
-    console.print("    [cyan]1[/cyan]  google/gemini-2.5-pro           \u2014 smart, low cost [dim](default)[/dim]")
-    console.print("    [cyan]2[/cyan]  xiaomi/mimo-v2-pro              \u2014 smart, very cheap")
+    console.print("    [cyan]1[/cyan]  google/gemini-3.1-pro-preview           \u2014 smart, low cost [dim](default)[/dim]")
+    console.print("    [cyan]2[/cyan]  z-ai/glm-5-turbo              \u2014 smart, very cheap")
     console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     \u2014 excellent reasoning")
     console.print("    [dim]Or type any OpenRouter model ID[/dim]")
     console.print()
 
     _model_choices = {
-        "1": "google/gemini-2.5-pro",
-        "2": "xiaomi/mimo-v2-pro",
+        "1": "google/gemini-3.1-pro-preview",
+        "2": "z-ai/glm-5-turbo",
         "3": "anthropic/claude-sonnet-4-6",
     }
     choice = Prompt.ask("  Enter 1, 2, 3, or a model ID", default="1")
@@ -386,14 +386,14 @@ def _setup_openrouter_full() -> tuple[str, str]:
 
     console.print("\n  [bold]Choose your LLM model[/bold]")
     console.print("  [dim]All models below support tool calling (required for OpenMind)[/dim]\n")
-    console.print("    [cyan]1[/cyan]  google/gemini-2.5-pro           \u2014 smart, low cost [dim](default)[/dim]")
-    console.print("    [cyan]2[/cyan]  xiaomi/mimo-v2-pro              \u2014 smart, very cheap")
+    console.print("    [cyan]1[/cyan]  google/gemini-3.1-pro-preview           \u2014 smart, low cost [dim](default)[/dim]")
+    console.print("    [cyan]2[/cyan]  z-ai/glm-5-turbo              \u2014 smart, very cheap")
     console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     \u2014 excellent reasoning")
     console.print("    [dim]Or type any OpenRouter model ID[/dim]")
 
     _model_choices = {
-        "1": "google/gemini-2.5-pro",
-        "2": "xiaomi/mimo-v2-pro",
+        "1": "google/gemini-3.1-pro-preview",
+        "2": "z-ai/glm-5-turbo",
         "3": "anthropic/claude-sonnet-4-6",
     }
     choice = Prompt.ask("\n  Enter 1, 2, 3, or a model ID", default="1")
@@ -407,14 +407,14 @@ def _setup_model_change(cfg: ConfigDict) -> None:
     console.print(f"\n  Current model: [bold]{current}[/bold]\n")
     console.print("  [bold]Choose your LLM model[/bold]")
     console.print("  [dim]All models below support tool calling (required for OpenMind)[/dim]\n")
-    console.print("    [cyan]1[/cyan]  google/gemini-2.5-pro           \u2014 smart, low cost")
-    console.print("    [cyan]2[/cyan]  xiaomi/mimo-v2-pro              \u2014 smart, very cheap")
+    console.print("    [cyan]1[/cyan]  google/gemini-3.1-pro-preview           \u2014 smart, low cost")
+    console.print("    [cyan]2[/cyan]  z-ai/glm-5-turbo              \u2014 smart, very cheap")
     console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     \u2014 excellent reasoning")
     console.print("    [dim]Or type any OpenRouter model ID[/dim]")
 
     _model_choices = {
-        "1": "google/gemini-2.5-pro",
-        "2": "xiaomi/mimo-v2-pro",
+        "1": "google/gemini-3.1-pro-preview",
+        "2": "z-ai/glm-5-turbo",
         "3": "anthropic/claude-sonnet-4-6",
     }
     choice = Prompt.ask("\n  Enter 1, 2, 3, or a model ID", default="1")
