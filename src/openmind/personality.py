@@ -28,13 +28,18 @@ def _build_context(user_name: str, courses: dict, profile: dict, canvas_name: st
     """Build the context layer: who is this student?"""
     from datetime import datetime
 
-    now = datetime.now()
+    try:
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("America/Los_Angeles"))
+    except ImportError:
+        now = datetime.now()
+
     date_str = now.strftime("%A, %B %d, %Y")
-    time_str = now.strftime("%I:%M %p")
+    time_str = now.strftime("%I:%M %p %Z")
 
     sections = [
         f"You are {user_name}'s study buddy at UC Berkeley.",
-        f"Today is {date_str}, {time_str} (Pacific Time).",
+        f"Today is {date_str}, {time_str}.",
     ]
 
     # Courses
