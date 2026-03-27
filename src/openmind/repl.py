@@ -131,6 +131,8 @@ def run_repl(cfg: ConfigDict) -> None:
             ("/setup obsidian", "Save notes to vault"),
             ("/setup model", "Change your LLM"),
             ("/config", "Show config path"),
+            ("/restart", "Restart OpenMind"),
+            ("/exit", "Exit"),
             ("/quit", "Exit"),
         ]
 
@@ -194,6 +196,11 @@ def run_repl(cfg: ConfigDict) -> None:
             if user_input.lower().strip() in ("/quit", "/exit", "/q"):
                 console.print("Later! Go Bears! \U0001f43b")
                 break
+            if user_input.lower().strip() == "/restart":
+                import sys as _sys
+                import os as _os
+                console.print("[dim]Restarting...[/dim]")
+                _os.execv(_sys.executable, [_sys.executable, "-m", "openmind"])
             handled, synthetic = _handle_command(user_input, cfg, messages)
             if handled:
                 continue
@@ -306,6 +313,7 @@ def _handle_command(
             "  /clear     \u2014 Nuke conversation history\n"
             "  /setup     \u2014 Add integrations (telegram, gmail, etc.)\n"
             "  /config    \u2014 Show config path\n"
+            "  /restart   \u2014 Restart OpenMind\n"
             "  /quit      \u2014 Exit\n"
         )
         return True, None
