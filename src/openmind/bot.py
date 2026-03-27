@@ -570,6 +570,22 @@ def run_bot(cfg: ConfigDict) -> None:
         async with application:
             await application.start()
             await application.updater.start_polling()  # type: ignore[union-attr]
+
+            # Send welcome message on startup
+            if allowed_user:
+                try:
+                    name = cfg.get("user_name", "there")
+                    await application.bot.send_message(
+                        chat_id=int(allowed_user),
+                        text=(
+                            f"\U0001f43b Hey {name}! OpenMind is online. {uni.get('spirit', '')}\n\n"
+                            f"Type anything or tap a button below."
+                        ),
+                        reply_markup=_quick_action_keyboard(),
+                    )
+                except Exception:
+                    logger.warning("Failed to send startup message to Telegram", exc_info=True)
+
             stop_event = asyncio.Event()
             await stop_event.wait()
 
