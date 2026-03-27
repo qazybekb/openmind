@@ -8,6 +8,7 @@ import stat
 from typing import Any, TypeAlias
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.history import FileHistory
 from rich.console import Console
 from rich.markdown import Markdown
@@ -89,7 +90,21 @@ def run_repl(cfg: ConfigDict) -> None:
     os.chmod(history_file.parent, stat.S_IRWXU)
     history_file.touch(exist_ok=True)
     os.chmod(history_file, stat.S_IRUSR | stat.S_IWUSR)
-    session: PromptSession[str] = PromptSession(history=FileHistory(str(history_file)))
+    slash_completer = WordCompleter(
+        [
+            "/help", "/learn", "/grades", "/gpa", "/courses",
+            "/study", "/cheatsheet", "/remind", "/new", "/clear",
+            "/setup", "/setup profile", "/setup telegram", "/setup gmail",
+            "/setup calendar", "/setup slack", "/setup todoist",
+            "/setup obsidian", "/setup model", "/config", "/quit",
+        ],
+        sentence=True,
+    )
+    session: PromptSession[str] = PromptSession(
+        history=FileHistory(str(history_file)),
+        completer=slash_completer,
+        complete_while_typing=False,
+    )
     client = create_client(cfg)
     messages: list[ChatMessage] = []
 
