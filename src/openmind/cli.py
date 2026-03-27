@@ -77,20 +77,36 @@ def main(
 
     cfg = _ensure_config()
 
-    if cfg.get("telegram", {}).get("enabled"):
-        try:
-            from openmind.bot import run_bot
-
-            import threading
-            bot_thread = threading.Thread(target=run_bot, args=(cfg,), daemon=True)
-            bot_thread.start()
-        except ImportError:
-            logger.warning("Telegram extras unavailable.", exc_info=True)
-            console.print("[yellow]Telegram requires: pip install 'openmind-berkeley[telegram]'[/yellow]")
+    _start_telegram_if_enabled(cfg)
 
     from openmind.repl import run_repl
 
     run_repl(cfg)
+
+
+def _start_telegram_if_enabled(cfg: ConfigDict) -> None:
+    """Start Telegram bot in a background thread if enabled."""
+    if not cfg.get("telegram", {}).get("enabled"):
+        return
+
+    try:
+        from openmind.bot import run_bot
+    except ImportError:
+        logger.warning("Telegram extras unavailable.", exc_info=True)
+        console.print("[yellow]Telegram requires: pip install 'openmind-berkeley[telegram]'[/yellow]")
+        return
+
+    import threading
+
+    def _bot_wrapper() -> None:
+        try:
+            run_bot(cfg)
+        except Exception:
+            logger.exception("Telegram bot crashed")
+            console.print("[red]Telegram bot stopped unexpectedly. REPL still works.[/red]")
+
+    bot_thread = threading.Thread(target=_bot_wrapper, daemon=True)
+    bot_thread.start()
 
 
 @app.command()
@@ -178,8 +194,9 @@ def config() -> None:
 
 @app.command()
 def chat() -> None:
-    """Start the terminal REPL (local chat, no Telegram)."""
+    """Start the terminal REPL (with Telegram in background if enabled)."""
     cfg = _ensure_config()
+    _start_telegram_if_enabled(cfg)
     from openmind.repl import run_repl
 
     run_repl(cfg)
