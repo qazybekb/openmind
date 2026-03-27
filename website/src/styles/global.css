@@ -54,10 +54,10 @@
     @apply py-16 md:py-24;
   }
   .container {
-    @apply max-w-5xl mx-auto px-6;
+    @apply max-w-5xl mx-auto px-4 md:px-6;
   }
   .terminal {
-    @apply bg-bg-card rounded-xl border border-border overflow-hidden font-mono text-sm;
+    @apply bg-bg-card rounded-xl border border-border overflow-hidden font-mono text-sm overflow-x-auto;
   }
   .terminal-header {
     @apply flex items-center gap-2 px-4 py-3 border-b border-border;
@@ -66,7 +66,7 @@
     @apply w-2.5 h-2.5 rounded-full;
   }
   .terminal-body {
-    @apply p-6 leading-relaxed;
+    @apply p-4 md:p-6 leading-relaxed text-sm;
   }
   .card {
     @apply bg-bg-card border border-border rounded-xl p-6
@@ -77,12 +77,12 @@
     @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-xs text-text-secondary font-medium;
   }
   .btn-primary {
-    @apply px-5 py-2.5 bg-text-primary text-bg font-semibold rounded-lg text-sm
-           hover:bg-accent transition-colors;
+    @apply px-5 py-3 bg-text-primary text-bg font-semibold rounded-lg text-sm
+           hover:bg-accent active:opacity-80 transition-colors;
   }
   .btn-secondary {
-    @apply px-5 py-2.5 border border-border text-text-body font-medium rounded-lg text-sm
-           hover:border-border-hover hover:text-text-primary transition-colors;
+    @apply px-5 py-3 border border-border text-text-body font-medium rounded-lg text-sm
+           hover:border-border-hover hover:text-text-primary active:opacity-80 transition-colors;
   }
 }
 
