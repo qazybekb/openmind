@@ -31,8 +31,10 @@ def run_repl(cfg: ConfigDict) -> None:
     from openmind.banner import print_banner
     from openmind.tools.profile import load_profile, save_profile
 
+    from openmind.universities import spirit
+
     print_banner(console)
-    console.print(f"  Hey {user_name}! {uni.get('spirit', '')}")
+    console.print(f"  Hey {user_name}! {spirit()}")
     console.print("  [dim]Type your question, /help for commands, or /quit to exit.[/dim]")
 
     # Nudge personalization if profile is empty

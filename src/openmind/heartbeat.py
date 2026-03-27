@@ -571,7 +571,8 @@ def _check_morning_briefing(cfg: ConfigDict) -> str:
         except Exception:
             pass
 
-    lines.append("\nHave a great day! \U0001f43b")
+    from openmind.universities import spirit
+    lines.append(f"\n{spirit()} \U0001f43b")
 
     _save_state("briefing", {"last_date": today})
     return "\n".join(lines)

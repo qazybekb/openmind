@@ -107,7 +107,6 @@ def _build_application(cfg: ConfigDict) -> Application:
     tg = cfg.get("telegram", {})
     bot_token = str(tg.get("bot_token", ""))
     allowed_user = str(tg.get("user_id", ""))
-    uni = cfg.get("university", {})
 
     if not bot_token:
         raise ValueError("Telegram bot token not configured. Run: openmind setup")
@@ -290,8 +289,8 @@ def _build_application(cfg: ConfigDict) -> Application:
         name = cfg.get("user_name", "there")
         keyboard = _quick_action_keyboard()
         await update.effective_message.reply_text(
-            f"Hey {name}! {uni.get('spirit', '')} {uni.get('mascot', '')}\n"
-            f"I'm your {uni.get('name', '')} study buddy. Ask me anything!\n\n"
+            f"Hey {name}! \U0001f43b\n"
+            f"I'm your Cal study buddy. Ask me anything or tap a button.\n\n"
             f"Commands: /help /clear /menu",
             reply_markup=keyboard,
         )
@@ -563,7 +562,7 @@ def _build_application(cfg: ConfigDict) -> Application:
                 await app.bot.send_message(
                     chat_id=int(allowed_user),
                     text=(
-                        f"\U0001f43b Hey {name}! OpenMind is online. {uni.get('spirit', '')}\n\n"
+                        f"\U0001f43b Hey {name}! OpenMind is online.\n\n"
                         f"Type anything or tap a button below."
                     ),
                     reply_markup=_quick_action_keyboard(),
@@ -742,8 +741,6 @@ def start_bot_service(cfg: ConfigDict) -> TelegramBotService:
 
 def run_bot(cfg: ConfigDict) -> None:
     """Run the Telegram bot as a standalone blocking process."""
-    uni = cfg.get("university", {})
-
     try:
         service = start_bot_service(cfg)
     except Exception:
@@ -751,7 +748,7 @@ def run_bot(cfg: ConfigDict) -> None:
         console.print("[red]Telegram bot failed to start.[/red] Run: openmind setup telegram")
         return
 
-    console.print(f"\n{uni.get('mascot', '')} Starting bot... {uni.get('spirit', '')}")
+    console.print("\n\U0001f43b Starting bot...")
     console.print(f"[dim]Telegram bot active. Heartbeat every {HEARTBEAT_INTERVAL // 3600} hours.[/dim]")
     console.print("[dim]Press Ctrl+C to stop.[/dim]\n")
 

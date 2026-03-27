@@ -42,6 +42,6 @@ def print_banner(console: Console | None = None, *, show_info: bool = True) -> N
 
         console.print()
         console.print(
-            f"  [dim]\U0001f43b AI study buddy for UC Berkeley \u00b7 v{__version__} \u00b7 Go Bears![/dim]"
+            f"  [dim]\U0001f43b AI study buddy for Cal \u00b7 v{__version__} \u00b7 Fiat Lux![/dim]"
         )
     console.print()
