@@ -29,9 +29,21 @@ def run_repl(cfg: ConfigDict) -> None:
     user_name = cfg.get("user_name", "Student")
 
     from openmind.banner import print_banner
+    from openmind.tools.profile import load_profile
+
     print_banner(console)
     console.print(f"  Hey {user_name}! {uni.get('spirit', '')}")
-    console.print("  [dim]Type your question, /help for commands, or /quit to exit.[/dim]\n")
+    console.print("  [dim]Type your question, /help for commands, or /quit to exit.[/dim]")
+
+    # Nudge personalization if profile is empty
+    profile = load_profile()
+    has_profile = any(v for v in profile.values())
+    if not has_profile:
+        console.print()
+        console.print("  [dim]\U0001f4a1 Tip: Make OpenMind smarter about YOU:[/dim]")
+        console.print("  [dim]   openmind setup profile[/dim]  [dim]\u2014 add your major, goals, interests[/dim]")
+        console.print("  [dim]   Upload your resume for skill-gap analysis & tailored advice[/dim]")
+    console.print()
 
     history_file = CONFIG_DIR / "repl_history"
     history_file.parent.mkdir(parents=True, exist_ok=True)
