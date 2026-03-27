@@ -78,7 +78,7 @@ def _build_context(user_name: str, courses: dict, profile: dict, canvas_name: st
                 profile_lines.append(f"Projects: {', '.join(str(p) for p in resume['projects'][:5])}")
 
         if profile_lines:
-            sections.append("\nStudent profile:\n" + "\n".join(f"  {l}" for l in profile_lines))
+            sections.append("\nStudent profile:\n" + "\n".join(f"  {line}" for line in profile_lines))
 
     return "\n".join(sections)
 

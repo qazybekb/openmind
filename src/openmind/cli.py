@@ -172,9 +172,9 @@ def config() -> None:
     # Hints
     disabled = [n for n in all_integrations if not cfg.get(n, {}).get("enabled")]
     if disabled:
-        console.print(f"\n  [dim]Add integrations:[/dim] [cyan]openmind setup <name>[/cyan]")
+        console.print("\n  [dim]Add integrations:[/dim] [cyan]openmind setup <name>[/cyan]")
     if not has_profile:
-        console.print(f"  [dim]Set up profile:[/dim]   [cyan]openmind setup profile[/cyan]")
+        console.print("  [dim]Set up profile:[/dim]   [cyan]openmind setup profile[/cyan]")
     console.print(f"  [dim]Config path:[/dim]      {CONFIG_DIR}\n")
 
 
@@ -243,7 +243,7 @@ def profile() -> None:
         border_style="yellow",
         padding=(1, 2),
     ))
-    console.print(f"  [dim]Edit:[/dim] [cyan]openmind setup profile[/cyan]")
+    console.print("  [dim]Edit:[/dim] [cyan]openmind setup profile[/cyan]")
     console.print(f"  [dim]File:[/dim] {PROFILE_FILE}\n")
 
 
