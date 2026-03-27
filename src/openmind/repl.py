@@ -155,6 +155,7 @@ def _handle_command(
         console.print(
             "\n[bold]Commands:[/bold]\n"
             "  /help      \u2014 Show this help\n"
+            "  /learn     \u2014 Guided learning session (e.g. /learn binary search trees)\n"
             "  /courses   \u2014 List your courses\n"
             "  /grades    \u2014 Quick grade check\n"
             "  /gpa       \u2014 Calculate your GPA (or /gpa 3.5 for target)\n"
@@ -173,6 +174,12 @@ def _handle_command(
         for cid, name in courses.items():
             console.print(f"  {cid} | {name}")
         return True, None
+
+    if cmd.startswith("/learn"):
+        topic = cmd[6:].strip()
+        if topic:
+            return False, f"I want to learn about: {topic}. Teach me step by step using the Socratic method. Start by asking what I already know, then guide me through it — don't just explain. Use my course materials."
+        return False, "I want to study something. What topic should we work on? Pick from my courses."
 
     if cmd == "/grades":
         return False, "What are my grades across all courses?"

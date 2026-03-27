@@ -45,9 +45,9 @@ def _quick_action_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("\U0001f393 GPA", callback_data="gpa"),
         ],
         [
+            InlineKeyboardButton("\U0001f9e0 Learn", callback_data="learn"),
             InlineKeyboardButton("\U0001f4d6 Study Plan", callback_data="study_plan"),
             InlineKeyboardButton("\U0001f4e2 Announcements", callback_data="announcements"),
-            InlineKeyboardButton("\u2753 Help", callback_data="help"),
         ],
     ])
 
@@ -278,9 +278,9 @@ def run_bot(cfg: ConfigDict) -> None:
             "deadlines": "What's due this week? Show urgency and grade weight.",
             "grades": "Show all my grades across every course.",
             "gpa": "Calculate my current GPA across all courses.",
+            "learn": "I want to study something. What topic should we work on? Pick from my courses and upcoming exams.",
             "study_plan": "Create a study plan for this week based on my deadlines and priorities.",
             "announcements": "Any new announcements from my courses?",
-            "help": "What can you help me with? Show examples.",
         }
 
         text = button_queries.get(str(query.data), "")
