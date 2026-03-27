@@ -81,18 +81,16 @@ def main(
         try:
             from openmind.bot import run_bot
 
-            run_bot(cfg)
+            import threading
+            bot_thread = threading.Thread(target=run_bot, args=(cfg,), daemon=True)
+            bot_thread.start()
         except ImportError:
-            logger.warning("Telegram extras unavailable; falling back to REPL.", exc_info=True)
-            console.print("[red]Telegram requires: pip install 'openmind-berkeley[telegram]'[/red]")
-            console.print("Falling back to terminal.\n")
-            from openmind.repl import run_repl
+            logger.warning("Telegram extras unavailable.", exc_info=True)
+            console.print("[yellow]Telegram requires: pip install 'openmind-berkeley[telegram]'[/yellow]")
 
-            run_repl(cfg)
-    else:
-        from openmind.repl import run_repl
+    from openmind.repl import run_repl
 
-        run_repl(cfg)
+    run_repl(cfg)
 
 
 @app.command()
