@@ -565,34 +565,21 @@ def run_bot(cfg: ConfigDict) -> None:
     application.add_handler(CallbackQueryHandler(handle_button))
     application.add_handler(MessageHandler((filters.TEXT | filters.Document.ALL) & ~filters.COMMAND, handle_message))
 
-    # Use explicit async lifecycle so this works in a background thread
-    async def _run() -> None:
-        async with application:
-            await application.start()
-            await application.updater.start_polling()  # type: ignore[union-attr]
+    # Send welcome message before polling starts
+    async def _send_welcome() -> None:
+        if allowed_user:
+            try:
+                name = cfg.get("user_name", "there")
+                await application.bot.send_message(
+                    chat_id=int(allowed_user),
+                    text=(
+                        f"\U0001f43b Hey {name}! OpenMind is online. {uni.get('spirit', '')}\n\n"
+                        f"Type anything or tap a button below."
+                    ),
+                    reply_markup=_quick_action_keyboard(),
+                )
+            except Exception:
+                logger.warning("Failed to send startup message", exc_info=True)
 
-            # Send welcome message on startup
-            if allowed_user:
-                try:
-                    name = cfg.get("user_name", "there")
-                    await application.bot.send_message(
-                        chat_id=int(allowed_user),
-                        text=(
-                            f"\U0001f43b Hey {name}! OpenMind is online. {uni.get('spirit', '')}\n\n"
-                            f"Type anything or tap a button below."
-                        ),
-                        reply_markup=_quick_action_keyboard(),
-                    )
-                except Exception:
-                    logger.warning("Failed to send startup message to Telegram", exc_info=True)
-
-            stop_event = asyncio.Event()
-            await stop_event.wait()
-
-    loop = asyncio.new_event_loop()
-    try:
-        loop.run_until_complete(_run())
-    except Exception:
-        logger.exception("Telegram bot stopped")
-    finally:
-        loop.close()
+    application.post_init = _send_welcome  # type: ignore[assignment]
+    application.run_polling()

@@ -96,17 +96,16 @@ def _start_telegram_if_enabled(cfg: ConfigDict) -> None:
         console.print("[yellow]Telegram failed to load. Try: pip install --force-reinstall git+https://github.com/qazybekb/openmind.git[/yellow]")
         return
 
-    import threading
+    import multiprocessing
 
     def _bot_wrapper() -> None:
         try:
             run_bot(cfg)
         except Exception:
-            logger.exception("Telegram bot crashed")
-            console.print("[red]Telegram bot stopped unexpectedly. REPL still works.[/red]")
+            pass  # Process exits silently; REPL continues
 
-    bot_thread = threading.Thread(target=_bot_wrapper, daemon=True)
-    bot_thread.start()
+    bot_process = multiprocessing.Process(target=_bot_wrapper, daemon=True)
+    bot_process.start()
 
 
 @app.command()
