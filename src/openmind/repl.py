@@ -8,7 +8,7 @@ import stat
 from typing import Any, TypeAlias
 
 from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.history import FileHistory
 from rich.console import Console
 from rich.markdown import Markdown
@@ -107,20 +107,45 @@ def run_repl(cfg: ConfigDict) -> None:
     os.chmod(history_file.parent, stat.S_IRWXU)
     history_file.touch(exist_ok=True)
     os.chmod(history_file, stat.S_IRUSR | stat.S_IWUSR)
-    slash_completer = WordCompleter(
-        [
-            "/help", "/learn", "/grades", "/gpa", "/courses",
-            "/study", "/cheatsheet", "/remind", "/new", "/clear",
-            "/setup", "/setup profile", "/setup telegram", "/setup gmail",
-            "/setup calendar", "/setup slack", "/setup todoist",
-            "/setup obsidian", "/setup model", "/config", "/quit",
-        ],
-        sentence=True,
-    )
+    class _SlashCompleter(Completer):
+        """Auto-complete slash commands — only triggers when input starts with /."""
+
+        _COMMANDS = [
+            ("/help", "Show all commands"),
+            ("/learn", "Guided Socratic tutoring"),
+            ("/grades", "Quick grade check"),
+            ("/gpa", "GPA calculator"),
+            ("/courses", "List your courses"),
+            ("/study", "Generate study guide PDF"),
+            ("/cheatsheet", "Generate exam cheatsheet PDF"),
+            ("/remind", "Set a reminder"),
+            ("/new", "Save context + start fresh"),
+            ("/clear", "Clear conversation"),
+            ("/setup", "Set up integrations"),
+            ("/setup profile", "Add major, goals, resume"),
+            ("/setup telegram", "Chat from phone + notifications"),
+            ("/setup gmail", "Search professor emails"),
+            ("/setup calendar", "Sync deadlines"),
+            ("/setup slack", "Search Slack channels"),
+            ("/setup todoist", "Sync tasks"),
+            ("/setup obsidian", "Save notes to vault"),
+            ("/setup model", "Change your LLM"),
+            ("/config", "Show config path"),
+            ("/quit", "Exit"),
+        ]
+
+        def get_completions(self, document, complete_event):
+            text = document.text_before_cursor
+            if not text.startswith("/"):
+                return
+            for cmd, desc in self._COMMANDS:
+                if cmd.startswith(text):
+                    yield Completion(cmd, start_position=-len(text), display_meta=desc)
+
     session: PromptSession[str] = PromptSession(
         history=FileHistory(str(history_file)),
-        completer=slash_completer,
-        complete_while_typing=False,
+        completer=_SlashCompleter(),
+        complete_while_typing=True,
     )
     client = create_client(cfg)
     messages: list[ChatMessage] = []
