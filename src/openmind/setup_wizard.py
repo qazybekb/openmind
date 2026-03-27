@@ -161,7 +161,7 @@ def run_first_setup() -> None:
     # Welcome message
     console.print()
     console.print(Panel(
-        f"\U0001f389 [bold]You're all set, {user_name}![/bold] Fiat Lux! \U0001f4a1\n"
+        f"\U0001f389 [bold]You're all set, {user_name}![/bold] Go Bears! \U0001f43b\n"
         f"\n"
         f"  Model: {cfg.get('model', DEFAULT_MODEL)}\n"
         f"  Courses: {len(courses)}\n"

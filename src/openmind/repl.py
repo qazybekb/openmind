@@ -93,7 +93,7 @@ def run_repl(cfg: ConfigDict) -> None:
         # Slash commands
         if user_input.startswith("/"):
             if user_input.lower().strip() in ("/quit", "/exit", "/q"):
-                console.print("Later! \U0001f43b")
+                console.print("Later! Go Bears! \U0001f43b")
                 break
             handled, synthetic = _handle_command(user_input, cfg, messages)
             if handled:
