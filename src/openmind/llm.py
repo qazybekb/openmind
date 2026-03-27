@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 ChatMessage: TypeAlias = dict[str, Any]
 
 DEFAULT_MODEL: Final[str] = "xiaomi/mimo-v2-pro"
-LEARN_MODEL: Final[str] = "google/gemini-2.5-pro"
 MAX_TOOL_OUTPUT_CHARS: Final[int] = 100_000
 MAX_TOOL_ROUNDS: Final[int] = 10
 MAX_HISTORY: Final[int] = 40

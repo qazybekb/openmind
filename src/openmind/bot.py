@@ -478,12 +478,7 @@ def _build_application(cfg: ConfigDict) -> Application:
             return
 
         try:
-            # Use Gemini for guided learning
-            btn_model = None
-            if str(query.data) == "learn":
-                from openmind.llm import LEARN_MODEL
-                btn_model = LEARN_MODEL
-            response = await _chat_with_streaming(chat_id, messages, model_override=btn_model)
+            response = await _chat_with_streaming(chat_id, messages)
             messages.append({"role": "assistant", "content": response})
             _prune_conversation(messages)
             if len(response) > MESSAGE_CHUNK_SIZE:
@@ -551,8 +546,7 @@ def _build_application(cfg: ConfigDict) -> Application:
             query = f"I want to learn about: {topic}. Teach me step by step using the Socratic method. Start by asking what I already know, then guide me through it. Use my course materials."
         else:
             query = "I want to study something. What topic should we work on? Pick from my courses."
-        from openmind.llm import LEARN_MODEL
-        await _route_slash_to_llm(update, user_id, query, model_override=LEARN_MODEL)
+        await _route_slash_to_llm(update, user_id, query)
 
     async def cmd_study(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
         if update.effective_user is None or update.effective_message is None:
