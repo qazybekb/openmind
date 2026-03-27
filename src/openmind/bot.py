@@ -113,7 +113,7 @@ def _build_application(cfg: ConfigDict) -> Application:
 
     llm_client = create_client(cfg)
 
-    async def _chat_with_streaming(chat_id: int, messages: list[ChatMessage]) -> str:
+    async def _chat_with_streaming(chat_id: int, messages: list[ChatMessage], *, model_override: str | None = None) -> str:
         """Run LLM chat with live message streaming in Telegram.
 
         Sends a placeholder message, then edits it as tokens arrive.
@@ -128,7 +128,7 @@ def _build_application(cfg: ConfigDict) -> Application:
             )
         except Exception:
             # Fall back to non-streaming
-            return await asyncio.to_thread(chat, cfg, messages, client=llm_client)
+            return await asyncio.to_thread(chat, cfg, messages, client=llm_client, model_override=model_override)
 
         collected: list[str] = []
         last_edit_len = 0
@@ -162,7 +162,7 @@ def _build_application(cfg: ConfigDict) -> Application:
         edit_task = asyncio.create_task(_periodic_edit())
         try:
             response = await asyncio.to_thread(
-                chat_stream, cfg, messages, client=llm_client, on_token=_on_token
+                chat_stream, cfg, messages, client=llm_client, on_token=_on_token, model_override=model_override
             )
         except Exception:
             # Fall back to non-streaming on error
@@ -171,7 +171,7 @@ def _build_application(cfg: ConfigDict) -> Application:
                 await placeholder.edit_text("Retrying...")
             except Exception:
                 pass
-            response = await asyncio.to_thread(chat, cfg, messages, client=llm_client)
+            response = await asyncio.to_thread(chat, cfg, messages, client=llm_client, model_override=model_override)
         finally:
             edit_task.cancel()
 
@@ -472,7 +472,12 @@ def _build_application(cfg: ConfigDict) -> Application:
             return
 
         try:
-            response = await _chat_with_streaming(chat_id, messages)
+            # Use Gemini for guided learning
+            btn_model = None
+            if str(query.data) == "learn":
+                from openmind.llm import LEARN_MODEL
+                btn_model = LEARN_MODEL
+            response = await _chat_with_streaming(chat_id, messages, model_override=btn_model)
             messages.append({"role": "assistant", "content": response})
             _prune_conversation(messages)
             if len(response) > MESSAGE_CHUNK_SIZE:
@@ -485,7 +490,7 @@ def _build_application(cfg: ConfigDict) -> Application:
             )
             messages.pop()
 
-    async def _route_slash_to_llm(update: Update, user_id: str, text: str) -> None:
+    async def _route_slash_to_llm(update: Update, user_id: str, text: str, *, model_override: str | None = None) -> None:
         """Route a slash command as an LLM query — mirrors REPL behavior."""
         if user_id not in _conversations:
             _conversations[user_id] = []
@@ -493,7 +498,7 @@ def _build_application(cfg: ConfigDict) -> Application:
         messages.append({"role": "user", "content": text})
         chat_id = update.effective_message.chat_id  # type: ignore[union-attr]
         try:
-            response = await _chat_with_streaming(chat_id, messages)
+            response = await _chat_with_streaming(chat_id, messages, model_override=model_override)
             messages.append({"role": "assistant", "content": response})
             _prune_conversation(messages)
             await _send_response(chat_id, response, reply_to=update.effective_message)
@@ -538,7 +543,8 @@ def _build_application(cfg: ConfigDict) -> Application:
             query = f"I want to learn about: {topic}. Teach me step by step using the Socratic method. Start by asking what I already know, then guide me through it. Use my course materials."
         else:
             query = "I want to study something. What topic should we work on? Pick from my courses."
-        await _route_slash_to_llm(update, user_id, query)
+        from openmind.llm import LEARN_MODEL
+        await _route_slash_to_llm(update, user_id, query, model_override=LEARN_MODEL)
 
     async def cmd_study(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
         if update.effective_user is None or update.effective_message is None:

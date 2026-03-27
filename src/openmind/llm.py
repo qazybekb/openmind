@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 ChatMessage: TypeAlias = dict[str, Any]
 
 DEFAULT_MODEL: Final[str] = "xiaomi/mimo-v2-pro"
+LEARN_MODEL: Final[str] = "google/gemini-2.5-pro"
 MAX_TOOL_OUTPUT_CHARS: Final[int] = 16_000
 MAX_TOOL_ROUNDS: Final[int] = 10
 MAX_HISTORY: Final[int] = 40
@@ -156,12 +157,13 @@ def chat(
     messages: list[ChatMessage],
     *,
     client: OpenAI | None = None,
+    model_override: str | None = None,
 ) -> str:
     """Send messages to the LLM, execute tool calls, and return the final reply."""
     if client is None:
         client = create_client(cfg)
 
-    model = str(cfg.get("model", DEFAULT_MODEL))
+    model = model_override or str(cfg.get("model", DEFAULT_MODEL))
     tools = get_all_tools(cfg)
     conversation: list[ChatMessage] = list(messages)
 
@@ -251,6 +253,7 @@ def chat_stream(
     *,
     client: OpenAI | None = None,
     on_token: Any | None = None,
+    model_override: str | None = None,
 ) -> str:
     """Stream the LLM response, calling on_token(text) for each chunk.
 
@@ -260,7 +263,7 @@ def chat_stream(
     if client is None:
         client = create_client(cfg)
 
-    model = str(cfg.get("model", DEFAULT_MODEL))
+    model = model_override or str(cfg.get("model", DEFAULT_MODEL))
     tools = get_all_tools(cfg)
     conversation: list[ChatMessage] = list(messages)
 

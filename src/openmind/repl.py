@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from openmind.config import CONFIG_DIR, ConfigDict
-from openmind.llm import chat, create_client
+from openmind.llm import LEARN_MODEL, chat, create_client
 from openmind.memory import consolidate_conversation
 
 logger = logging.getLogger(__name__)
@@ -116,6 +116,7 @@ def run_repl(cfg: ConfigDict) -> None:
             continue
 
         # Slash commands
+        use_learn_model = False
         if user_input.startswith("/"):
             if user_input.lower().strip() in ("/quit", "/exit", "/q"):
                 console.print("Later! Go Bears! \U0001f43b")
@@ -124,6 +125,8 @@ def run_repl(cfg: ConfigDict) -> None:
             if handled:
                 continue
             if synthetic:
+                if user_input.lower().startswith("/learn"):
+                    use_learn_model = True
                 user_input = synthetic
 
         messages.append({"role": "user", "content": user_input})
@@ -134,8 +137,9 @@ def run_repl(cfg: ConfigDict) -> None:
             console.print()
 
             try:
+                override = LEARN_MODEL if use_learn_model else None
                 with console.status("[dim]Thinking...[/dim]", spinner="dots"):
-                    response = chat(cfg, messages, client=client)
+                    response = chat(cfg, messages, client=client, model_override=override)
             except KeyboardInterrupt:
                 console.print("\n[dim]Cancelled.[/dim]")
                 messages.pop()
