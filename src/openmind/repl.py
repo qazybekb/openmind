@@ -13,7 +13,8 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from openmind.config import CONFIG_DIR, ConfigDict
-from openmind.llm import chat, create_client
+from openmind.llm import chat_stream, create_client
+from openmind.memory import consolidate_conversation
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +66,29 @@ def run_repl(cfg: ConfigDict) -> None:
         messages.append({"role": "user", "content": user_input})
 
         try:
+            console.print()
+            console.rule(style="dim")
+            console.print()
+
+            collected: list[str] = []
+            streaming = False
+
+            def _on_token(text: str) -> None:
+                nonlocal streaming
+                if not streaming:
+                    streaming = True
+                collected.append(text)
+                console.print(text, end="", highlight=False)
+
             with console.status("[dim]Thinking...[/dim]", spinner="dots"):
-                response = chat(cfg, messages, client=client)
+                response = chat_stream(cfg, messages, client=client, on_token=_on_token)
+
+            # If we streamed, add a newline; if not, render as markdown
+            if streaming:
+                console.print()
+            else:
+                console.print(Markdown(response))
+            console.print()
         except Exception:
             logger.exception("REPL request failed")
             console.print("[red]Something went wrong while handling that request.[/red]")
@@ -74,11 +96,6 @@ def run_repl(cfg: ConfigDict) -> None:
             continue
 
         messages.append({"role": "assistant", "content": response})
-        console.print()
-        console.rule(style="dim")
-        console.print()
-        console.print(Markdown(response))
-        console.print()
 
 
 def _handle_command(
@@ -95,7 +112,9 @@ def _handle_command(
             "  /help      \u2014 Show this help\n"
             "  /courses   \u2014 List your courses\n"
             "  /grades    \u2014 Quick grade check\n"
+            "  /new       \u2014 Start a new conversation (saves context)\n"
             "  /clear     \u2014 Clear conversation history\n"
+            "  /remind    \u2014 Set a reminder\n"
             "  /config    \u2014 Show config path\n"
             "  /quit      \u2014 Exit\n"
         )
@@ -110,10 +129,26 @@ def _handle_command(
     if cmd == "/grades":
         return False, "What are my grades across all courses?"
 
+    if cmd == "/new":
+        if messages:
+            consolidate_conversation(messages)
+            messages.clear()
+            console.print("[dim]Conversation saved to memory and cleared. Starting fresh![/dim]")
+        else:
+            console.print("[dim]Already a fresh conversation.[/dim]")
+        return True, None
+
     if cmd == "/clear":
         messages.clear()
         console.print("[dim]Conversation cleared.[/dim]")
         return True, None
+
+    if cmd.startswith("/remind"):
+        # Pass to LLM as a natural language reminder request
+        reminder_text = cmd[7:].strip()
+        if reminder_text:
+            return False, f"Set a reminder: {reminder_text}"
+        return False, "I want to set a reminder. Ask me what and when."
 
     if cmd == "/config":
         console.print(f"Config: {CONFIG_DIR}")

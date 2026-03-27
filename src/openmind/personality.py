@@ -9,6 +9,7 @@ Layer 4: Policy — safety, security, and behavioral boundaries
 from __future__ import annotations
 
 from openmind.config import ConfigDict
+from openmind.memory import format_memory_context
 from openmind.tools.profile import load_profile
 from openmind.universities import UniversityConfig, generate_personality
 
@@ -289,4 +290,11 @@ def build_system_prompt(cfg: ConfigDict) -> str:
     # Layer 4: Policy
     policy = _build_policy(canvas_name)
 
-    return f"{persona}\n\n{context}\n\n{playbooks}\n\n{policy}"
+    # Layer 5: Memory — prior conversation context
+    memory = format_memory_context()
+
+    parts = [persona, context, playbooks, policy]
+    if memory:
+        parts.append(memory)
+
+    return "\n\n".join(parts)

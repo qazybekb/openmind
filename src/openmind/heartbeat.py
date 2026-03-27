@@ -62,9 +62,12 @@ def start_heartbeat(cfg: ConfigDict, bot_token: str, chat_id: str) -> None:
             notifications.extend(_check_grades(cfg))
             notifications.extend(_check_announcements(cfg))
             notifications.extend(_check_emails(cfg))
+            notifications.extend(_check_reminders())
 
             if notifications:
-                _send_telegram(bot_token, chat_id, "\n\n".join(notifications))
+                summary = "\n\n".join(notifications)
+                if _should_notify(summary):
+                    _send_telegram(bot_token, chat_id, summary)
         except Exception:
             logger.exception("Heartbeat cycle failed")
 
@@ -383,6 +386,44 @@ def _check_announcements(cfg: ConfigDict) -> list[str]:
     if new_items:
         return ["New announcements \U0001f43b\n" + "\n".join(new_items)]
     return []
+
+
+def _check_reminders() -> list[str]:
+    """Check for due reminders."""
+    try:
+        from openmind.tools.reminders import get_due_reminders
+    except ImportError:
+        return []
+
+    due = get_due_reminders()
+    if not due:
+        return []
+
+    items = [f"\u23f0 {r.get('message', '')}" for r in due]
+    return ["Reminders \U0001f43b\n" + "\n".join(items)]
+
+
+def _should_notify(summary: str) -> bool:
+    """Evaluate whether the notification summary is worth sending.
+
+    Filters out low-value notifications to reduce noise. Always notifies for:
+    - Urgent deadlines (⚠️)
+    - Unsubmitted assignments (🚨)
+    - Grade changes (📈/📉)
+    Skips if only low-priority items (headsup-level deadlines with no urgency).
+    """
+    high_priority_markers = ("\u26a0\ufe0f", "\U0001f6a8", "\U0001f4c8", "\U0001f4c9", "\U0001f4e2", "\u2709\ufe0f", "\u23f0")
+    for marker in high_priority_markers:
+        if marker in summary:
+            return True
+
+    # If we only have low-priority headsup items, suppress during quiet hours
+    now = datetime.now()
+    if 0 <= now.hour < 8:
+        logger.info("Suppressing low-priority heartbeat notification during quiet hours")
+        return False
+
+    return True
 
 
 def _check_emails(cfg: ConfigDict) -> list[str]:

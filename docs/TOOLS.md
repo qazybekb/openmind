@@ -1,8 +1,8 @@
 # OpenMind — Tools Reference
 
-OpenMind uses LLM function calling (tool use) to interact with external services. The LLM decides which tools to call based on the student's question. This document describes all 38 tools.
+OpenMind uses LLM function calling (tool use) to interact with external services. The LLM decides which tools to call based on the student's question. This document describes all 40 tools.
 
-## Core Tools (25 — always available)
+## Core Tools (27 — always available)
 
 ### Canvas API — 13 tools
 
@@ -53,6 +53,13 @@ OpenMind uses LLM function calling (tool use) to interact with external services
 | `read_pdf` | `url` (required) | Download a PDF and extract text. SSRF protected. |
 | `web_fetch` | `url` (required) | Fetch a web page. SSRF protected. Redirects PDF to read_pdf. |
 | `web_search` | `query` (required) | Search DuckDuckGo. |
+
+### Reminders — 2 tools
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `remind_me` | `message`, `due_at` (required, ISO 8601) | Set a reminder. Delivered via Telegram when due. |
+| `list_reminders` | — | List all pending reminders. |
 
 ---
 

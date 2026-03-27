@@ -30,8 +30,8 @@ class ReleaseContractTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(len(core_tools), 25)
-        self.assertEqual(len(full_tools), 38)
+        self.assertEqual(len(core_tools), 27)
+        self.assertEqual(len(full_tools), 40)
 
         names = [tool["function"]["name"] for tool in full_tools]
         self.assertEqual(len(names), len(set(names)))
