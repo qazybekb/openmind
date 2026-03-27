@@ -3,16 +3,30 @@
 from __future__ import annotations
 
 from rich.console import Console
+from rich.text import Text
 
-# Hardcoded slant font — no pyfiglet dependency needed.
-# "Open" in bold white, "Mind" in bold yellow (Cal Gold).
-_BANNER = """\
-[bold white]   ____                  [/bold white][bold yellow] __  ___  _           __[/bold yellow]
-[bold white]  / __ \\____  ___  ____ [/bold white][bold yellow]/  |/  (_)___  ____/ /[/bold yellow]
-[bold white] / / / / __ \\/ _ \\/ __ \\[/bold white][bold yellow]/ /|_/ / / __ \\/ __  /[/bold yellow]
-[bold white]/ /_/ / /_/ /  __/ / / [/bold white][bold yellow]/ /  / / / / / / /_/ /[/bold yellow]
-[bold white]\\____/ .___/\\___/_/ /_[/bold white][bold yellow]/_/  /_/_/_/ /_/\\__,_/[/bold yellow]
-[bold white]    /_/[/bold white]"""
+
+def _build_banner() -> Text:
+    """Build the ASCII banner with Open in white, Mind in Cal Gold."""
+    # Slant font, hardcoded for consistency across environments.
+    # Each line: (white_part, gold_part)
+    lines = [
+        ("   ____                  ", " __  ___  _           __"),
+        ("  / __ \\____  ___  ____ ", "/  |/  (_)___  ____/ /"),
+        (" / / / / __ \\/ _ \\/ __ \\", "/ /|_/ / / __ \\/ __  /"),
+        ("/ /_/ / /_/ /  __/ / / ", "/ /  / / / / / / /_/ /"),
+        ("\\____/ .___/\\___/_/ /_", "/_/  /_/_/_/ /_/\\__,_/"),
+        ("    /_/", ""),
+    ]
+
+    banner = Text()
+    for white_part, gold_part in lines:
+        banner.append(white_part, style="bold white")
+        if gold_part:
+            banner.append(gold_part, style="bold yellow")
+        banner.append("\n")
+
+    return banner
 
 
 def print_banner(console: Console | None = None, *, show_info: bool = True) -> None:
@@ -21,7 +35,7 @@ def print_banner(console: Console | None = None, *, show_info: bool = True) -> N
         console = Console()
 
     console.print()
-    console.print(_BANNER)
+    console.print(_build_banner(), end="")
 
     if show_info:
         from openmind import __version__
