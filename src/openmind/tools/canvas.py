@@ -413,33 +413,45 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
             f"/courses/{course_id}/assignments",
             {"include[]": "submission", "order_by": "due_at"},
         )
-        # Flag upcoming deadlines so the LLM doesn't ignore them
+        # Build compact summary — full assignment objects are too large (can be 60K+)
         if isinstance(data, list):
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc).isoformat()
             upcoming = []
+            completed = []
             for a in data:
                 if not isinstance(a, dict):
                     continue
+                name = a.get("name", "")
                 due = a.get("due_at", "")
-                if not due or due < now:
-                    continue
+                pts = a.get("points_possible")
                 sub = a.get("submission", {})
                 ws = sub.get("workflow_state", "") if isinstance(sub, dict) else ""
-                if ws not in ("submitted", "graded"):
-                    upcoming.append({
-                        "name": a.get("name", ""),
-                        "due_at": due,
-                        "points_possible": a.get("points_possible"),
-                        "submission_state": ws or "unsubmitted",
-                    })
+                score = sub.get("score") if isinstance(sub, dict) else None
+
+                entry = {"name": name, "due_at": due, "points_possible": pts}
+
+                if ws in ("submitted", "graded"):
+                    entry["status"] = "done"
+                    if score is not None:
+                        entry["score"] = score
+                    completed.append(entry)
+                elif due and due > now:
+                    entry["status"] = "UNSUBMITTED"
+                    upcoming.append(entry)
+                else:
+                    entry["status"] = ws or "unknown"
+                    completed.append(entry)
+
+            result: dict[str, Any] = {}
             if upcoming:
-                return _json_result({
-                    "WARNING": f"This course has {len(upcoming)} UPCOMING DEADLINES that are NOT YET SUBMITTED. You MUST tell the student about these.",
-                    "UPCOMING_DEADLINES": upcoming,
-                    "all_assignments": data,
-                })
-            return _json_result({"all_assignments": data, "UPCOMING_DEADLINES": []})
+                result["UPCOMING_DEADLINES_NOT_SUBMITTED"] = upcoming
+                result["_IMPORTANT"] = f"There are {len(upcoming)} upcoming deadlines. TELL THE STUDENT about ALL of them."
+            else:
+                result["UPCOMING_DEADLINES_NOT_SUBMITTED"] = []
+                result["_note"] = "No upcoming deadlines for this course."
+            result["completed_assignments"] = completed
+            return _json_result(result)
         return _json_result(data)
 
     if name == "get_grades":
