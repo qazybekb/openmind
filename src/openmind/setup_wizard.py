@@ -266,8 +266,10 @@ def setup_single_integration(name: str) -> None:
         result = handler()
         cfg[name] = result
         save_config(cfg)
-
-    console.print("\n[green]Saved![/green]")
+        if result.get("enabled"):
+            console.print("\n[green]Saved![/green]")
+        else:
+            console.print("\n[dim]Not enabled.[/dim]")
 
 
 # ---------------------------------------------------------------------------
