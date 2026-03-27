@@ -52,6 +52,8 @@ def run_repl(cfg: ConfigDict) -> None:
     ]
 
     tips = [tip for _, enabled, tip in all_tips if not enabled]
+    # Always show model change option
+    tips.append("[cyan]/setup model[/cyan]   \u2014 change your LLM model")
 
     if tips:
         console.print()
