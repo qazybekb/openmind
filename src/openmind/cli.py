@@ -77,35 +77,21 @@ def main(
 
     cfg = _ensure_config()
 
-    _start_telegram_if_enabled(cfg)
-
-    from openmind.repl import run_repl
-
-    run_repl(cfg)
-
-
-def _start_telegram_if_enabled(cfg: ConfigDict) -> None:
-    """Start Telegram bot in a background thread if enabled."""
-    if not cfg.get("telegram", {}).get("enabled"):
-        return
-
-    try:
-        from openmind.bot import run_bot
-    except ImportError:
-        logger.warning("Telegram dependency missing.", exc_info=True)
-        console.print("[yellow]Telegram failed to load. Try: pip install --force-reinstall git+https://github.com/qazybekb/openmind.git[/yellow]")
-        return
-
-    import multiprocessing
-
-    def _bot_wrapper() -> None:
+    if cfg.get("telegram", {}).get("enabled"):
         try:
-            run_bot(cfg)
-        except Exception:
-            pass  # Process exits silently; REPL continues
+            from openmind.bot import run_bot
 
-    bot_process = multiprocessing.Process(target=_bot_wrapper, daemon=True)
-    bot_process.start()
+            run_bot(cfg)
+        except ImportError:
+            logger.warning("Telegram dependency missing.", exc_info=True)
+            console.print("[yellow]Telegram failed to load.[/yellow]")
+            from openmind.repl import run_repl
+
+            run_repl(cfg)
+    else:
+        from openmind.repl import run_repl
+
+        run_repl(cfg)
 
 
 @app.command()
@@ -193,9 +179,8 @@ def config() -> None:
 
 @app.command()
 def chat() -> None:
-    """Start the terminal REPL (with Telegram in background if enabled)."""
+    """Start the terminal REPL (no Telegram, local only)."""
     cfg = _ensure_config()
-    _start_telegram_if_enabled(cfg)
     from openmind.repl import run_repl
 
     run_repl(cfg)
