@@ -7,7 +7,7 @@ import logging
 import threading
 from typing import Any, Final, TypeAlias
 
-from telegram import Update
+from telegram import ChatAction, Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -67,8 +67,26 @@ def run_bot(cfg: ConfigDict) -> None:
         messages.append({"role": "user", "content": text})
 
         try:
-            # Run blocking LLM + tool calls in a thread to avoid stalling the event loop
-            response = await asyncio.to_thread(chat, cfg, messages, client=llm_client)
+            # Show "typing..." while the LLM is working
+            chat_id = update.effective_message.chat_id
+            typing_active = True
+
+            async def _keep_typing() -> None:
+                while typing_active:
+                    try:
+                        await application.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+                    except Exception:
+                        pass
+                    await asyncio.sleep(4)  # Telegram typing expires after 5s
+
+            typing_task = asyncio.create_task(_keep_typing())
+
+            try:
+                response = await asyncio.to_thread(chat, cfg, messages, client=llm_client)
+            finally:
+                typing_active = False
+                typing_task.cancel()
+
             messages.append({"role": "assistant", "content": response})
 
             # Telegram limits messages to 4096 characters
