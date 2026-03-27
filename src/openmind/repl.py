@@ -36,14 +36,28 @@ def run_repl(cfg: ConfigDict) -> None:
     console.print(f"  Hey {user_name}! {spirit()}")
     console.print("  [dim]Ask me anything about your classes. /help for commands, /quit to exit.[/dim]")
 
-    # Nudge personalization if profile is empty
+    # Show tips — integrations and personalization
     profile = load_profile()
     has_profile = any(v for v in profile.values())
+    tg_enabled = cfg.get("telegram", {}).get("enabled")
+    gmail_enabled = cfg.get("gmail", {}).get("enabled")
+    calendar_enabled = cfg.get("calendar", {}).get("enabled")
+
+    tips: list[str] = []
     if not has_profile:
+        tips.append("[cyan]/setup profile[/cyan]  \u2014 add your major, goals, resume for personalized advice")
+    if not tg_enabled:
+        tips.append("[cyan]/setup telegram[/cyan] \u2014 chat from your phone + push notifications")
+    if not gmail_enabled:
+        tips.append("[cyan]/setup gmail[/cyan]    \u2014 search professor emails")
+    if not calendar_enabled:
+        tips.append("[cyan]/setup calendar[/cyan] \u2014 sync deadlines to Google Calendar")
+
+    if tips:
         console.print()
-        console.print("  [dim]\U0001f4a1 Pro tip: I can give way better advice if I know you[/dim]")
-        console.print("  [dim]   Run [cyan]openmind setup profile[/cyan] \u2014 major, goals, interests[/dim]")
-        console.print("  [dim]   Drop your resume and I'll do skill-gap analysis[/dim]")
+        console.print("  [dim]\U0001f4a1 Make OpenMind even better:[/dim]")
+        for tip in tips:
+            console.print(f"  [dim]   {tip}[/dim]")
     console.print()
 
     # Consume pending resume import from setup wizard
