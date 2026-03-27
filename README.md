@@ -84,6 +84,8 @@ openmind setup model        # Change your LLM model
 
 ## Install
 
+**PyPI / pipx package name (once published):** `openmind-berkeley`
+
 **From GitHub:**
 ```bash
 pip install git+https://github.com/qazybekb/openmind.git
@@ -92,6 +94,17 @@ pip install git+https://github.com/qazybekb/openmind.git
 **From a local clone:**
 ```bash
 pip install .
+```
+
+**From PyPI (after the first public release):**
+```bash
+pip install openmind-berkeley
+```
+
+**Recommended for Homebrew users (after PyPI release):**
+```bash
+brew install pipx
+pipx install openmind-berkeley
 ```
 
 **With optional integrations (from a local clone):**
@@ -178,6 +191,7 @@ src/openmind/
 | [Tools Reference](docs/TOOLS.md) | All 38 tools with parameters |
 | [Privacy & Security](docs/PRIVACY.md) | What data goes where |
 | [Contributing](docs/CONTRIBUTING.md) | How to add tools and features |
+| [Distribution](docs/DISTRIBUTION.md) | PyPI, pipx, and release workflow |
 | [Security Policy](SECURITY.md) | How to report vulnerabilities responsibly |
 | [Changelog](CHANGELOG.md) | Release history and notable changes |
 | [Roadmap](PLAN.md) | Berkeley knowledge base, multi-university, live feeds |

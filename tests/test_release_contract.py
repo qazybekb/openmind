@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -81,6 +82,18 @@ class ReleaseContractTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8").lower()
             for phrase in disallowed_phrases:
                 self.assertNotIn(phrase, text, msg=f"{path} still contains: {phrase}")
+
+    def test_distribution_metadata_matches_release_plan(self) -> None:
+        """Keep PyPI metadata, CLI entrypoint, and distribution docs aligned."""
+        pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        project = pyproject["project"]
+        scripts = project["scripts"]
+        distribution_doc = (REPO_ROOT / "docs" / "DISTRIBUTION.md").read_text(encoding="utf-8")
+
+        self.assertEqual(project["name"], "openmind-berkeley")
+        self.assertEqual(scripts["openmind"], "openmind.cli:app")
+        self.assertIn("pip install openmind-berkeley", distribution_doc)
+        self.assertIn("pipx install openmind-berkeley", distribution_doc)
 
 
 if __name__ == "__main__":
