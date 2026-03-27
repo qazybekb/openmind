@@ -16,6 +16,9 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+
+import tempfile
+from pathlib import Path
 from rich.console import Console
 
 from openmind.config import ConfigDict
@@ -75,6 +78,14 @@ def run_bot(cfg: ConfigDict) -> None:
             return
 
         text = update.effective_message.text
+
+        # Handle PDF documents
+        if update.effective_message.document:
+            doc = update.effective_message.document
+            if doc.file_name and doc.file_name.lower().endswith(".pdf"):
+                await _handle_pdf(update, user_id, doc)
+                return
+
         if not text:
             return
 
@@ -114,12 +125,115 @@ def run_bot(cfg: ConfigDict) -> None:
                 except Exception:
                     logger.warning("Telegram Markdown reply failed; falling back to plain text.", exc_info=True)
                     await update.effective_message.reply_text(chunk)
+
+            # Send any generated PDFs (study guides, cheatsheets)
+            await _send_generated_pdfs(update.effective_message.chat_id, response)
         except Exception:
             logger.exception("Error handling message")
             await update.effective_message.reply_text(
                 "Something went wrong while handling that request. Try again in a sec."
             )
             messages.pop()
+
+    async def _handle_pdf(update: Update, user_id: str, doc: Any) -> None:
+        """Download a PDF sent by the user, extract text, and feed to LLM."""
+        chat_id = update.effective_message.chat_id  # type: ignore[union-attr]
+        try:
+            await application.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+
+            # Download to temp file
+            file = await doc.get_file()
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                await file.download_to_drive(tmp.name)
+                tmp_path = tmp.name
+
+            # Extract text with pymupdf
+            try:
+                import pymupdf
+                pdf_doc = pymupdf.open(tmp_path)
+                text_parts = []
+                for page in pdf_doc:
+                    text_parts.append(page.get_text())
+                pdf_doc.close()
+                pdf_text = "\n".join(text_parts)
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+
+            if not pdf_text.strip():
+                await update.effective_message.reply_text(  # type: ignore[union-attr]
+                    "I couldn't extract text from this PDF. It might be image-based."
+                )
+                return
+
+            # Truncate if very long
+            if len(pdf_text) > 30000:
+                pdf_text = pdf_text[:30000] + "\n... (truncated)"
+
+            caption = update.effective_message.caption or ""  # type: ignore[union-attr]
+            user_msg = f"I'm sending you a PDF: {doc.file_name}\n"
+            if caption:
+                user_msg += f"My question: {caption}\n"
+            else:
+                user_msg += "Please summarize the key points.\n"
+            user_msg += f"\nPDF content:\n{pdf_text}"
+
+            if user_id not in _conversations:
+                _conversations[user_id] = []
+            messages = _conversations[user_id]
+            messages.append({"role": "user", "content": user_msg})
+
+            typing_active = True
+
+            async def _keep_typing_pdf() -> None:
+                while typing_active:
+                    try:
+                        await application.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+                    except Exception:
+                        pass
+                    await asyncio.sleep(4)
+
+            typing_task = asyncio.create_task(_keep_typing_pdf())
+            try:
+                response = await asyncio.to_thread(chat, cfg, messages, client=llm_client)
+            finally:
+                typing_active = False
+                typing_task.cancel()
+
+            messages.append({"role": "assistant", "content": response})
+
+            for i in range(0, len(response), MESSAGE_CHUNK_SIZE):
+                chunk = response[i : i + MESSAGE_CHUNK_SIZE]
+                try:
+                    await update.effective_message.reply_text(chunk, parse_mode="Markdown")  # type: ignore[union-attr]
+                except Exception:
+                    await update.effective_message.reply_text(chunk)  # type: ignore[union-attr]
+
+            # If the response mentions a generated PDF, send it
+            await _send_generated_pdfs(chat_id, response)
+
+        except Exception:
+            logger.exception("Error handling PDF")
+            await update.effective_message.reply_text(  # type: ignore[union-attr]
+                "Something went wrong reading that PDF. Try again."
+            )
+
+    async def _send_generated_pdfs(chat_id: int, response: str) -> None:
+        """Check if the LLM response mentions a generated PDF file and send it."""
+        import re
+        # Look for paths in the response that end in .pdf
+        pdf_paths = re.findall(r'(/[^\s"\']+\.pdf)', response)
+        for pdf_path in pdf_paths:
+            path = Path(pdf_path)
+            if path.exists() and path.stat().st_size > 0:
+                try:
+                    await application.bot.send_document(
+                        chat_id=chat_id,
+                        document=path.open("rb"),
+                        filename=path.name,
+                        caption=f"\U0001f4da {path.stem.replace('_', ' ')}",
+                    )
+                except Exception:
+                    logger.warning("Failed to send PDF %s via Telegram", pdf_path, exc_info=True)
 
     async def cmd_start(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
         if update.effective_user is None or update.effective_message is None:
@@ -218,7 +332,7 @@ def run_bot(cfg: ConfigDict) -> None:
     application.add_handler(CommandHandler("start", cmd_start))
     application.add_handler(CommandHandler("clear", cmd_clear))
     application.add_handler(CallbackQueryHandler(handle_button))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler((filters.TEXT | filters.Document.PDF) & ~filters.COMMAND, handle_message))
 
     # Use explicit async lifecycle so this works in a background thread
     async def _run() -> None:
