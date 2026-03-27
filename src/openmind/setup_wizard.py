@@ -11,6 +11,7 @@ from typing import Any, Final
 
 import httpx
 from rich.console import Console
+from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
 from openmind.config import CONFIG_DIR, ConfigDict, GMAIL_CREDS_DIR, load_config, save_config
@@ -56,7 +57,12 @@ def run_first_setup() -> None:
     cfg["university"] = university
 
     # Step 1: Canvas
-    console.print("[bold]Step 1 of 2[/bold] — Connect to bCourses\n")
+    console.print(Panel(
+        "Get your token: bCourses \u2192 Profile \u2192 Settings \u2192 + New Access Token",
+        title="[bold]Step 1 of 2[/bold] \u2014 Connect to bCourses",
+        border_style="yellow",
+        padding=(1, 2),
+    ))
     canvas_token, user_name, courses = _setup_canvas(university["canvas_url"])
     cfg["canvas_token"] = canvas_token
     cfg["canvas_url"] = university["canvas_url"]
@@ -64,7 +70,12 @@ def run_first_setup() -> None:
     cfg["courses"] = courses
 
     # Step 2: OpenRouter
-    console.print("\n[bold]Step 2 of 2[/bold] — Connect OpenRouter\n")
+    console.print(Panel(
+        "Get your key: openrouter.ai/keys (free credits available)",
+        title="[bold]Step 2 of 2[/bold] \u2014 Connect OpenRouter",
+        border_style="yellow",
+        padding=(1, 2),
+    ))
     api_key = _setup_openrouter_key()
     cfg["openrouter_api_key"] = api_key
     cfg["model"] = DEFAULT_MODEL
@@ -93,15 +104,23 @@ def run_first_setup() -> None:
     enabled = [name for name in ("telegram", "gmail", "calendar", "slack", "todoist", "obsidian")
                if cfg.get(name, {}).get("enabled")]
 
-    console.print(f"\n[bold]\U0001f389 You're ready![/bold] {university.get('mascot', '')}{university.get('colors', '')}")
-    console.print(f"\n  Model: [dim]{DEFAULT_MODEL}[/dim]")
+    # Summary
+    summary_lines = [f"\U0001f389 [bold]You're ready![/bold] {university.get('mascot', '')}{university.get('colors', '')}"]
+    summary_lines.append(f"\n  Model: {DEFAULT_MODEL}")
     if enabled:
-        console.print(f"  Integrations: [dim]{', '.join(enabled)}[/dim]")
+        summary_lines.append(f"  Integrations: {', '.join(enabled)}")
+    summary_lines.append("")
+    summary_lines.append("  [dim]Change anytime:[/dim]")
+    summary_lines.append("    [cyan]openmind setup model[/cyan]     \u2014 change your LLM")
+    summary_lines.append("    [cyan]openmind setup profile[/cyan]   \u2014 add your goals + interests")
+    summary_lines.append("    [cyan]openmind setup <name>[/cyan]    \u2014 add/change any integration")
+
     console.print()
-    console.print("  [dim]Change anytime:[/dim]")
-    console.print("    [cyan]openmind setup model[/cyan]     — change your LLM")
-    console.print("    [cyan]openmind setup profile[/cyan]   — add your goals + interests")
-    console.print("    [cyan]openmind setup <name>[/cyan]    — add/change any integration")
+    console.print(Panel(
+        "\n".join(summary_lines),
+        border_style="green",
+        padding=(1, 2),
+    ))
     console.print()
 
 

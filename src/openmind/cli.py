@@ -8,10 +8,19 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from openmind.config import CONFIG_DIR, ConfigDict, config_exists, config_valid, load_config
 
 logger = logging.getLogger(__name__)
+
+def _version_callback(value: bool) -> None:
+    if value:
+        from openmind.banner import print_banner
+        print_banner()
+        raise typer.Exit()
+
 
 app: typer.Typer = typer.Typer(
     name="openmind",
@@ -58,7 +67,10 @@ def _ensure_config() -> ConfigDict:
 
 
 @app.callback(invoke_without_command=True)
-def main(ctx: typer.Context) -> None:
+def main(
+    ctx: typer.Context,
+    version: bool = typer.Option(False, "--version", "-v", callback=_version_callback, is_eager=True, help="Show version and exit"),
+) -> None:
     """Launch openmind. Runs setup on first use, then starts the bot."""
     if ctx.invoked_subcommand is not None:
         return
@@ -72,7 +84,7 @@ def main(ctx: typer.Context) -> None:
             run_bot(cfg)
         except ImportError:
             logger.warning("Telegram extras unavailable; falling back to REPL.", exc_info=True)
-            console.print("[red]Telegram requires: pip install 'openmind[telegram]'[/red]")
+            console.print("[red]Telegram requires: pip install 'openmind-berkeley[telegram]'[/red]")
             console.print("Falling back to terminal.\n")
             from openmind.repl import run_repl
 
@@ -116,27 +128,54 @@ def config() -> None:
     cfg = load_config()
     university = cfg.get("university", {})
     courses = cfg.get("courses", {})
-    integrations: list[str] = []
 
-    for name in ("telegram", "todoist", "gmail", "calendar", "slack", "obsidian"):
-        if cfg.get(name, {}).get("enabled"):
-            integrations.append(name.capitalize())
+    # Build config display
+    lines: list[str] = []
+    lines.append(f"[bold]University[/bold]    {university.get('name', 'Unknown')}")
+    lines.append(f"[bold]Canvas[/bold]        {university.get('canvas_name', 'Canvas')}")
+    lines.append(f"[bold]Model[/bold]         {cfg.get('model', 'not set')}")
+    lines.append(f"[bold]Courses[/bold]        {len(courses)}")
+    lines.append("")
 
-    console.print(f"\n[bold]{university.get('name', 'Unknown')}[/bold] {university.get('mascot', '')}")
-    console.print(f"Canvas: {university.get('canvas_name', 'Canvas')}")
-    console.print(f"Model: {cfg.get('model', 'not set')}")
-    console.print(f"Courses: {len(courses)}")
-    for cid, name in courses.items():
-        console.print(f"  {cid} | {name}")
-    console.print(f"Integrations: {', '.join(integrations) if integrations else 'none'}")
-    console.print(f"\nConfig: {CONFIG_DIR}")
+    # Integrations with status indicators
+    lines.append("[bold]Integrations[/bold]")
+    all_integrations = ("telegram", "gmail", "calendar", "slack", "todoist", "obsidian")
+    for name in all_integrations:
+        enabled = cfg.get(name, {}).get("enabled", False)
+        icon = "[green]\u2705[/green]" if enabled else "[dim]\u2b1c[/dim]"
+        lines.append(f"  {icon} {name.capitalize()}")
 
-    # Show available integrations that aren't enabled
-    disabled = [n for n in ("telegram", "gmail", "calendar", "slack", "todoist", "obsidian") if not cfg.get(n, {}).get("enabled")]
-    if disabled:
-        console.print("\n[dim]Add integrations: openmind setup <name>[/dim]")
-        console.print(f"[dim]Available: {', '.join(disabled)}[/dim]")
+    # Profile status
+    from openmind.tools.profile import load_profile
+    p = load_profile()
+    has_profile = any(v for v in p.values())
+    profile_icon = "[green]\u2705[/green]" if has_profile else "[dim]\u2b1c[/dim]"
+    lines.append(f"\n[bold]Profile[/bold]       {profile_icon} {'Set up' if has_profile else 'Not set up'}")
+
     console.print()
+    console.print(Panel(
+        "\n".join(lines),
+        title="\U0001f43b OpenMind Configuration",
+        border_style="yellow",
+        padding=(1, 2),
+    ))
+
+    # Courses table
+    if courses:
+        table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2))
+        table.add_column("ID", style="dim")
+        table.add_column("Course")
+        for cid, name in courses.items():
+            table.add_row(cid, name)
+        console.print(table)
+
+    # Hints
+    disabled = [n for n in all_integrations if not cfg.get(n, {}).get("enabled")]
+    if disabled:
+        console.print(f"\n  [dim]Add integrations:[/dim] [cyan]openmind setup <name>[/cyan]")
+    if not has_profile:
+        console.print(f"  [dim]Set up profile:[/dim]   [cyan]openmind setup profile[/cyan]")
+    console.print(f"  [dim]Config path:[/dim]      {CONFIG_DIR}\n")
 
 
 @app.command()
@@ -156,94 +195,99 @@ def profile() -> None:
     p = load_profile()
     has_data = any(v for v in p.values())
     if not has_data:
-        console.print("\n[yellow]No profile data yet.[/yellow]")
-        console.print("Add yours: [cyan]openmind setup profile[/cyan]\n")
+        console.print()
+        console.print(Panel(
+            "[yellow]No profile data yet.[/yellow]\n\n"
+            "Add yours: [cyan]openmind setup profile[/cyan]",
+            title="\U0001f43b Profile",
+            border_style="yellow",
+            padding=(1, 2),
+        ))
         return
 
-    console.print("\n[bold]Your profile[/bold] \U0001f43b\n")
+    lines: list[str] = []
 
     if p.get("level"):
-        console.print(f"  Level: {p['level']}")
+        lines.append(f"[bold]Level[/bold]          {p['level']}")
     if p.get("major"):
         school = f" ({p['school']})" if p.get("school") else ""
         year = f", {p['year']}" if p.get("year") else ""
-        console.print(f"  Major: {p['major']}{school}{year}")
+        lines.append(f"[bold]Major[/bold]          {p['major']}{school}{year}")
     if p.get("expected_graduation"):
-        console.print(f"  Graduation: {p['expected_graduation']}")
+        lines.append(f"[bold]Graduation[/bold]     {p['expected_graduation']}")
     if p.get("interests"):
         val = p["interests"]
-        console.print(f"  Interests: {', '.join(val) if isinstance(val, list) else val}")
+        lines.append(f"[bold]Interests[/bold]      {', '.join(val) if isinstance(val, list) else val}")
     if p.get("career_goals"):
         val = p["career_goals"]
-        console.print(f"  Career goals: {', '.join(val) if isinstance(val, list) else val}")
+        lines.append(f"[bold]Career goals[/bold]   {', '.join(val) if isinstance(val, list) else val}")
     if p.get("dream_companies"):
-        console.print(f"  Dream companies: {', '.join(p['dream_companies'])}")
+        lines.append(f"[bold]Target co's[/bold]    {', '.join(p['dream_companies'])}")
     if p.get("gpa_goal"):
-        console.print(f"  GPA goal: {p['gpa_goal']}")
+        lines.append(f"[bold]GPA goal[/bold]       {p['gpa_goal']}")
 
     resume = p.get("resume", {})
     if isinstance(resume, dict) and resume:
+        lines.append("")
         if resume.get("skills"):
-            console.print(f"  Skills: {', '.join(resume['skills'][:10])}")
+            lines.append(f"[bold]Skills[/bold]         {', '.join(resume['skills'][:10])}")
         if resume.get("experience"):
             for exp in resume["experience"][:3]:
                 if isinstance(exp, dict):
-                    console.print(f"  Experience: {exp.get('role', '')} @ {exp.get('company', '')}")
+                    lines.append(f"[bold]Experience[/bold]     {exp.get('role', '')} @ {exp.get('company', '')}")
 
-    console.print("\n  Edit: [cyan]openmind setup profile[/cyan]")
-    console.print(f"  File: {PROFILE_FILE}\n")
+    console.print()
+    console.print(Panel(
+        "\n".join(lines),
+        title="\U0001f43b Student Profile",
+        border_style="yellow",
+        padding=(1, 2),
+    ))
+    console.print(f"  [dim]Edit:[/dim] [cyan]openmind setup profile[/cyan]")
+    console.print(f"  [dim]File:[/dim] {PROFILE_FILE}\n")
 
 
 @app.command()
 def privacy() -> None:
     """Show what data stays local vs what goes to the LLM."""
-    console.print("\n[bold]\U0001f512 Privacy summary[/bold]\n")
+    console.print()
+
+    # Local
+    console.print(Panel(
+        "[green]\u2705[/green] ~/.openmind/config.json (API tokens, settings)\n"
+        "[green]\u2705[/green] ~/.openmind/profile.json (academic profile)\n"
+        "[green]\u2705[/green] ~/.openmind/state/ (heartbeat state)\n"
+        "[green]\u2705[/green] ~/.openmind/repl_history (terminal history)\n"
+        "[green]\u2705[/green] Resume PDF (never uploaded)",
+        title="[green]Stays on your machine[/green]",
+        border_style="green",
+        padding=(1, 2),
+    ))
+
+    # Sent to LLM
+    console.print(Panel(
+        "[yellow]\u26a0\ufe0f[/yellow]  Your name, course list, and profile fields\n"
+        "   (major, interests, goals, skills, GPA target)\n"
+        "[yellow]\u26a0\ufe0f[/yellow]  Resume-extracted data (skills, experience, projects)\n"
+        "[yellow]\u26a0\ufe0f[/yellow]  Canvas data fetched during the conversation\n"
+        "[yellow]\u26a0\ufe0f[/yellow]  Your messages and the bot's responses\n"
+        "[yellow]\u26a0\ufe0f[/yellow]  Gmail/Slack/Calendar content when you ask about it",
+        title="[yellow]Sent to your LLM provider (OpenRouter)[/yellow]",
+        border_style="yellow",
+        padding=(1, 2),
+    ))
+
+    # Never sent
+    console.print(Panel(
+        "\U0001f6ab API tokens (sent only to their own service for auth)\n"
+        "\U0001f6ab Raw resume PDF file\n"
+        "\U0001f6ab Heartbeat state files\n"
+        "\U0001f6ab Terminal command history",
+        title="[red]Never sent to the LLM[/red]",
+        border_style="red",
+        padding=(1, 2),
+    ))
+
     console.print("  [dim]OpenMind runs on your machine. There is no OpenMind server.[/dim]")
-    console.print()
-
-    console.print("  [bold]Files that stay on your machine:[/bold]")
-    console.print("    \u2705 ~/.openmind/config.json (API tokens, settings)")
-    console.print("    \u2705 ~/.openmind/profile.json (your academic profile)")
-    console.print("    \u2705 ~/.openmind/state/ (heartbeat notification state)")
-    console.print("    \u2705 ~/.openmind/repl_history (terminal command history)")
-    console.print("    \u2705 Resume PDF (never uploaded)")
-    console.print()
-
-    console.print("  [bold]Sent to the LLM on every request (via OpenRouter):[/bold]")
-    console.print("    \u26a0\ufe0f  Your name and course list")
-    console.print("    \u26a0\ufe0f  Profile fields when present: level, major, school, year,")
-    console.print("       expected graduation, interests, career goals, dream companies,")
-    console.print("       GPA goal, strengths, areas to improve, study/learning preferences")
-    console.print("    \u26a0\ufe0f  Resume-extracted data: skills, experience, projects")
-    console.print("       (if you imported a resume)")
-    console.print("    \u26a0\ufe0f  Tool results used in the conversation: Canvas data, PDFs,")
-    console.print("       web pages, and any other fetched content")
-    console.print("    \u26a0\ufe0f  Your messages and the bot's responses")
-    console.print()
-
-    console.print("  [bold]Sent to external services when needed:[/bold]")
-    console.print("    \u26a0\ufe0f  Canvas token \u2192 bCourses")
-    console.print("    \u26a0\ufe0f  OpenRouter API key \u2192 OpenRouter")
-    console.print("    \u26a0\ufe0f  Telegram bot token \u2192 Telegram (if enabled)")
-    console.print("    \u26a0\ufe0f  Slack/Todoist/Google tokens \u2192 their own APIs (if enabled)")
-    console.print()
-
-    console.print("  [bold]Sent to the LLM only when you explicitly ask:[/bold]")
-    console.print("    \u26a0\ufe0f  Gmail message content (when you ask about email)")
-    console.print("    \u26a0\ufe0f  Slack message content (when you ask about Slack)")
-    console.print("    \u26a0\ufe0f  Google Calendar events (when you ask about calendar)")
-    console.print("    \u26a0\ufe0f  Todoist task content (when you ask about tasks)")
-    console.print("    \u26a0\ufe0f  Obsidian note content (when you ask about notes)")
-    console.print()
-
-    console.print("  [bold]Never sent to the LLM or an OpenMind server:[/bold]")
-    console.print("    \U0001f6ab API tokens themselves")
-    console.print("    \U0001f6ab Raw resume PDF file")
-    console.print("    \U0001f6ab Heartbeat state")
-    console.print("    \U0001f6ab Terminal history")
-    console.print()
-
-    console.print("  [dim]Your profile fields are embedded in the AI's instructions so it[/dim]")
-    console.print("  [dim]can personalize responses. The files themselves stay local.[/dim]")
-    console.print()
-    console.print(f"  Delete everything: rm -rf {CONFIG_DIR}\n")
+    console.print("  [dim]Profile fields are embedded in the AI's instructions for personalization.[/dim]")
+    console.print(f"\n  Delete everything: [cyan]rm -rf {CONFIG_DIR}[/cyan]\n")

@@ -36,9 +36,10 @@ class CliTests(unittest.TestCase):
         """Explain the real privacy boundary in CLI output."""
         result = runner.invoke(app, ["privacy"])
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("There is no OpenMind server", result.stdout)
-        self.assertIn("Sent to the LLM on every request", result.stdout)
-        self.assertIn("Slack/Todoist/Google tokens", result.stdout)
+        out = result.stdout.lower()
+        self.assertIn("no openmind server", out)
+        self.assertIn("sent to your llm provider", out)
+        self.assertIn("never sent to the llm", out)
 
 
 class SetupWizardTests(unittest.TestCase):

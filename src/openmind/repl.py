@@ -75,6 +75,8 @@ def run_repl(cfg: ConfigDict) -> None:
 
         messages.append({"role": "assistant", "content": response})
         console.print()
+        console.rule(style="dim")
+        console.print()
         console.print(Markdown(response))
         console.print()
 
