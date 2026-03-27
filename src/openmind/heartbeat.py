@@ -298,18 +298,20 @@ def _check_deadlines(cfg: ConfigDict) -> list[str]:
                 old_str = prev_due_dt.strftime("%b %d")
                 new_str = due_dt.strftime("%b %d")
                 diff_days = (due_dt - prev_due_dt).total_seconds() / 86400
-                course_label = f" ({course_name})" if course_name else ""
+                prefix = f"{course_name} \u2014 {title}" if course_name else title
                 if diff_days > 0:
-                    deadline_changes.append(f"\U0001f4c5 {title}{course_label}: {old_str} \u2192 {new_str} (extended {int(diff_days)}d)")
+                    deadline_changes.append(f"\U0001f4c5 {prefix}: {old_str} \u2192 {new_str} (extended {int(diff_days)}d)")
                 else:
-                    deadline_changes.append(f"\U0001f4c5 {title}{course_label}: {old_str} \u2192 {new_str} (moved earlier by {int(abs(diff_days))}d)")
+                    deadline_changes.append(f"\U0001f4c5 {prefix}: {old_str} \u2192 {new_str} (moved earlier by {int(abs(diff_days))}d)")
 
         # Check for urgency escalation
         if not previous_level or _URGENCY_ORDER.get(level, 0) > _URGENCY_ORDER.get(previous_level, -1):
             due_str = due_dt.strftime("%b %d")
             days_str = f"{int(days)}d" if days >= 1 else "TODAY"
-            course_label = f" \u2014 {course_name}" if course_name else ""
-            notifications.append(f"{emoji} {title}{course_label} (due {due_str}, {days_str})")
+            if course_name:
+                notifications.append(f"{emoji} {course_name} \u2014 {title} (due {due_str}, {days_str})")
+            else:
+                notifications.append(f"{emoji} {title} (due {due_str}, {days_str})")
 
     _save_state("deadlines", new_state)
     results: list[str] = []
