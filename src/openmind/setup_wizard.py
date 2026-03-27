@@ -126,18 +126,20 @@ def run_first_setup() -> None:
         padding=(1, 2),
     ))
 
-    console.print("    [cyan]1[/cyan]  google/gemini-3.1-pro-preview           \u2014 smart, low cost [dim](default)[/dim]")
-    console.print("    [cyan]2[/cyan]  z-ai/glm-5-turbo              \u2014 smart, very cheap")
-    console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     \u2014 excellent reasoning")
+    console.print("    [cyan]1[/cyan]  google/gemini-3.1-pro-preview     \u2014 smartest, 1M context [dim](default)[/dim]")
+    console.print("    [cyan]2[/cyan]  google/gemini-3-flash-preview    \u2014 fast + cheap, 1M context")
+    console.print("    [cyan]3[/cyan]  google/gemini-2.5-flash-lite     \u2014 ultra cheap, 1M context")
+    console.print("    [cyan]4[/cyan]  anthropic/claude-sonnet-4-6      \u2014 excellent reasoning, 1M context")
     console.print("    [dim]Or type any OpenRouter model ID[/dim]")
     console.print()
 
     _model_choices = {
         "1": "google/gemini-3.1-pro-preview",
-        "2": "z-ai/glm-5-turbo",
-        "3": "anthropic/claude-sonnet-4-6",
+        "2": "google/gemini-3-flash-preview",
+        "3": "google/gemini-2.5-flash-lite",
+        "4": "anthropic/claude-sonnet-4-6",
     }
-    choice = Prompt.ask("  Enter 1, 2, 3, or a model ID", default="1")
+    choice = Prompt.ask("  Enter 1-4 or a model ID", default="1")
     cfg["model"] = _model_choices.get(choice, choice)
 
     # Step 3: OpenRouter API key
@@ -386,9 +388,10 @@ def _setup_openrouter_full() -> tuple[str, str]:
 
     console.print("\n  [bold]Choose your LLM model[/bold]")
     console.print("  [dim]All models below support tool calling (required for OpenMind)[/dim]\n")
-    console.print("    [cyan]1[/cyan]  google/gemini-3.1-pro-preview           \u2014 smart, low cost [dim](default)[/dim]")
-    console.print("    [cyan]2[/cyan]  z-ai/glm-5-turbo              \u2014 smart, very cheap")
-    console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     \u2014 excellent reasoning")
+    console.print("    [cyan]1[/cyan]  google/gemini-3.1-pro-preview     \u2014 smartest, 1M context [dim](default)[/dim]")
+    console.print("    [cyan]2[/cyan]  google/gemini-3-flash-preview    \u2014 fast + cheap, 1M context")
+    console.print("    [cyan]3[/cyan]  google/gemini-2.5-flash-lite     \u2014 ultra cheap, 1M context")
+    console.print("    [cyan]4[/cyan]  anthropic/claude-sonnet-4-6      \u2014 excellent reasoning, 1M context")
     console.print("    [dim]Or type any OpenRouter model ID[/dim]")
 
     _model_choices = {
@@ -407,9 +410,10 @@ def _setup_model_change(cfg: ConfigDict) -> None:
     console.print(f"\n  Current model: [bold]{current}[/bold]\n")
     console.print("  [bold]Choose your LLM model[/bold]")
     console.print("  [dim]All models below support tool calling (required for OpenMind)[/dim]\n")
-    console.print("    [cyan]1[/cyan]  google/gemini-3.1-pro-preview           \u2014 smart, low cost")
-    console.print("    [cyan]2[/cyan]  z-ai/glm-5-turbo              \u2014 smart, very cheap")
-    console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     \u2014 excellent reasoning")
+    console.print("    [cyan]1[/cyan]  google/gemini-3.1-pro-preview     \u2014 smartest, 1M context")
+    console.print("    [cyan]2[/cyan]  google/gemini-3-flash-preview    \u2014 fast + cheap, 1M context")
+    console.print("    [cyan]3[/cyan]  google/gemini-2.5-flash-lite     \u2014 ultra cheap, 1M context")
+    console.print("    [cyan]4[/cyan]  anthropic/claude-sonnet-4-6      \u2014 excellent reasoning, 1M context")
     console.print("    [dim]Or type any OpenRouter model ID[/dim]")
 
     _model_choices = {
