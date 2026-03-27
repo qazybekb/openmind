@@ -7,12 +7,16 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   body {
-    @apply bg-bg text-text-secondary font-sans antialiased;
+    @apply bg-bg text-text-body font-sans;
+    font-size: 16px;
+    line-height: 1.7;
   }
   ::selection {
-    @apply bg-white/10 text-white;
+    @apply bg-cal-gold/20 text-white;
   }
 }
 
@@ -44,14 +48,14 @@
            hover:border-border-hover hover:bg-bg-card-hover;
   }
   .badge {
-    @apply inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border text-xs text-text-muted;
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-xs text-text-secondary font-medium;
   }
   .btn-primary {
-    @apply px-5 py-2.5 bg-text-primary text-bg font-medium rounded-lg text-sm
+    @apply px-5 py-2.5 bg-text-primary text-bg font-semibold rounded-lg text-sm
            hover:bg-accent transition-colors;
   }
   .btn-secondary {
-    @apply px-5 py-2.5 border border-border text-text-secondary font-medium rounded-lg text-sm
+    @apply px-5 py-2.5 border border-border text-text-body font-medium rounded-lg text-sm
            hover:border-border-hover hover:text-text-primary transition-colors;
   }
 }

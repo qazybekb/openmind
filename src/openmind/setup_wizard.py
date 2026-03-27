@@ -48,11 +48,9 @@ def run_first_setup() -> None:
     """Minimal first-run: Canvas token + OpenRouter key. Instant value."""
     university = get_university()
 
-    console.print(
-        f"\n[bold]{university.get('mascot', '')} Welcome to OpenMind![/bold] "
-        f"{university.get('spirit', '')} {university.get('colors', '')}"
-    )
-    console.print("Your Cal study buddy. Let's get you set up.\n")
+    from openmind.banner import print_banner
+    print_banner(console)
+    console.print("  [bold]Let's get you set up.[/bold]\n")
 
     cfg: ConfigDict = load_config()
     cfg["university"] = university
@@ -357,6 +355,15 @@ def _setup_profile() -> None:
     )
     if goals:
         profile["career_goals"] = [g.strip() for g in goals.split(",") if g.strip()]
+
+    resume_path = Prompt.ask("  Resume PDF path (for skill extraction, or Enter to skip)", default="")
+    if resume_path:
+        resolved = Path(resume_path).expanduser()
+        if resolved.exists() and resolved.suffix.lower() == ".pdf":
+            profile["_pending_resume"] = str(resolved)
+            console.print("  [green]Resume noted![/green] Skills will be extracted on your first chat.")
+        elif resume_path.strip():
+            console.print(f"  [yellow]File not found or not a PDF: {resolved}[/yellow]")
 
     # Only save if the user actually entered something
     meaningful_keys = [k for k, v in profile.items() if v]

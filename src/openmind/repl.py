@@ -27,8 +27,10 @@ def run_repl(cfg: ConfigDict) -> None:
     uni = cfg.get("university", {})
     user_name = cfg.get("user_name", "Student")
 
-    console.print(f"\n{uni.get('mascot', '')} Hey {user_name}! {uni.get('spirit', '')}")
-    console.print("[dim]Type your question, /help for commands, or /quit to exit.[/dim]\n")
+    from openmind.banner import print_banner
+    print_banner(console)
+    console.print(f"  Hey {user_name}! {uni.get('spirit', '')}")
+    console.print("  [dim]Type your question, /help for commands, or /quit to exit.[/dim]\n")
 
     history_file = CONFIG_DIR / "repl_history"
     history_file.parent.mkdir(parents=True, exist_ok=True)
