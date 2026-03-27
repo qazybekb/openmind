@@ -433,11 +433,13 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
                         "points_possible": a.get("points_possible"),
                         "submission_state": ws or "unsubmitted",
                     })
-            return _json_result({
-                "all_assignments": data,
-                "UPCOMING_DEADLINES": upcoming,
-                "_note": "UPCOMING_DEADLINES lists future unsubmitted assignments. ALWAYS report these to the student.",
-            })
+            if upcoming:
+                return _json_result({
+                    "WARNING": f"This course has {len(upcoming)} UPCOMING DEADLINES that are NOT YET SUBMITTED. You MUST tell the student about these.",
+                    "UPCOMING_DEADLINES": upcoming,
+                    "all_assignments": data,
+                })
+            return _json_result({"all_assignments": data, "UPCOMING_DEADLINES": []})
         return _json_result(data)
 
     if name == "get_grades":
