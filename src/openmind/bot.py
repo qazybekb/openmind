@@ -10,7 +10,8 @@ import threading
 from pathlib import Path
 from typing import Any, Final, TypeAlias
 
-from telegram import ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ChatAction
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
