@@ -121,10 +121,19 @@ def run_bot(cfg: ConfigDict) -> None:
     application.add_handler(CommandHandler("clear", cmd_clear))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Run polling in its own event loop (supports running in a background thread)
+    # Use explicit async lifecycle so this works in a background thread
+    async def _run() -> None:
+        async with application:
+            await application.start()
+            await application.updater.start_polling()  # type: ignore[union-attr]
+            # Block until cancelled
+            stop_event = asyncio.Event()
+            await stop_event.wait()
+
     loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        application.run_polling()
+        loop.run_until_complete(_run())
     except Exception:
         logger.exception("Telegram bot stopped")
+    finally:
+        loop.close()
