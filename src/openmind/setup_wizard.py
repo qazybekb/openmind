@@ -29,6 +29,13 @@ TELEGRAM_VALIDATE_TIMEOUT_S: Final[float] = 10.0
 console: Console = Console()
 
 
+def _mask_key(key: str) -> str:
+    """Show first 6 and last 4 chars of a key, mask the rest."""
+    if len(key) <= 12:
+        return key[:3] + "****"
+    return key[:6] + "****" + key[-4:]
+
+
 def _ensure_private_dir(path: Path) -> None:
     """Create a directory with owner-only permissions."""
     path.mkdir(parents=True, exist_ok=True)
@@ -76,10 +83,8 @@ def run_first_setup() -> None:
         border_style="yellow",
         padding=(1, 2),
     ))
-    api_key = _setup_openrouter_key()
-    cfg["openrouter_api_key"] = api_key
 
-    console.print("\n  [bold]Choose your LLM model[/bold]")
+    console.print("  [bold]Choose your LLM model[/bold]")
     console.print("  [dim]All models below support tool calling (required for OpenMind)[/dim]\n")
     console.print("    [cyan]1[/cyan]  google/gemini-2.5-pro           — smart, low cost [dim](default)[/dim]")
     console.print("    [cyan]2[/cyan]  xiaomi/mimo-v2-pro              — smart, very cheap")
@@ -93,6 +98,9 @@ def run_first_setup() -> None:
     }
     choice = Prompt.ask("\n  Model", default="1")
     cfg["model"] = _model_choices.get(choice, choice)
+
+    api_key = _setup_openrouter_key()
+    cfg["openrouter_api_key"] = api_key
 
     # Optional integrations — show what's available, let them skip or enable
     console.print("\n[bold]Optional features[/bold] (press Enter to skip any)\n")
@@ -241,6 +249,7 @@ def _setup_canvas(canvas_url: str) -> tuple[str, str, dict[str, str]]:
             console.print("  [red]Token cannot be empty.[/red]")
             continue
 
+        console.print(f"  [dim]Key: {_mask_key(token)}[/dim]")
         console.print("  Connecting...", end=" ")
         try:
             response = httpx.get(
@@ -305,6 +314,7 @@ def _setup_openrouter_key() -> str:
             console.print("  [red]Key cannot be empty.[/red]")
             continue
 
+        console.print(f"  [dim]Key: {_mask_key(api_key)}[/dim]")
         console.print("  Validating...", end=" ")
         try:
             response = httpx.get(
@@ -439,6 +449,7 @@ def _setup_telegram() -> dict[str, Any]:
             console.print("    [red]Token cannot be empty.[/red]")
             continue
 
+        console.print(f"    [dim]Token: {_mask_key(bot_token)}[/dim]")
         user_id = Prompt.ask("    Your Telegram user ID")
         if not user_id.strip():
             console.print("    [red]User ID cannot be empty.[/red]")
@@ -467,6 +478,8 @@ def _setup_todoist() -> dict[str, Any]:
     if not Confirm.ask("  Enable Todoist?", default=False):
         return {"enabled": False}
     token = Prompt.ask("    API token", password=True)
+    if token.strip():
+        console.print(f"    [dim]Token: {_mask_key(token)}[/dim]")
     return {"enabled": True, "token": token}
 
 
@@ -525,6 +538,8 @@ def _setup_slack() -> dict[str, Any]:
 
     console.print("    api.slack.com/apps \u2192 Create App \u2192 Add scopes: channels:history, channels:read, search:read")
     token = Prompt.ask("    User OAuth Token (xoxp-...)", password=True)
+    if token.strip():
+        console.print(f"    [dim]Token: {_mask_key(token)}[/dim]")
     if not token.strip():
         return {"enabled": False}
 
