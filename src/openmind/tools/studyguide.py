@@ -210,8 +210,11 @@ Return ONLY the complete LaTeX document. No commentary."""
 
 
 def _ensure_output_dir() -> None:
-    """Create the study guides directory."""
+    """Create the study guides directory with owner-only permissions."""
+    import os
+    import stat
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    os.chmod(OUTPUT_DIR, stat.S_IRWXU)
 
 
 def _find_pdflatex() -> str | None:

@@ -133,6 +133,13 @@ def run_repl(cfg: ConfigDict) -> None:
                     use_learn_model = True
                 user_input = synthetic
 
+        # Detect guided-learning intent from natural language
+        if not use_learn_model:
+            lower = user_input.lower()
+            learn_phrases = ("teach me", "help me understand", "explain to me", "walk me through", "i don't understand", "i don't get")
+            if any(phrase in lower for phrase in learn_phrases):
+                use_learn_model = True
+
         messages.append({"role": "user", "content": user_input})
 
         try:
@@ -153,11 +160,14 @@ def run_repl(cfg: ConfigDict) -> None:
             console.print()
         except Exception as exc:
             logger.exception("REPL request failed")
-            err_type = type(exc).__name__
-            if "timeout" in err_type.lower() or "Timeout" in str(exc):
+            err_str = str(exc).lower()
+            err_type = type(exc).__name__.lower()
+            if "timeout" in err_type or "timeout" in err_str:
                 console.print("[red]Timed out \u2014 the model's taking too long. Try again or try a shorter question.[/red]")
-            elif "auth" in err_type.lower() or "401" in str(exc):
-                console.print("[red]Auth error \u2014 your API key might be off. Run: openmind setup model[/red]")
+            elif "401" in err_str or "auth" in err_type:
+                console.print("[red]Auth error \u2014 your API key might be off. Run: /setup model[/red]")
+            elif "402" in err_str or "credit" in err_str or "quota" in err_str or "balance" in err_str or "billing" in err_str:
+                console.print("[red]Out of credits \u2014 top up at openrouter.ai/credits or switch to a cheaper model with /setup model[/red]")
             else:
                 console.print("[red]Something broke \u2014 probably a network thing. Give it another shot.[/red]")
             messages.pop()
@@ -262,8 +272,17 @@ def _handle_command(
         arg = original_cmd[6:].strip()
         try:
             from openmind.setup_wizard import setup_single_integration
+            from openmind.config import load_config
             if arg:
                 setup_single_integration(arg)
+                # Reload config so changes take effect immediately
+                new_cfg = load_config()
+                cfg.clear()
+                cfg.update(new_cfg)
+                if arg == "telegram":
+                    console.print("[dim]Restart openmind to activate Telegram.[/dim]")
+                elif arg == "model":
+                    console.print(f"[dim]Model active: {cfg.get('model', 'unknown')}[/dim]")
             else:
                 console.print(
                     "\n[bold]Setup integrations:[/bold]\n"
@@ -278,7 +297,7 @@ def _handle_command(
                 )
         except Exception:
             logger.warning("In-REPL setup failed", exc_info=True)
-            console.print("[red]Setup failed. Try running it from terminal: openmind setup " + (arg or "") + "[/red]")
+            console.print("[red]Setup failed. Try: openmind setup " + (arg or "") + "[/red]")
         return True, None
 
     return False, None

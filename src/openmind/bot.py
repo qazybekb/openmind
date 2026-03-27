@@ -175,6 +175,10 @@ def _build_application(cfg: ConfigDict) -> Application:
         finally:
             edit_task.cancel()
 
+        # Handle empty responses
+        if not response or not response.strip():
+            response = "I didn't get a usable answer \u2014 try again or rephrase your question."
+
         # Final edit with complete response (remove cursor block)
         try:
             final = _sanitize_markdown(response)
@@ -277,6 +281,8 @@ def _build_application(cfg: ConfigDict) -> Application:
                 reply = "The AI model took too long to respond. Try a shorter question or try again."
             elif "401" in err_msg or "auth" in err_msg:
                 reply = "Authentication error with your AI model. Check your OpenRouter key."
+            elif "402" in err_msg or "credit" in err_msg or "quota" in err_msg or "balance" in err_msg:
+                reply = "Out of OpenRouter credits. Top up at openrouter.ai/credits or switch to a cheaper model."
             else:
                 reply = "Something went wrong \u2014 this might be a network issue. Try again in a moment."
             await update.effective_message.reply_text(reply)
@@ -627,9 +633,26 @@ def _build_application(cfg: ConfigDict) -> Application:
                 reply_markup=_quick_action_keyboard(),
             )
 
+    async def cmd_setup(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        await update.effective_message.reply_text(
+            "Setup runs in your terminal, not Telegram.\n\n"
+            "Open a terminal and run:\n"
+            "`openmind setup telegram`\n"
+            "`openmind setup gmail`\n"
+            "`openmind setup calendar`\n\n"
+            "Or type `/setup` in the terminal REPL.",
+            parse_mode="Markdown",
+        )
+
     # Telegram application
     application = Application.builder().token(bot_token).build()
     application.add_handler(CommandHandler("start", cmd_start))
+    application.add_handler(CommandHandler("setup", cmd_setup))
     application.add_handler(CommandHandler("help", cmd_help))
     application.add_handler(CommandHandler("menu", cmd_menu))
     application.add_handler(CommandHandler("clear", cmd_clear))
