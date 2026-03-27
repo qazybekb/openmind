@@ -78,7 +78,21 @@ def run_first_setup() -> None:
     ))
     api_key = _setup_openrouter_key()
     cfg["openrouter_api_key"] = api_key
-    cfg["model"] = DEFAULT_MODEL
+
+    console.print("\n  [bold]Choose your LLM model[/bold]")
+    console.print("  [dim]All models below support tool calling (required for OpenMind)[/dim]\n")
+    console.print("    [cyan]1[/cyan]  google/gemini-2.5-pro           — smart, low cost [dim](default)[/dim]")
+    console.print("    [cyan]2[/cyan]  xiaomi/mimo-v2-pro              — smart, very cheap")
+    console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     — excellent reasoning")
+    console.print("    [dim]Or type any OpenRouter model ID[/dim]")
+
+    _model_choices = {
+        "1": "google/gemini-2.5-pro",
+        "2": "xiaomi/mimo-v2-pro",
+        "3": "anthropic/claude-sonnet-4-6",
+    }
+    choice = Prompt.ask("\n  Model", default="1")
+    cfg["model"] = _model_choices.get(choice, choice)
 
     # Optional integrations — show what's available, let them skip or enable
     console.print("\n[bold]Optional features[/bold] (press Enter to skip any)\n")
@@ -106,7 +120,7 @@ def run_first_setup() -> None:
 
     # Summary
     summary_lines = [f"\U0001f389 [bold]You're ready![/bold] {university.get('mascot', '')}{university.get('colors', '')}"]
-    summary_lines.append(f"\n  Model: {DEFAULT_MODEL}")
+    summary_lines.append(f"\n  Model: {cfg.get('model', DEFAULT_MODEL)}")
     if enabled:
         summary_lines.append(f"  Integrations: {', '.join(enabled)}")
     summary_lines.append("")
@@ -310,13 +324,20 @@ def _setup_openrouter_full() -> tuple[str, str]:
     """Validate OpenRouter key + choose model."""
     api_key = _setup_openrouter_key()
 
-    console.print("\n  Popular models:")
-    console.print("    google/gemini-2.5-pro        \u2014 great all-rounder, low cost")
-    console.print("    xiaomi/mimo-v2-pro           \u2014 very capable, very cheap")
-    console.print("    openai/gpt-5-mini            \u2014 fast and capable")
-    console.print("    anthropic/claude-sonnet-4    \u2014 excellent reasoning")
+    console.print("\n  [bold]Choose your LLM model[/bold]")
+    console.print("  [dim]All models below support tool calling (required for OpenMind)[/dim]\n")
+    console.print("    [cyan]1[/cyan]  google/gemini-2.5-pro           \u2014 smart, low cost [dim](default)[/dim]")
+    console.print("    [cyan]2[/cyan]  xiaomi/mimo-v2-pro              \u2014 smart, very cheap")
+    console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     \u2014 excellent reasoning")
+    console.print("    [dim]Or type any OpenRouter model ID[/dim]")
 
-    model = Prompt.ask("\n  Model", default=DEFAULT_MODEL)
+    _model_choices = {
+        "1": "google/gemini-2.5-pro",
+        "2": "xiaomi/mimo-v2-pro",
+        "3": "anthropic/claude-sonnet-4-6",
+    }
+    choice = Prompt.ask("\n  Model", default="1")
+    model = _model_choices.get(choice, choice)
     return api_key, model
 
 
@@ -324,14 +345,20 @@ def _setup_model_change(cfg: ConfigDict) -> None:
     """Change the LLM model."""
     current = cfg.get("model", DEFAULT_MODEL)
     console.print(f"\n  Current model: [bold]{current}[/bold]\n")
-    console.print("  Popular models:")
-    console.print("    google/gemini-2.5-pro        \u2014 great all-rounder, low cost")
-    console.print("    xiaomi/mimo-v2-pro           \u2014 very capable, very cheap")
-    console.print("    openai/gpt-5-mini            \u2014 fast and capable")
-    console.print("    anthropic/claude-sonnet-4    \u2014 excellent reasoning")
+    console.print("  [bold]Choose your LLM model[/bold]")
+    console.print("  [dim]All models below support tool calling (required for OpenMind)[/dim]\n")
+    console.print("    [cyan]1[/cyan]  google/gemini-2.5-pro           \u2014 smart, low cost")
+    console.print("    [cyan]2[/cyan]  xiaomi/mimo-v2-pro              \u2014 smart, very cheap")
+    console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     \u2014 excellent reasoning")
+    console.print("    [dim]Or type any OpenRouter model ID[/dim]")
 
-    model = Prompt.ask("\n  New model", default=current)
-    cfg["model"] = model
+    _model_choices = {
+        "1": "google/gemini-2.5-pro",
+        "2": "xiaomi/mimo-v2-pro",
+        "3": "anthropic/claude-sonnet-4-6",
+    }
+    choice = Prompt.ask("\n  New model", default="1")
+    cfg["model"] = _model_choices.get(choice, choice)
     save_config(cfg)
     console.print(f"  Model changed to: [bold]{model}[/bold]")
 

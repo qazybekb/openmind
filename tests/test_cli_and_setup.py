@@ -67,6 +67,7 @@ class SetupWizardTests(unittest.TestCase):
             patch("openmind.setup_wizard._setup_slack", return_value=disabled),
             patch("openmind.setup_wizard._setup_todoist", return_value=disabled),
             patch("openmind.setup_wizard._setup_obsidian", return_value=disabled),
+            patch("openmind.setup_wizard.Prompt.ask", return_value="1"),
             patch("openmind.setup_wizard.Confirm.ask", return_value=False),
             patch("openmind.setup_wizard.console.print"),
             patch("openmind.setup_wizard.save_config") as save_config,
