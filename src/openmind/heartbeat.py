@@ -1,4 +1,4 @@
-"""Run background Canvas checks and send Telegram notifications."""
+"""Run background Canvas + Gmail checks and send Telegram notifications."""
 
 from __future__ import annotations
 
@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 JsonObject: TypeAlias = dict[str, Any]
 
 ANNOUNCEMENT_LOOKBACK_HOURS: Final[int] = 3
+EMAIL_LOOKBACK_HOURS: Final[int] = 3
+EMAIL_MAX_RESULTS: Final[int] = 10
+EMAIL_QUERY: Final[str] = "is:unread from:berkeley.edu newer_than:3h"
 CANVAS_TIMEOUT_S: Final[float] = 30.0
 DEADLINE_LOOKAHEAD_DAYS: Final[int] = 7
 HEARTBEAT_INTERVAL: Final[int] = 3 * 60 * 60
@@ -58,6 +61,7 @@ def start_heartbeat(cfg: ConfigDict, bot_token: str, chat_id: str) -> None:
             notifications.extend(_check_submissions(cfg))
             notifications.extend(_check_grades(cfg))
             notifications.extend(_check_announcements(cfg))
+            notifications.extend(_check_emails(cfg))
 
             if notifications:
                 _send_telegram(bot_token, chat_id, "\n\n".join(notifications))
@@ -378,6 +382,75 @@ def _check_announcements(cfg: ConfigDict) -> list[str]:
     _save_state("announcements", {"seen": sorted(all_ids)})
     if new_items:
         return ["New announcements \U0001f43b\n" + "\n".join(new_items)]
+    return []
+
+
+def _check_emails(cfg: ConfigDict) -> list[str]:
+    """Check for recent unread emails from berkeley.edu senders."""
+    if not cfg.get("gmail", {}).get("enabled"):
+        return []
+
+    try:
+        from openmind.tools.gmail import _get_gmail_service, _headers_map
+    except ImportError:
+        return []
+
+    service = _get_gmail_service(cfg)
+    if service is None:
+        return []
+
+    seen_raw = _load_state("emails").get("seen", [])
+    seen = {str(item) for item in seen_raw} if isinstance(seen_raw, list) else set()
+
+    try:
+        results = service.users().messages().list(
+            userId="me",
+            q=EMAIL_QUERY,
+            maxResults=EMAIL_MAX_RESULTS,
+        ).execute()
+        messages = results.get("messages", [])
+    except Exception:
+        logger.warning("Gmail heartbeat check failed", exc_info=True)
+        return []
+
+    new_items: list[str] = []
+    all_ids: set[str] = set(seen)
+
+    for msg_ref in messages:
+        msg_id = str(msg_ref.get("id", ""))
+        if not msg_id or msg_id in seen:
+            continue
+
+        all_ids.add(msg_id)
+
+        try:
+            msg = service.users().messages().get(
+                userId="me",
+                id=msg_id,
+                format="metadata",
+                metadataHeaders=["From", "Subject"],
+            ).execute()
+        except Exception:
+            logger.warning("Failed to fetch email %s", msg_id, exc_info=True)
+            continue
+
+        headers = _headers_map(msg.get("payload", {}).get("headers", []))
+        sender = headers.get("From", "Unknown")
+        subject = headers.get("Subject", "(no subject)")
+
+        # Clean up sender display
+        if "<" in sender:
+            sender = sender.split("<")[0].strip().strip('"')
+
+        new_items.append(f"\u2709\ufe0f {sender} \u2014 {subject}")
+
+    # Cap seen set to prevent unbounded growth
+    if len(all_ids) > 500:
+        all_ids = set(sorted(all_ids)[-250:])
+    _save_state("emails", {"seen": sorted(all_ids)})
+
+    if new_items:
+        return ["New emails from Berkeley \U0001f43b\n" + "\n".join(new_items)]
     return []
 
 
