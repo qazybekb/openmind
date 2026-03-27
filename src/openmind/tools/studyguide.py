@@ -24,6 +24,13 @@ ToolDefinition: TypeAlias = dict[str, Any]
 
 OUTPUT_DIR: Final[Path] = CONFIG_DIR / "study_guides"
 OPUS_MODEL: Final[str] = "anthropic/claude-opus-4-6"
+# Common pdflatex locations
+_PDFLATEX_PATHS: Final[tuple[str, ...]] = (
+    "pdflatex",
+    "/Library/TeX/texbin/pdflatex",
+    "/usr/local/texlive/2026/bin/universal-darwin/pdflatex",
+    "/usr/bin/pdflatex",
+)
 
 STUDY_GUIDE_TOOLS: list[ToolDefinition] = [
     {
@@ -104,9 +111,7 @@ _LATEX_PREAMBLE = r"""\documentclass[10pt,letterpaper]{article}
 \usepackage{titlesec}
 \usepackage{fancyhdr}
 \usepackage{xcolor}
-\usepackage{tcolorbox}
-\usepackage{tabularx}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 
 % Colors
 \definecolor{calgold}{RGB}{253,181,21}
@@ -129,19 +134,16 @@ _LATEX_PREAMBLE = r"""\documentclass[10pt,letterpaper]{article}
 \titlespacing*{\subsection}{0pt}{8pt}{3pt}
 \titlespacing*{\subsubsection}{0pt}{6pt}{2pt}
 
-% Exam tip boxes
-\newtcolorbox{examtip}{
-    colback=tipbg,colframe=tipborder,
-    fonttitle=\small\bfseries,title=EXAM TIP,
-    boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=2pt,bottom=2pt
-}
+% Exam tip boxes (works without tcolorbox)
+\newenvironment{examtip}{%
+  \par\smallskip\noindent\colorbox{tipbg}{\parbox{\dimexpr\columnwidth-2\fboxsep}{%
+  \small\textbf{EXAM TIP:} \ignorespaces}}%
+  \par\noindent\fbox{\parbox{\dimexpr\columnwidth-2\fboxsep}{\small\ignorespaces}}}{}
 
 % Core concept boxes
-\newtcolorbox{corebox}[1][Core Argument]{
-    colback=white,colframe=calblue,
-    fonttitle=\small\bfseries,title=#1,
-    boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=2pt,bottom=2pt
-}
+\newenvironment{corebox}[1][Core Argument]{%
+  \par\smallskip\noindent\fcolorbox{calblue}{white}{\parbox{\dimexpr\columnwidth-2\fboxsep-2\fboxrule}{%
+  \small\textbf{#1}\par\smallskip\ignorespaces}}}{}
 
 % Header
 \pagestyle{fancy}
@@ -212,7 +214,20 @@ def _ensure_output_dir() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _compile_latex(latex_content: str, title: str) -> str | None:
+def _find_pdflatex() -> str | None:
+    """Find the pdflatex binary."""
+    import shutil
+    for path in _PDFLATEX_PATHS:
+        if path == "pdflatex":
+            found = shutil.which("pdflatex")
+            if found:
+                return found
+        elif Path(path).exists():
+            return path
+    return None
+
+
+def _compile_latex(latex_content: str, title: str, pdflatex_bin: str = "pdflatex") -> str | None:
     """Compile LaTeX to PDF. Returns the output path or None on failure."""
     _ensure_output_dir()
 
@@ -229,7 +244,7 @@ def _compile_latex(latex_content: str, title: str) -> str | None:
         # Try pdflatex (2 passes for ToC/references)
         for _pass in range(2):
             result = subprocess.run(
-                ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", str(tex_path)],
+                [pdflatex_bin, "-interaction=nonstopmode", "-halt-on-error", str(tex_path)],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True,
@@ -362,11 +377,10 @@ def execute_study_guide_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
         return json.dumps({"error": "Missing required argument: source_material. Fetch course content from Canvas first (modules, lectures, readings)."})
 
     # Check if pdflatex is available
-    try:
-        subprocess.run(["pdflatex", "--version"], capture_output=True, timeout=10)
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    pdflatex_bin = _find_pdflatex()
+    if not pdflatex_bin:
         return json.dumps({
-            "error": "pdflatex is not installed. Install LaTeX: brew install --cask mactex-no-gui (macOS) or apt install texlive-full (Linux)."
+            "error": "pdflatex is not installed. Install LaTeX: brew install --cask basictex (macOS) or apt install texlive (Linux). Then: sudo tlmgr install tcolorbox environ etoolbox pgf"
         })
 
     # Generate content with Opus
@@ -391,7 +405,7 @@ def execute_study_guide_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
 
     label = "Cheatsheet" if is_cheatsheet else "Study Guide"
     title = f"{course_name} — {scope.capitalize() + ' ' if scope else ''}{label}"
-    output_path = _compile_latex(latex_content, title)
+    output_path = _compile_latex(latex_content, title, pdflatex_bin=pdflatex_bin)
 
     if output_path is None:
         # Save the raw LaTeX for debugging
