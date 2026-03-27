@@ -29,13 +29,10 @@ dependencies = [
     "openai>=1.30",
     "httpx>=0.27",
     "pymupdf>=1.24",
+    "python-telegram-bot>=21.0",
+    "google-auth-oauthlib>=1.0",
+    "google-api-python-client>=2.0",
 ]
-
-[project.optional-dependencies]
-telegram = ["python-telegram-bot>=21.0"]
-gmail = ["google-auth-oauthlib>=1.0", "google-api-python-client>=2.0"]
-calendar = ["google-auth-oauthlib>=1.0", "google-api-python-client>=2.0"]
-all = ["python-telegram-bot>=21.0", "google-auth-oauthlib>=1.0", "google-api-python-client>=2.0"]
 
 [project.urls]
 Homepage = "https://github.com/qazybekb/openmind"

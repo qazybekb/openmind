@@ -92,8 +92,8 @@ def _start_telegram_if_enabled(cfg: ConfigDict) -> None:
     try:
         from openmind.bot import run_bot
     except ImportError:
-        logger.warning("Telegram extras unavailable.", exc_info=True)
-        console.print("[yellow]Telegram requires: pip install 'openmind-berkeley[telegram]'[/yellow]")
+        logger.warning("Telegram dependency missing.", exc_info=True)
+        console.print("[yellow]Telegram failed to load. Try: pip install --force-reinstall git+https://github.com/qazybekb/openmind.git[/yellow]")
         return
 
     import threading

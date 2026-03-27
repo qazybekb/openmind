@@ -55,9 +55,10 @@ GMAIL_TOOLS: list[ToolDefinition] = [
 
 NOT_READY_MESSAGE: Final[str] = (
     "Gmail is not connected yet. To set it up: "
-    "(1) pip install 'openmind-berkeley[gmail]' for the Google dependencies, "
-    "(2) run: openmind setup gmail and provide your Google OAuth credentials (from Google Cloud Console > Gmail API > OAuth 2.0 Client ID, Desktop app), "
-    "(3) on first use a browser window will open for Google sign-in."
+    "(1) run: openmind setup gmail and provide your Google OAuth credentials "
+    "(from Google Cloud Console > Gmail API > OAuth 2.0 Client ID, Desktop app), "
+    "(2) on first use a browser window will open for Google sign-in. "
+    "Detailed guide: openmindbot.io/guides/gmail"
 )
 
 
