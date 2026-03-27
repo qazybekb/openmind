@@ -401,22 +401,7 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
     if name == "get_upcoming_assignments":
         data = _get(cfg, "/users/self/upcoming_events")
         if isinstance(data, list):
-            # Return compact summaries — raw events can be 40K+
-            compact = []
-            for event in data:
-                if not isinstance(event, dict) or not event.get("assignment"):
-                    continue
-                assignment = event["assignment"]
-                sub = assignment.get("submission", {}) if isinstance(assignment, dict) else {}
-                ws = sub.get("workflow_state", "") if isinstance(sub, dict) else ""
-                compact.append({
-                    "title": event.get("title", ""),
-                    "course": courses.get(str(event.get("context_code", "")).replace("course_", ""), ""),
-                    "due_at": event.get("end_at") or event.get("start_at") or "",
-                    "points_possible": assignment.get("points_possible") if isinstance(assignment, dict) else None,
-                    "submitted": ws in ("submitted", "graded"),
-                })
-            return _json_result(compact)
+            data = [event for event in data if isinstance(event, dict) and event.get("assignment")]
         return _json_result(data)
 
     if name == "get_course_assignments":
@@ -546,20 +531,6 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
             params["search_term"] = search_term
 
         data = _get_paginated(cfg, f"/courses/{course_id}/files", params or None)
-        # Return compact file list — full metadata can be 30K+
-        if isinstance(data, list):
-            compact = []
-            for f in data:
-                if not isinstance(f, dict):
-                    continue
-                compact.append({
-                    "display_name": f.get("display_name", ""),
-                    "url": f.get("url", ""),
-                    "size": f.get("size", 0),
-                    "content_type": f.get("content-type", ""),
-                    "updated_at": f.get("updated_at", ""),
-                })
-            return _json_result(compact)
         return _json_result(data)
 
     if name == "get_announcements":
@@ -583,19 +554,6 @@ def _execute_canvas_tool(name: str, args: ToolArgs, cfg: ConfigDict) -> str:
         if course_id is None:
             return _error_result("Missing required argument: course_id.")
         data = _get_paginated(cfg, f"/courses/{course_id}/discussion_topics")
-        # Return compact list — full topics with HTML can be 20K+
-        if isinstance(data, list):
-            compact = []
-            for t in data:
-                if not isinstance(t, dict):
-                    continue
-                compact.append({
-                    "title": t.get("title", ""),
-                    "posted_at": t.get("posted_at", ""),
-                    "author": t.get("user_name", ""),
-                    "discussion_subentry_count": t.get("discussion_subentry_count", 0),
-                })
-            return _json_result(compact)
         return _json_result(data)
 
     return _error_result(f"Unknown canvas tool: {name}")
