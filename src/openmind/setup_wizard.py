@@ -65,8 +65,10 @@ def run_first_setup() -> None:
 
     # Step 1: Canvas
     console.print(Panel(
-        "Get your token: bCourses \u2192 Profile \u2192 Settings \u2192 + New Access Token",
-        title="[bold]Step 1 of 2[/bold] \u2014 Connect to bCourses",
+        "You'll need a bCourses access token.\n"
+        "Go to: bCourses \u2192 click your profile icon (top-left) \u2192 Settings \u2192 + New Access Token\n\n"
+        "[dim]Detailed guide: openmindbot.io/guides/bcourses[/dim]",
+        title="[bold]Step 1 of 3[/bold] \u2014 Connect to bCourses",
         border_style="yellow",
         padding=(1, 2),
     ))
@@ -76,19 +78,19 @@ def run_first_setup() -> None:
     cfg["user_name"] = user_name
     cfg["courses"] = courses
 
-    # Step 2: OpenRouter
+    # Step 2: Choose model
     console.print(Panel(
-        "Get your key: openrouter.ai/keys (free credits available)",
-        title="[bold]Step 2 of 2[/bold] \u2014 Connect OpenRouter",
+        "Pick the AI model that will power OpenMind.\n"
+        "All models below support tool calling (required).\n"
+        "You can change this later with: [cyan]openmind setup model[/cyan]",
+        title="[bold]Step 2 of 3[/bold] \u2014 Choose your LLM",
         border_style="yellow",
         padding=(1, 2),
     ))
 
-    console.print("  [bold]Choose your LLM model[/bold]")
-    console.print("  [dim]All models below support tool calling (required for OpenMind)[/dim]\n")
-    console.print("    [cyan]1[/cyan]  google/gemini-2.5-pro           — smart, low cost [dim](default)[/dim]")
-    console.print("    [cyan]2[/cyan]  xiaomi/mimo-v2-pro              — smart, very cheap")
-    console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     — excellent reasoning")
+    console.print("    [cyan]1[/cyan]  google/gemini-2.5-pro           \u2014 smart, low cost [dim](default)[/dim]")
+    console.print("    [cyan]2[/cyan]  xiaomi/mimo-v2-pro              \u2014 smart, very cheap")
+    console.print("    [cyan]3[/cyan]  anthropic/claude-sonnet-4-6     \u2014 excellent reasoning")
     console.print("    [dim]Or type any OpenRouter model ID[/dim]")
     console.print()
 
@@ -100,6 +102,15 @@ def run_first_setup() -> None:
     choice = Prompt.ask("  Enter 1, 2, 3, or a model ID", default="1")
     cfg["model"] = _model_choices.get(choice, choice)
 
+    # Step 3: OpenRouter API key
+    console.print(Panel(
+        "You need an OpenRouter API key to connect to your chosen model.\n"
+        "Get one at: [link=https://openrouter.ai/keys]openrouter.ai/keys[/link] (free credits available)\n\n"
+        "[dim]Detailed guide: openmindbot.io/guides/openrouter[/dim]",
+        title="[bold]Step 3 of 3[/bold] \u2014 Connect OpenRouter",
+        border_style="yellow",
+        padding=(1, 2),
+    ))
     api_key = _setup_openrouter_key()
     cfg["openrouter_api_key"] = api_key
 
@@ -240,12 +251,9 @@ def setup_single_integration(name: str) -> None:
 
 def _setup_canvas(canvas_url: str) -> tuple[str, str, dict[str, str]]:
     """Validate Canvas token and discover courses."""
-    console.print("  Get your bCourses token:")
-    console.print("  bCourses \u2192 Profile \u2192 Settings \u2192 + New Access Token\n")
-
     user_name = "Bear"
     while True:
-        token = Prompt.ask("  bCourses token", password=True)
+        token = Prompt.ask("  Paste your bCourses token", password=True)
         if not token.strip():
             console.print("  [red]Token cannot be empty.[/red]")
             continue
@@ -305,12 +313,9 @@ def _setup_canvas(canvas_url: str) -> tuple[str, str, dict[str, str]]:
 
 
 def _setup_openrouter_key() -> str:
-    """Validate OpenRouter key only — use default model (no model question)."""
-    console.print("  Get your OpenRouter key:")
-    console.print("  [link=https://openrouter.ai/keys]openrouter.ai/keys[/link] (free credits available)\n")
-
+    """Validate OpenRouter key only."""
     while True:
-        api_key = Prompt.ask("  OpenRouter key", password=True)
+        api_key = Prompt.ask("  Paste your OpenRouter key", password=True)
         if not api_key.strip():
             console.print("  [red]Key cannot be empty.[/red]")
             continue
@@ -371,7 +376,7 @@ def _setup_model_change(cfg: ConfigDict) -> None:
     choice = Prompt.ask("\n  Enter 1, 2, 3, or a model ID", default="1")
     cfg["model"] = _model_choices.get(choice, choice)
     save_config(cfg)
-    console.print(f"  Model changed to: [bold]{model}[/bold]")
+    console.print(f"  Model changed to: [bold]{cfg['model']}[/bold]")
 
 
 # ---------------------------------------------------------------------------
@@ -438,11 +443,14 @@ def _setup_profile() -> None:
 
 def _setup_telegram() -> dict[str, Any]:
     """Configure Telegram bot integration."""
-    if not Confirm.ask("  Enable Telegram bot?", default=False):
+    if not Confirm.ask("  Enable Telegram bot? (chat on your phone + push notifications)", default=False):
         return {"enabled": False}
 
-    console.print("    1. Message @BotFather on Telegram \u2192 /newbot \u2192 copy the token")
-    console.print("    2. Message @userinfobot \u2192 get your user ID")
+    console.print()
+    console.print("    1. Message @BotFather on Telegram \u2192 /newbot \u2192 copy the bot token")
+    console.print("    2. Message @userinfobot on Telegram \u2192 copy your user ID")
+    console.print("    [dim]Detailed guide: openmindbot.io/guides/telegram[/dim]")
+    console.print()
 
     while True:
         bot_token = Prompt.ask("    Bot token", password=True)
@@ -476,21 +484,48 @@ def _setup_telegram() -> dict[str, Any]:
 
 def _setup_todoist() -> dict[str, Any]:
     """Configure Todoist integration."""
-    if not Confirm.ask("  Enable Todoist?", default=False):
+    if not Confirm.ask("  Enable Todoist? (sync tasks from Canvas)", default=False):
         return {"enabled": False}
-    token = Prompt.ask("    API token", password=True)
-    if token.strip():
-        console.print(f"    [dim]Token: {_mask_key(token)}[/dim]")
-    return {"enabled": True, "token": token}
+
+    console.print()
+    console.print("    Go to: todoist.com/app/settings/integrations/developer")
+    console.print("    Copy your API token.")
+    console.print()
+    token = Prompt.ask("    Paste your API token", password=True)
+    if not token.strip():
+        console.print("    [dim]Skipping Todoist.[/dim]")
+        return {"enabled": False}
+
+    console.print(f"    [dim]Token: {_mask_key(token)}[/dim]")
+    console.print("    Validating...", end=" ")
+    try:
+        resp = httpx.get(
+            "https://api.todoist.com/rest/v2/projects",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=REQUEST_TIMEOUT_S,
+        )
+        if resp.status_code == 200:
+            console.print("[green]OK[/green]")
+            return {"enabled": True, "token": token}
+        console.print(f"[red]Failed (HTTP {resp.status_code})[/red]")
+    except httpx.HTTPError:
+        console.print("[red]Connection error.[/red]")
+
+    return {"enabled": False}
 
 
 def _setup_gmail() -> dict[str, Any]:
     """Configure Gmail integration."""
-    if not Confirm.ask("  Enable Gmail?", default=False):
+    if not Confirm.ask("  Enable Gmail? (read-only access to search professor emails)", default=False):
         return {"enabled": False}
 
-    console.print("    Google Cloud Console \u2192 Gmail API \u2192 OAuth 2.0 Client ID (Desktop app)")
-    creds_path = Prompt.ask("    Path to OAuth JSON (or Enter to skip)", default="")
+    console.print()
+    console.print("    You'll need a Google OAuth credentials file (credentials.json).")
+    console.print("    Steps: Google Cloud Console \u2192 Create project \u2192 Enable Gmail API")
+    console.print("           \u2192 OAuth consent screen \u2192 Credentials \u2192 Desktop app \u2192 Download JSON")
+    console.print("    [dim]Detailed guide: openmindbot.io/guides/gmail[/dim]")
+    console.print()
+    creds_path = Prompt.ask("    Path to credentials.json (or Enter to skip)", default="")
 
     if creds_path:
         _ensure_private_dir(GMAIL_CREDS_DIR)
@@ -509,15 +544,19 @@ def _setup_gmail() -> dict[str, Any]:
 
 def _setup_calendar() -> dict[str, Any]:
     """Configure Google Calendar integration."""
-    if not Confirm.ask("  Enable Google Calendar?", default=False):
+    if not Confirm.ask("  Enable Google Calendar? (sync deadlines, block study time)", default=False):
         return {"enabled": False}
 
     creds_file = GMAIL_CREDS_DIR / "credentials.json"
     if creds_file.exists():
         console.print("    [green]OAuth credentials found (shared with Gmail)[/green]")
     else:
-        console.print("    Google Cloud Console \u2192 Calendar API \u2192 OAuth 2.0 Client ID")
-        creds_path = Prompt.ask("    Path to OAuth JSON (or Enter to skip)", default="")
+        console.print()
+        console.print("    You'll need a Google OAuth credentials file (same as Gmail).")
+        console.print("    If you already set up Gmail, you can reuse the same credentials.")
+        console.print("    [dim]Detailed guide: openmindbot.io/guides/calendar[/dim]")
+        console.print()
+        creds_path = Prompt.ask("    Path to credentials.json (or Enter to skip)", default="")
         if creds_path:
             _ensure_private_dir(GMAIL_CREDS_DIR)
             try:
@@ -534,11 +573,16 @@ def _setup_calendar() -> dict[str, Any]:
 
 def _setup_slack() -> dict[str, Any]:
     """Configure Slack integration (read-only)."""
-    if not Confirm.ask("  Enable Slack?", default=False):
+    if not Confirm.ask("  Enable Slack? (read-only access to course channels)", default=False):
         return {"enabled": False}
 
-    console.print("    api.slack.com/apps \u2192 Create App \u2192 Add scopes: channels:history, channels:read, search:read")
-    token = Prompt.ask("    User OAuth Token (xoxp-...)", password=True)
+    console.print()
+    console.print("    1. Go to api.slack.com/apps \u2192 Create New App \u2192 From scratch")
+    console.print("    2. OAuth & Permissions \u2192 Add scopes: channels:history, channels:read, search:read")
+    console.print("    3. Install to Workspace \u2192 Copy the User OAuth Token (starts with xoxp-)")
+    console.print("    [dim]Detailed guide: openmindbot.io/guides/slack[/dim]")
+    console.print()
+    token = Prompt.ask("    Paste your User OAuth Token (xoxp-...)", password=True)
     if token.strip():
         console.print(f"    [dim]Token: {_mask_key(token)}[/dim]")
     if not token.strip():
@@ -561,13 +605,22 @@ def _setup_slack() -> dict[str, Any]:
 
 def _setup_obsidian() -> dict[str, Any]:
     """Configure Obsidian vault integration."""
-    if not Confirm.ask("  Enable Obsidian?", default=False):
+    if not Confirm.ask("  Enable Obsidian? (save notes to your vault)", default=False):
         return {"enabled": False}
 
+    console.print()
+    console.print("    Enter the path to your Obsidian vault folder.")
+    console.print("    [dim]This is the folder that contains your .obsidian/ directory.[/dim]")
+    console.print()
     vault_path = Prompt.ask("    Vault path", default="~/Documents/Obsidian")
     resolved = Path(vault_path).expanduser()
     if not resolved.exists():
-        console.print("    [yellow]Path doesn't exist yet. Will be created when needed.[/yellow]")
+        console.print(f"    [yellow]Path not found: {resolved}[/yellow]")
+        if not Confirm.ask("    Save anyway?", default=False):
+            console.print("    [dim]Skipping Obsidian.[/dim]")
+            return {"enabled": False}
+    else:
+        console.print(f"    [green]Found vault at {resolved}[/green]")
 
     return {"enabled": True, "vault_path": str(resolved)}
 
