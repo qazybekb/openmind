@@ -113,8 +113,13 @@ def _execute_todoist_tool(name: str, args: ToolArgs, headers: dict[str, str]) ->
             logger.warning("Todoist list tasks failed", exc_info=True)
             return _error_result("Failed to list Todoist tasks.")
 
-        tasks = response.json()
-        if not isinstance(tasks, list):
+        data = response.json()
+        # v1 API wraps results: {"results": [...], "next_cursor": ...}
+        if isinstance(data, dict):
+            tasks = data.get("results", [])
+        elif isinstance(data, list):
+            tasks = data
+        else:
             return _error_result("Todoist returned an unexpected response.")
 
         items: list[dict[str, Any]] = []
