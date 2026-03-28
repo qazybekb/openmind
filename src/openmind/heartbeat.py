@@ -121,6 +121,9 @@ def start_heartbeat(
                     notifications.extend(_check_announcements(cfg))
                     notifications.extend(_check_emails(cfg))
 
+                    # Auto-sync Canvas deadlines to Todoist
+                    _sync_deadlines_to_todoist(cfg)
+
                     if notifications:
                         summary = "\n\n".join(notifications)
                         if _should_notify(summary):
@@ -583,6 +586,75 @@ def _check_morning_briefing(cfg: ConfigDict) -> str:
 
     _save_state("briefing", {"last_date": today})
     return "\n".join(lines)
+
+
+def _sync_deadlines_to_todoist(cfg: ConfigDict) -> None:
+    """Auto-add upcoming Canvas deadlines to Todoist if enabled."""
+    todoist = cfg.get("todoist", {})
+    if not todoist.get("enabled") or not todoist.get("token"):
+        return
+
+    token = str(todoist["token"])
+    courses = _normalise_courses(cfg)
+
+    # Load what we've already synced
+    state = _load_state("todoist_sync")
+    synced = set(state.get("synced", []))
+
+    try:
+        events = _canvas_get(cfg, "/users/self/upcoming_events")
+        if not isinstance(events, list):
+            return
+    except Exception:
+        return
+
+    new_synced: set[str] = set(synced)
+
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        assignment = event.get("assignment")
+        if not isinstance(assignment, dict):
+            continue
+
+        # Skip already submitted
+        sub = assignment.get("submission", {})
+        if isinstance(sub, dict) and sub.get("workflow_state") in ("submitted", "graded"):
+            continue
+
+        title = str(event.get("title", ""))
+        due = str(event.get("end_at") or event.get("start_at") or "")
+        context_code = str(event.get("context_code", ""))
+        course_name = courses.get(context_code.replace("course_", ""), "")
+        assignment_id = str(assignment.get("id", ""))
+
+        key = f"{context_code}:{assignment_id}"
+        if key in synced:
+            continue
+
+        # Create Todoist task
+        task_title = f"{course_name} \u2014 {title}" if course_name else title
+        due_date = due[:10] if due else ""
+
+        try:
+            body: dict[str, str] = {"content": task_title}
+            if due_date:
+                body["due_string"] = due_date
+
+            resp = httpx.post(
+                "https://api.todoist.com/api/v1/tasks",
+                json=body,
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=15.0,
+            )
+            if resp.status_code == 200:
+                new_synced.add(key)
+                logger.info("Synced to Todoist: %s", task_title)
+        except Exception:
+            logger.warning("Failed to sync task to Todoist: %s", task_title, exc_info=True)
+
+    if new_synced != synced:
+        _save_state("todoist_sync", {"synced": sorted(new_synced)})
 
 
 def _check_reminders() -> list[str]:
