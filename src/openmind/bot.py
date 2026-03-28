@@ -576,6 +576,23 @@ def _build_application(cfg: ConfigDict) -> Application:
             query = "Which course or topic should I make a cheatsheet for?"
         await _route_slash_to_llm(update, user_id, query)
 
+    async def cmd_sync(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        if not cfg.get("todoist", {}).get("enabled"):
+            await update.effective_message.reply_text("Todoist not set up. Run `openmind setup todoist` in your terminal.")
+            return
+        await update.effective_message.reply_text("\u23f3 Syncing Canvas deadlines to Todoist...")
+        try:
+            from openmind.heartbeat import _sync_deadlines_to_todoist
+            await asyncio.to_thread(_sync_deadlines_to_todoist, cfg)
+            await update.effective_message.reply_text("Done! \u2705 Check your Todoist for new tasks.")
+        except Exception:
+            await update.effective_message.reply_text("Sync failed. Check your Todoist token.")
+
     async def cmd_courses(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
         if update.effective_user is None or update.effective_message is None:
             return
@@ -656,6 +673,7 @@ def _build_application(cfg: ConfigDict) -> Application:
     application.add_handler(CommandHandler("learn", cmd_learn))
     application.add_handler(CommandHandler("study", cmd_study))
     application.add_handler(CommandHandler("cheatsheet", cmd_cheatsheet))
+    application.add_handler(CommandHandler("sync", cmd_sync))
     application.add_handler(CommandHandler("courses", cmd_courses))
     application.add_handler(CommandHandler("remind", cmd_remind))
     application.add_handler(CallbackQueryHandler(handle_button))

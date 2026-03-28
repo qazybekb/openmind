@@ -119,6 +119,7 @@ def run_repl(cfg: ConfigDict) -> None:
             ("/study", "Generate study guide PDF"),
             ("/cheatsheet", "Generate exam cheatsheet PDF"),
             ("/remind", "Set a reminder"),
+            ("/sync", "Sync Canvas deadlines to Todoist"),
             ("/new", "Save context + start fresh"),
             ("/clear", "Clear conversation"),
             ("/setup", "Set up integrations"),
@@ -307,6 +308,7 @@ def _handle_command(
             "  /gpa       \u2014 GPA calculator (or /gpa 3.5 for target)\n"
             "  /courses   \u2014 List your courses\n"
             "  /remind    \u2014 Set a reminder\n"
+            "  /sync      \u2014 Sync Canvas deadlines to Todoist\n"
             "\n"
             "  [bold]Session[/bold]\n"
             "  /new       \u2014 Save context + start fresh\n"
@@ -371,6 +373,20 @@ def _handle_command(
         if reminder_text:
             return False, f"Set a reminder: {reminder_text}"
         return False, "I want to set a reminder. Ask me what and when."
+
+    if cmd == "/sync":
+        if not cfg.get("todoist", {}).get("enabled"):
+            console.print("[yellow]Todoist not set up. Run: /setup todoist[/yellow]")
+            return True, None
+        console.print("[dim]Syncing Canvas deadlines to Todoist...[/dim]")
+        try:
+            from openmind.heartbeat import _sync_deadlines_to_todoist
+            _sync_deadlines_to_todoist(cfg)
+            console.print("[green]Done![/green] Check your Todoist for new tasks.")
+        except Exception:
+            logger.warning("Sync failed", exc_info=True)
+            console.print("[red]Sync failed. Check your Todoist token.[/red]")
+        return True, None
 
     if cmd == "/config":
         console.print(f"Config: {CONFIG_DIR}")
