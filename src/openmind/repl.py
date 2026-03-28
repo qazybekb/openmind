@@ -118,8 +118,9 @@ def run_repl(cfg: ConfigDict) -> None:
             ("/courses", "List your courses"),
             ("/study", "Generate study guide PDF"),
             ("/cheatsheet", "Generate exam cheatsheet PDF"),
-            ("/remind", "Set a reminder"),
+            ("/plan", "Create a study plan with time blocks"),
             ("/sync", "Sync Canvas deadlines to Todoist"),
+            ("/remind", "Set a reminder"),
             ("/new", "Save context + start fresh"),
             ("/clear", "Clear conversation"),
             ("/setup", "Set up integrations"),
@@ -307,8 +308,9 @@ def _handle_command(
             "  /grades    \u2014 Quick grade check\n"
             "  /gpa       \u2014 GPA calculator (or /gpa 3.5 for target)\n"
             "  /courses   \u2014 List your courses\n"
-            "  /remind    \u2014 Set a reminder\n"
+            "  /plan      \u2014 Create a study plan with time blocks\n"
             "  /sync      \u2014 Sync Canvas deadlines to Todoist\n"
+            "  /remind    \u2014 Set a reminder\n"
             "\n"
             "  [bold]Session[/bold]\n"
             "  /new       \u2014 Save context + start fresh\n"
@@ -373,6 +375,12 @@ def _handle_command(
         if reminder_text:
             return False, f"Set a reminder: {reminder_text}"
         return False, "I want to set a reminder. Ask me what and when."
+
+    if cmd.startswith("/plan"):
+        scope = original_cmd[5:].strip()
+        if scope:
+            return False, f"Create a detailed study plan for: {scope}. Check my deadlines, estimate time per task, look at my calendar for free time, and give me specific day-by-day time blocks. Offer to add them to Google Calendar and Todoist."
+        return False, "Create a study plan for this week. Check my deadlines, estimate how long each task will take, look at my calendar for free time, and give me specific day-by-day time blocks with locations (Moffitt, Doe, etc). Offer to add them to Google Calendar and Todoist."
 
     if cmd == "/sync":
         if not cfg.get("todoist", {}).get("enabled"):

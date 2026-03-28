@@ -449,7 +449,7 @@ def _build_application(cfg: ConfigDict) -> Application:
             "grades": "Show all my grades across every course.",
             "gpa": "Calculate my current GPA across all courses.",
             "learn": "I want to study something. What topic should we work on? Pick from my courses and upcoming exams.",
-            "study_plan": "Create a study plan for this week based on my deadlines and priorities.",
+            "study_plan": "Create a study plan for this week. Check my deadlines, estimate how long each task will take, look at my calendar for free time, and give me specific day-by-day time blocks. Offer to add them to Google Calendar and Todoist.",
             "announcements": "Any new announcements from my courses?",
             "menu": None,  # Special: just show menu
         }
@@ -576,6 +576,20 @@ def _build_application(cfg: ConfigDict) -> Application:
             query = "Which course or topic should I make a cheatsheet for?"
         await _route_slash_to_llm(update, user_id, query)
 
+    async def cmd_plan(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.effective_user is None or update.effective_message is None:
+            return
+        user_id = str(update.effective_user.id)
+        if allowed_user and user_id != allowed_user:
+            return
+        text = update.effective_message.text or ""
+        scope = text.replace("/plan", "").strip()
+        if scope:
+            query = f"Create a detailed study plan for: {scope}. Check my deadlines, estimate time per task, look at my calendar for free time, and give me specific day-by-day time blocks. Offer to add them to Google Calendar and Todoist."
+        else:
+            query = "Create a study plan for this week. Check my deadlines, estimate how long each task will take, look at my calendar for free time, and give me specific day-by-day time blocks. Offer to add them to Google Calendar and Todoist."
+        await _route_slash_to_llm(update, user_id, query)
+
     async def cmd_sync(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
         if update.effective_user is None or update.effective_message is None:
             return
@@ -673,6 +687,7 @@ def _build_application(cfg: ConfigDict) -> Application:
     application.add_handler(CommandHandler("learn", cmd_learn))
     application.add_handler(CommandHandler("study", cmd_study))
     application.add_handler(CommandHandler("cheatsheet", cmd_cheatsheet))
+    application.add_handler(CommandHandler("plan", cmd_plan))
     application.add_handler(CommandHandler("sync", cmd_sync))
     application.add_handler(CommandHandler("courses", cmd_courses))
     application.add_handler(CommandHandler("remind", cmd_remind))
