@@ -121,8 +121,9 @@ def start_heartbeat(
                     notifications.extend(_check_announcements(cfg))
                     notifications.extend(_check_emails(cfg))
 
-                    # Auto-sync Canvas deadlines to Todoist
+                    # Auto-sync Canvas deadlines to Todoist + Calendar
                     _sync_deadlines_to_todoist(cfg)
+                    _sync_deadlines_to_calendar(cfg)
 
                     if notifications:
                         summary = "\n\n".join(notifications)
@@ -655,6 +656,100 @@ def _sync_deadlines_to_todoist(cfg: ConfigDict) -> None:
 
     if new_synced != synced:
         _save_state("todoist_sync", {"synced": sorted(new_synced)})
+
+
+def _sync_deadlines_to_calendar(cfg: ConfigDict) -> None:
+    """Auto-create Google Calendar events for upcoming Canvas deadlines."""
+    if not cfg.get("calendar", {}).get("enabled"):
+        return
+
+    try:
+        from openmind.tools.calendar import _get_calendar_service
+    except ImportError:
+        return
+
+    service = _get_calendar_service(cfg)
+    if service is None:
+        return
+
+    courses = _normalise_courses(cfg)
+
+    # Load what we've already synced
+    state = _load_state("calendar_sync")
+    synced = set(state.get("synced", []))
+
+    try:
+        events = _canvas_get(cfg, "/users/self/upcoming_events")
+        if not isinstance(events, list):
+            return
+    except Exception:
+        return
+
+    new_synced: set[str] = set(synced)
+
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        assignment = event.get("assignment")
+        if not isinstance(assignment, dict):
+            continue
+
+        # Skip already submitted
+        sub = assignment.get("submission", {})
+        if isinstance(sub, dict) and sub.get("workflow_state") in ("submitted", "graded"):
+            continue
+
+        title = str(event.get("title", ""))
+        due = str(event.get("end_at") or event.get("start_at") or "")
+        context_code = str(event.get("context_code", ""))
+        course_name = courses.get(context_code.replace("course_", ""), "")
+        assignment_id = str(assignment.get("id", ""))
+        points = assignment.get("points_possible", 0) or 0
+
+        key = f"cal:{context_code}:{assignment_id}"
+        if key in synced:
+            continue
+
+        # Only auto-add significant assignments (5+ points)
+        try:
+            if float(points) < 5:
+                continue
+        except (TypeError, ValueError):
+            continue
+
+        # Create all-day calendar event on the due date
+        event_title = f"\U0001f4da {course_name} \u2014 {title}" if course_name else f"\U0001f4da {title}"
+        due_date = due[:10] if due else ""
+        if not due_date:
+            continue
+
+        # Exclusive end date for all-day events
+        try:
+            next_day = (datetime.strptime(due_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
+        try:
+            event_body = {
+                "summary": event_title,
+                "start": {"date": due_date},
+                "end": {"date": next_day},
+                "reminders": {
+                    "useDefault": False,
+                    "overrides": [
+                        {"method": "popup", "minutes": 24 * 60},
+                        {"method": "popup", "minutes": 60},
+                    ],
+                },
+            }
+            service.events().insert(calendarId="primary", body=event_body).execute()
+            new_synced.add(key)
+            logger.info("Synced to Calendar: %s on %s", event_title, due_date)
+        except Exception:
+            logger.warning("Failed to sync to Calendar: %s", event_title, exc_info=True)
+
+    if new_synced != synced:
+        _save_state("calendar_sync", {"synced": sorted(new_synced)})
 
 
 def _check_reminders() -> list[str]:
