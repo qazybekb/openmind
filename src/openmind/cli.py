@@ -210,6 +210,17 @@ def chat() -> None:
 
 
 @app.command()
+def bot() -> None:
+    """Run Telegram bot only (headless, no REPL). For 24/7 background service."""
+    cfg = _ensure_config()
+    if not cfg.get("telegram", {}).get("enabled"):
+        console.print("[red]Telegram not enabled.[/red] Run: openmind setup telegram")
+        raise typer.Exit(1)
+    from openmind.bot import run_bot
+    run_bot(cfg)
+
+
+@app.command()
 def profile() -> None:
     """View your student profile."""
     from openmind.tools.profile import PROFILE_FILE, load_profile
