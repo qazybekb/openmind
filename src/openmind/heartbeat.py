@@ -417,7 +417,24 @@ def _check_grades(cfg: ConfigDict) -> list[str]:
         diff = current_score - previous_value
         arrow = "\U0001f4c8" if diff > 0 else "\U0001f4c9"
         sign = "+" if diff >= 0 else ""
-        changes.append(f"{arrow} {data['name']}: {current_score}% ({sign}{diff:.1f}%)")
+        # Show letter grade alongside percentage
+        if current_score >= 93:
+            letter = "A"
+        elif current_score >= 90:
+            letter = "A-"
+        elif current_score >= 87:
+            letter = "B+"
+        elif current_score >= 83:
+            letter = "B"
+        elif current_score >= 80:
+            letter = "B-"
+        elif current_score >= 77:
+            letter = "C+"
+        elif current_score >= 70:
+            letter = "C"
+        else:
+            letter = "D"
+        changes.append(f"{arrow} {data['name']}: {letter} ({current_score}%, {sign}{diff:.1f}%)")
 
     if changes:
         return ["Grade update \U0001f43b\n" + "\n".join(changes)]
