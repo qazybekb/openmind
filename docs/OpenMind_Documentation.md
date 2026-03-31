@@ -1,772 +1,443 @@
-# OpenMind — Comprehensive Documentation
+# OpenMind Documentation
 
 **AI Study Buddy + Personal Time Manager for UC Berkeley**
 
-Version 1.0.0 | March 2026
+Version 1.0.0 | Spring 2026
 
 ---
 
-## Table of Contents
+## What is OpenMind?
 
-1. [Overview](#1-overview)
-2. [Installation](#2-installation)
-3. [First-Run Setup](#3-first-run-setup)
-4. [Models](#4-models)
-5. [CLI Commands](#5-cli-commands)
-6. [Telegram Bot](#6-telegram-bot)
-7. [Integrations](#7-integrations)
-8. [Tools Reference (43 Tools)](#8-tools-reference)
-9. [Features](#9-features)
-10. [Time & Task Management](#10-time--task-management)
-11. [Guided Learning](#11-guided-learning)
-12. [Study Guide & Cheatsheet Generator](#12-study-guide--cheatsheet-generator)
-13. [Background Alerts](#13-background-alerts)
-14. [Privacy & Security](#14-privacy--security)
-15. [Architecture](#15-architecture)
-16. [Testing Guide](#16-testing-guide)
-17. [Troubleshooting](#17-troubleshooting)
+OpenMind is an AI-powered study assistant built specifically for UC Berkeley students. It connects to your bCourses (Canvas), reads your actual courses, assignments, and grades, and helps you study smarter. Available as a terminal CLI and Telegram bot.
 
----
-
-## 1. Overview
-
-OpenMind is a pip-installable Python CLI tool that serves as an AI-powered study buddy and personal time manager for UC Berkeley students. It connects to bCourses (Canvas LMS), reads your courses, assignments, and grades, and provides personalized study advice through a terminal REPL and Telegram bot.
-
-### Key capabilities
-
-- **43 AI tools** (30 core + 13 optional integrations)
-- **Canvas LMS integration** — read-only access to courses, assignments, grades, announcements
-- **Telegram bot** — chat from your phone with push notifications
-- **Time management** — auto-sync deadlines to Todoist + Google Calendar
-- **Guided learning** — Socratic tutoring from your actual course materials
-- **Study guide generator** — 10-25 page PDFs powered by Claude Opus
-- **Morning briefing** — daily 8am summary via Telegram
-- **Berkeley personality** — talks like a Cal student, references campus locations
-
-### Tech stack
-
-- Python 3.11+
-- OpenRouter API (any LLM — MiMo, Claude, GPT, Gemini)
-- Canvas LMS API (bCourses)
-- python-telegram-bot (Telegram)
-- Google APIs (Gmail, Calendar)
-- Rich + prompt-toolkit (terminal UI)
-- pymupdf (PDF reading)
-- pdflatex (PDF generation)
-
----
-
-## 2. Installation
-
-### Requirements
-
-- Python 3.11 or higher
-- pip
-- macOS, Linux, or WSL
-
-### Install
-
-```bash
+Install in 30 seconds:
+```
 pip install git+https://github.com/qazybekb/openmind.git
+openmind
 ```
 
-All dependencies are included — no extras needed. This installs:
-
-| Package | Purpose |
-|---------|---------|
-| typer | CLI framework |
-| rich | Terminal UI (panels, tables, markdown) |
-| prompt-toolkit | REPL with history and autocomplete |
-| openai | OpenRouter LLM client |
-| httpx | HTTP requests |
-| pymupdf | PDF reading |
-| python-telegram-bot | Telegram bot |
-| google-auth-oauthlib | Gmail/Calendar OAuth |
-| google-api-python-client | Gmail/Calendar API |
-
-### Verify installation
-
-```bash
-openmind --version
-```
+Website: openmindbot.io
 
 ---
 
-## 3. First-Run Setup
+## Use Cases
 
-Running `openmind` for the first time starts a 3-step setup wizard:
+### 1. Check What's Due
 
-### Step 1: Connect to bCourses
+**What you say:**
+- "What's due this week?"
+- "What should I work on?"
+- "Any deadlines coming up?"
 
-1. Go to bcourses.berkeley.edu
-2. Click your profile icon (top-left) → Settings → + New Access Token
-3. Name it "OpenMind", generate, and paste the token
+**What OpenMind does:**
+- Reads all your bCourses assignments across every course
+- Sorts by urgency x grade weight (a 30% midterm beats a 1% quiz)
+- Shows submission status (submitted vs not)
+- Includes course name, due date, and points
 
-The wizard validates the token and shows your courses.
+**Example response:**
 
-### Step 2: Choose your LLM model
+> Due Monday 3/30:
+> - Info Law and Policy -- Lab 2 (Submit), 10 pts
+>   Partner lab, ~90 min. Make a copy of the Google Doc, turn responses red
+>
+> Due Tuesday 3/31:
+> - NLP -- Midterm Report, 10 pts
+>   Group project progress report. 2000 words, ACL format, 10+ sources
+>
+> The NLP report is the bigger lift. I'd start there this weekend.
 
-```
-1  xiaomi/mimo-v2-pro           — reliable + affordable, $1/$3 per 1M (default)
-2  anthropic/claude-sonnet-4-6  — best reasoning, $3/$15 per 1M
-3  openai/gpt-5.4              — GPT ecosystem, $2.50/$15 per 1M
-4  google/gemini-2.5-pro       — 1M context, strong Canvas analysis, $1.25/$10 per 1M
-```
-
-You can change this later with `/setup model`.
-
-### Step 3: Connect OpenRouter
-
-1. Go to openrouter.ai/keys
-2. Create an account (free credits available)
-3. Generate an API key and paste it
-
-After setup, you'll see a welcome message with all available integrations.
-
-### Detailed setup guides
-
-Available at openmindbot.io/guides:
-- bCourses token
-- OpenRouter API key
-- Telegram bot
-- Gmail
-- Google Calendar
-- Slack
+**Commands:** Just ask naturally, or type `/grades`
 
 ---
 
-## 4. Models
+### 2. Check Your Grades
 
-### Chat model (user's choice)
+**What you say:**
+- "How are my grades?"
+- "What's my grade in NLP?"
+- "Show me all my grades"
 
-The student picks their model during setup. It handles everything — Canvas queries, chat, tools, learning.
+**What OpenMind does:**
+- Pulls current scores from every enrolled course
+- Shows percentage + letter grade
+- Flags courses below 80%
 
-| Model | Cost (in/out per 1M) | Context | Best for |
-|-------|---------------------|---------|----------|
-| xiaomi/mimo-v2-pro | $1 / $3 | 1M | Default — reliable, affordable |
-| anthropic/claude-sonnet-4-6 | $3 / $15 | 1M | Deep reasoning |
-| openai/gpt-5.4 | $2.50 / $15 | 1M | GPT ecosystem |
-| google/gemini-2.5-pro | $1.25 / $10 | 1M | Strong Canvas analysis |
+**Example response:**
 
-### Study guide model (automatic)
+> Here are your current grades:
+>
+> - Deep Tech Commercialization: 94% (A)
+> - Special Topics in Info: 96.67% (A)
+> - Info Law and Policy: 100% (A)
+> - NLP: 100% (A)
+> - Data Structures: 88.69% (B+)
+> - Big Data and Development: 83% (B)
+> - MBA 231 Corporate: 71.43% (C-)
+>
+> That MBA 231 grade needs attention. Want me to check what's dragging it down?
 
-Claude Opus (anthropic/claude-opus-4-6) is used automatically for `/study` and `/cheatsheet` PDF generation. Students don't configure this.
-
-### Changing models
-
-```
-/setup model
-```
+**Commands:** `/grades` or `/gpa` or `/gpa 3.5` (for what-if analysis)
 
 ---
 
-## 5. CLI Commands
+### 3. Plan Your Week
 
-### Terminal commands
+**What you say:**
+- "Plan my week"
+- "Help me manage my time"
+- "What should I do this weekend?"
 
-```bash
-openmind              # Start (REPL + Telegram if enabled)
-openmind chat         # Terminal REPL only (no Telegram)
-openmind config       # Show configuration
-openmind profile      # View student profile
-openmind privacy      # What stays local vs what goes to the LLM
-openmind setup        # Full setup wizard
-openmind setup <name> # Set up a specific integration
-```
+**What OpenMind does:**
+- Checks all your deadlines (Canvas + Todoist)
+- Estimates time needed for each task
+- Looks at your Google Calendar for free slots
+- Creates day-by-day schedule with time blocks
+- Offers to add blocks to Calendar and tasks to Todoist
 
-### In-chat slash commands
+**Example response:**
 
-Type `/` to see the autocomplete menu.
+> Weekend Study Plan:
+>
+> Saturday:
+>   10:00-11:30  Info Law -- Lab 2 with partner (1.5h) at Moffitt
+>   1:00-3:00    NLP -- Lit review, find 10+ sources (2h) at Doe
+>   3:30-5:30    NLP -- Write methodology section (2h) at Doe
+>
+> Sunday:
+>   10:00-1:00   NLP -- Finish midterm report draft (3h) at Main Stacks
+>   2:00-3:00    Review + proofread + submit (1h)
+>
+> Want me to block these on Google Calendar?
 
-#### Learning
-| Command | Description |
+**Commands:** `/plan` or `/plan this weekend`
+
+---
+
+### 4. Sync Deadlines to Todoist and Calendar
+
+**What you say:**
+- "Sync my deadlines"
+- "Add my assignments to Todoist"
+- "Put my deadlines on Google Calendar"
+
+**What OpenMind does:**
+- Creates Todoist tasks for every unsubmitted Canvas assignment
+- Creates Google Calendar events for assignments worth 5+ points
+- Calendar events include reminders (1 day before + 1 hour before)
+- Deduplicates -- never creates duplicates
+- Runs automatically every 3 hours in background
+
+**Commands:** `/sync` for manual sync. Automatic sync runs in background when Telegram is active.
+
+**Setup required:** `/setup todoist` and `/setup calendar`
+
+---
+
+### 5. Learn Something (Guided Tutoring)
+
+**What you say:**
+- "Teach me about contextual integrity"
+- "Help me understand binary search"
+- "I don't get attention mechanisms"
+- "Explain recursion"
+
+**What OpenMind does:**
+- Uses Socratic method -- asks questions instead of lecturing
+- Starts by checking what you already know
+- Teaches one concept at a time with analogies
+- Tests understanding with scenario questions (never yes/no)
+- If you're wrong: gives hints, not answers
+- Uses your actual course materials from bCourses
+
+**Example conversation:**
+
+> You: Teach me about contextual integrity
+>
+> OpenMind: What do you already know about Nissenbaum's contextual integrity?
+>
+> You: Something about privacy norms?
+>
+> OpenMind: Good start! There are 3 independent parameters. If a doctor asks
+> your age -- that's fine. But if a stranger does? Same data, different actors.
+> What's the second parameter?
+>
+> You: The type of information?
+>
+> OpenMind: Exactly! Medical data in a hospital = appropriate. Same data sold
+> to advertisers = violation. That's information type. One more parameter --
+> hint: think about how data flows.
+
+**Commands:** `/learn [topic]` or just ask naturally
+
+---
+
+### 6. Generate Study Guides
+
+**What you say:**
+- "Make me a study guide for the NLP midterm"
+- "Create a review document for Info 205"
+- "Help me prepare for the final"
+
+**What OpenMind does:**
+- Reads your course materials from bCourses (modules, lectures, readings)
+- Sends everything to Claude Opus (most capable AI model)
+- Generates a 10-25 page professional PDF
+- Two-column LaTeX format, organized by topic
+- Teaches from scratch -- not a cheatsheet
+- Adapts structure to subject (law vs CS vs business)
+- Saved to ~/.openmind/study_guides/
+
+**Commands:** `/study [course or topic]`
+
+**Requirements:** pdflatex installed (brew install --cask basictex on macOS)
+
+---
+
+### 7. Generate Exam Cheatsheets
+
+**What you say:**
+- "Make me a cheatsheet for the Info 205 midterm"
+- "I need a reference sheet for the exam"
+- "Create a crib sheet"
+
+**What OpenMind does:**
+- Same as study guide but ultra-compressed
+- 2-page PDF, 7pt font, maximum information density
+- Designed to print and bring to open-note exams
+- Key terms, comparisons, formulas, brief definitions
+- Powered by Claude Opus
+
+**Commands:** `/cheatsheet [course or topic]`
+
+---
+
+### 8. GPA Calculator
+
+**What you say:**
+- "What's my GPA?"
+- "What do I need on the final to get a 3.5?"
+- "Calculate my GPA"
+
+**What OpenMind does:**
+- Calculates estimated GPA from Canvas grades
+- Shows each course with letter grade and grade points
+- What-if analysis: tells you what score you need to hit a target GPA
+- Includes disclaimer: this is an estimate, check CalCentral for official GPA
+
+**Commands:** `/gpa` or `/gpa 3.5`
+
+---
+
+### 9. Read and Summarize PDFs
+
+**What you say (terminal):**
+- "Summarize this PDF: [URL]"
+- "What's in this lecture slide?"
+
+**What you do (Telegram):**
+- Send a PDF file to the bot
+- Optionally add a caption: "summarize this" or "make flashcards from this"
+
+**What OpenMind does:**
+- Extracts text from PDF using pymupdf
+- Summarizes key points
+- Can create flashcards, answer questions about content
+- Telegram: sends generated PDFs back as documents
+
+---
+
+### 10. Email Notifications
+
+**What happens (automatic):**
+- Every hour, checks for unread emails from @berkeley.edu
+- Sends Telegram notification with sender, subject, and body preview
+
+**Example notification:**
+
+> New Berkeley emails:
+> - Prof. Mulligan -- Zoom Class on Monday March 30
+>   Reminder: class will be on Zoom this Monday. Link in bCourses...
+> - GSI Sarah -- Lab 2 clarification
+>   Quick note: you can submit individually even if you worked with...
+
+**Setup required:** `/setup gmail` + `/setup telegram`
+
+---
+
+### 11. Morning Briefing
+
+**What happens (automatic at 8am PT):**
+
+> Good morning Kazybek! Here's your Monday:
+>
+> Due today:
+>   Info Law and Policy -- Lab 2 (Submit)
+>
+> Coming this week:
+>   NLP -- Midterm Report (Tue 3/31)
+>   Big Data -- 4. Midterm report (Wed 4/2)
+>
+> Grades needing attention:
+>   MBA 231 Corporate: 71%
+>
+> 3 unread Berkeley emails
+>
+> Fiat Lux!
+
+**Setup required:** `/setup telegram` (must be running for delivery)
+
+---
+
+### 12. Search Course Catalog
+
+**What you say:**
+- "What CS courses are good for AI?"
+- "Find graduate courses about privacy"
+- "What's CS 61A about?"
+
+**What OpenMind does:**
+- Searches 11,169 Berkeley courses (6,771 undergrad + 4,398 graduate)
+- Filters by subject, keyword, or level
+- Bundled locally -- no API needed
+
+---
+
+### 13. Campus Information
+
+**What you say:**
+- "What events are happening this week?"
+- "Library hours?"
+- "Where can I book a study room?"
+
+**What OpenMind does:**
+- Live events from events.berkeley.edu
+- Library hours (Moffitt, Doe, etc.)
+- Study room booking links (LibCal)
+
+---
+
+### 14. Set Reminders
+
+**What you say:**
+- "Remind me about office hours Thursday 2pm"
+- "Don't let me forget to email Prof. Smith"
+- "Remind me Monday 9am about the midterm"
+
+**What OpenMind does:**
+- Creates reminder with date/time (normalized to Pacific time)
+- Delivers via Telegram when due
+- Checks every hour
+
+**Commands:** `/remind [text]`
+
+---
+
+### 15. Slack Integration
+
+**What you say:**
+- "Search Slack for midterm review session"
+- "What did the TA say about the homework in #cs188?"
+- "Show me recent messages in the NLP channel"
+
+**Setup:** `/setup slack`
+**Access:** Read-only
+
+---
+
+## Setup
+
+### 3-Step First Run
+
+1. **bCourses token** -- go to bCourses, Profile, Settings, + New Access Token
+2. **Choose model** -- MiMo ($1/$3), Sonnet ($3/$15), GPT-5.4 ($2.50/$15), or Gemini ($1.25/$10)
+3. **OpenRouter key** -- get one at openrouter.ai/keys (free credits available)
+
+### Optional Integrations
+
+Set up from inside the chat with `/setup [name]`:
+
+| Integration | Command | What it adds |
+|-------------|---------|-------------|
+| Telegram | `/setup telegram` | Chat from phone + push notifications |
+| Gmail | `/setup gmail` | Search professor emails + email alerts |
+| Calendar | `/setup calendar` | Auto-sync deadlines with reminders |
+| Slack | `/setup slack` | Search course Slack channels |
+| Todoist | `/setup todoist` | Task management + auto-sync |
+| Obsidian | `/setup obsidian` | Save notes to your vault |
+| Profile | `/setup profile` | Personalized advice based on your goals |
+| Model | `/setup model` | Switch AI model |
+
+Detailed guides: openmindbot.io/guides
+
+---
+
+## All Commands
+
+| Command | What it does |
 |---------|-------------|
 | `/learn [topic]` | Guided Socratic tutoring |
-| `/study [course]` | Generate 10-25 page study guide PDF |
-| `/cheatsheet [course]` | Generate 2-page exam cheatsheet PDF |
-
-#### Academics
-| Command | Description |
-|---------|-------------|
-| `/grades` | Quick grade check across all courses |
-| `/gpa [target]` | GPA calculator (e.g., `/gpa 3.5` for what-if) |
-| `/courses` | List enrolled courses |
-| `/plan [scope]` | Create a study plan with time blocks |
+| `/study [course]` | Generate study guide PDF (10-25 pages) |
+| `/cheatsheet [course]` | Generate 2-page exam cheatsheet |
+| `/grades` | Check all grades |
+| `/gpa [target]` | GPA calculator with what-if |
+| `/plan [scope]` | Create study plan with time blocks |
 | `/sync` | Sync Canvas deadlines to Todoist |
 | `/remind [text]` | Set a reminder |
-
-#### Session
-| Command | Description |
-|---------|-------------|
-| `/new` | Save conversation context + start fresh |
-| `/clear` | Clear conversation history |
-| `/setup [name]` | Set up integrations without leaving chat |
-| `/config` | Show config path |
+| `/courses` | List enrolled courses |
+| `/new` | Save context + start fresh |
+| `/clear` | Clear conversation |
+| `/setup [name]` | Set up an integration |
 | `/restart` | Restart OpenMind |
-| `/quit` or `/exit` | Exit |
+| `/help` | Show all commands |
+| `/quit` | Exit |
 
 ---
 
-## 6. Telegram Bot
+## Privacy
 
-### Setup
+**Stays on your machine:**
+- API tokens, profile, conversation memory, reminders, study guides, REPL history
 
-```
-/setup telegram
-```
+**Sent to your AI model (via OpenRouter):**
+- Your messages, course list, profile fields, Canvas data when you ask
 
-Requires:
-1. Bot token from @BotFather on Telegram
-2. Your user ID from @userinfobot
+**Never sent:**
+- API tokens, resume PDF, heartbeat state, terminal history
 
-### How it works
+There is no OpenMind server. Everything runs locally.
 
-- OpenMind runs the bot in a background thread while the REPL stays in the foreground
-- Both work simultaneously
-- The bot sends a welcome message with quick-action buttons on startup
-
-### Telegram commands
-
-All REPL commands work in Telegram:
-`/start`, `/help`, `/menu`, `/learn`, `/grades`, `/gpa`, `/study`, `/cheatsheet`, `/plan`, `/sync`, `/courses`, `/remind`, `/new`, `/clear`, `/setup`
-
-### Quick-action buttons
-
-After `/start` and after every response:
-
-```
-[Deadlines] [Grades] [GPA]
-[Learn] [Study Plan] [Announcements]
-```
-
-### Features
-
-- **Streaming responses** — placeholder message edited in real-time as tokens arrive
-- **Typing indicator** — "typing..." shown while processing
-- **PDF support** — send a PDF to get it summarized; generated PDFs are sent back as documents
-- **Markdown rendering** — with automatic sanitization for Telegram's parser
+Delete everything: `rm -rf ~/.openmind`
 
 ---
 
-## 7. Integrations
+## Technical Details
 
-All integrations are set up via `/setup <name>` (in chat) or `openmind setup <name>` (terminal).
-
-### Required
-
-| Integration | Setup | Access |
-|-------------|-------|--------|
-| **bCourses** | Canvas access token | Read-only |
-| **OpenRouter** | API key | LLM requests |
-
-### Optional
-
-| Integration | Setup | Access | What it does |
-|-------------|-------|--------|-------------|
-| **Telegram** | Bot token + user ID | Read/Write | Chat + notifications |
-| **Gmail** | Google OAuth credentials.json | Read-only | Search professor emails |
-| **Google Calendar** | Google OAuth (shared with Gmail) | Read/Write | Sync deadlines, add events |
-| **Slack** | User OAuth token (xoxp-...) | Read-only | Search course channels |
-| **Todoist** | API token | Read/Write | Sync tasks |
-| **Obsidian** | Vault path | Local write | Save notes |
-| **Profile** | In-chat or setup wizard | Local | Major, goals, resume |
+- **43 tools** (30 core + 13 from optional integrations)
+- **Python 3.11+** required
+- **9 dependencies** -- all bundled, no extras needed
+- **Models:** MiMo V2 Pro (default), Claude Sonnet 4.6, GPT-5.4, Gemini 2.5 Pro
+- **Study guides:** Claude Opus (separate, automatic)
+- **pdflatex** needed for /study and /cheatsheet
 
 ---
 
-## 8. Tools Reference
-
-### 43 tools total (30 core + 13 optional)
-
-#### Canvas (13 tools — always available)
-
-| Tool | What it does |
-|------|-------------|
-| `get_upcoming_assignments` | All upcoming deadlines across courses |
-| `get_course_assignments` | Assignments for a specific course (with UPCOMING_DEADLINES) |
-| `get_assignment_details` | Full details for one assignment |
-| `get_grades` | Grades for a specific course |
-| `get_all_grades` | Grades across all courses |
-| `get_assignment_groups` | Grade weights per category |
-| `get_modules` | Course modules |
-| `get_page_content` | Module page content |
-| `get_course_files` | Files in a course |
-| `get_announcements` | Recent announcements |
-| `get_syllabus` | Course syllabus |
-| `get_discussion_topics` | Discussion topics |
-| `get_upcoming_events` | Calendar events |
-
-#### Berkeley Campus (3 tools)
-
-| Tool | What it does |
-|------|-------------|
-| `berkeley_events` | Live events from events.berkeley.edu |
-| `berkeley_library_hours` | Library hours |
-| `berkeley_study_rooms` | Study room booking links |
-
-#### Course Catalog (1 tool)
-
-| Tool | What it does |
-|------|-------------|
-| `berkeley_course_search` | Search 11,169 Berkeley courses |
-
-#### GPA Calculator (1 tool)
-
-| Tool | What it does |
-|------|-------------|
-| `gpa_calculator` | Estimate GPA with what-if analysis |
-
-#### Profile (3 tools)
-
-| Tool | What it does |
-|------|-------------|
-| `get_profile` | Read student profile |
-| `update_profile` | Update profile fields (allowlisted) |
-| `import_resume` | Import skills from resume |
-
-#### Study Guide & Cheatsheet (2 tools)
-
-| Tool | What it does |
-|------|-------------|
-| `generate_study_guide` | 10-25 page PDF (Claude Opus) |
-| `generate_cheatsheet` | 2-page exam reference PDF (Claude Opus) |
-
-#### Reminders (2 tools)
-
-| Tool | What it does |
-|------|-------------|
-| `remind_me` | Set a reminder with due date |
-| `list_reminders` | List pending reminders |
-
-#### Web & PDF (3 tools)
-
-| Tool | What it does |
-|------|-------------|
-| `web_fetch` | Fetch a web page (SSRF protected) |
-| `web_search` | Search DuckDuckGo |
-| `read_pdf` | Read a PDF from URL |
-
-#### Optional: Gmail (2 tools)
-
-| Tool | What it does |
-|------|-------------|
-| `gmail_search` | Search emails |
-| `gmail_read` | Read an email |
-
-#### Optional: Slack (3 tools)
-
-| Tool | What it does |
-|------|-------------|
-| `slack_search` | Search messages |
-| `slack_read_channel` | Read channel history |
-| `slack_list_channels` | List channels |
-
-#### Optional: Google Calendar (3 tools)
-
-| Tool | What it does |
-|------|-------------|
-| `calendar_list_events` | List upcoming events |
-| `calendar_add_event` | Create an event |
-| `calendar_add_deadlines` | Bulk-add Canvas deadlines |
-
-#### Optional: Todoist (2 tools)
-
-| Tool | What it does |
-|------|-------------|
-| `todoist_add_task` | Create a task |
-| `todoist_list_tasks` | List tasks |
-
-#### Optional: Obsidian (3 tools)
-
-| Tool | What it does |
-|------|-------------|
-| `obsidian_read` | Read a note |
-| `obsidian_write` | Write/update a note |
-| `obsidian_search` | Search notes |
-
----
-
-## 9. Features
-
-### Smart deadlines
-- Sorted by urgency x grade weight
-- Deadline change detection (alerts when professors move dates)
-- Course names included in notifications
-
-### GPA calculator
-- Estimates current GPA from Canvas grades
-- What-if analysis: "what do I need on the final for a 3.5?"
-- Disclaimer: estimates only, check CalCentral for official GPA
-
-### Personalization
-- Student profile: major, year, interests, career goals
-- Resume import: skill extraction + skill-gap analysis
-- Tailored course recommendations
-
-### Memory
-- Conversation context preserved across sessions via memory.json
-- `/new` saves current context before clearing
-
-### Berkeley personality
-- Campus references: Moffitt, Doe, Main Stacks, FSM Cafe, Top Dog
-- Varied spirit phrases: "Fiat Lux!", "Sko Bears!", "Go Bears!"
-- Says "Cal" not "UC Berkeley", "GSI" not "TA"
-- Acknowledges the grind: "Berkeley's hard. That's not a you problem"
-
----
-
-## 10. Time & Task Management
-
-### Auto-sync (background)
-
-Every 3 hours, the heartbeat automatically:
-- **Canvas → Todoist**: Creates tasks for all unsubmitted deadlines
-- **Canvas → Calendar**: Creates all-day events for assignments worth 5+ points (with 1-day and 1-hour reminders)
-- Deduped — won't create duplicates
-
-### /plan command
-
-Creates a study plan by:
-1. Checking all deadlines (Canvas + Todoist)
-2. Estimating time per task (quiz 30min, essay 4-8h, final 10-20h)
-3. Checking Google Calendar for free time
-4. Creating day-by-day time blocks with Berkeley locations
-5. Offering to add blocks to Calendar + tasks to Todoist
-
-### /sync command
-
-Manually triggers Canvas → Todoist sync for all upcoming deadlines.
-
-### Proactive task creation
-
-The LLM suggests adding Todoist tasks when it sees:
-- New assignments with due dates
-- Actionable emails
-- Student requests ("I need to...")
-
----
-
-## 11. Guided Learning
-
-### How it works
-
-Type `/learn [topic]` or naturally say "teach me about X", "help me understand Y".
-
-### 5-phase Socratic method
-
-1. **Diagnose** — "What do you already know about [topic]?"
-2. **Teach one concept** — analogy + worked example from course materials
-3. **Check understanding** — scenario question (never yes/no)
-4. **Respond adaptively** — correct→extend, partial→probe, wrong→hint ladder
-5. **Consolidate** — "Explain in your own words"
-
-### Hint ladder (for wrong answers)
-
-1. Self-monitoring: "What do you notice about...?"
-2. Reveal constraint: "Remember that [rule]..."
-3. Worked example: "Let me show a simpler case..."
-4. Direct guidance: "The key insight is..." (last resort)
-
----
-
-## 12. Study Guide & Cheatsheet Generator
-
-### Study Guide (`/study [course]`)
-
-- 10-25 page two-column LaTeX PDF
-- Powered by Claude Opus
-- Teaches from scratch — not a cheatsheet
-- Structure adapts to subject (law vs CS vs business vs science)
-- Reads actual course materials from Canvas first
-
-### Cheatsheet (`/cheatsheet [course]`)
-
-- 2-page ultra-dense exam reference
-- 7pt font, two-column, tight margins
-- Maximum information density
-- Designed for open-note exams
-
-### Requirements
-
-- pdflatex installed (`brew install --cask basictex` on macOS)
-- Output saved to `~/.openmind/study_guides/`
-
----
-
-## 13. Background Alerts
-
-### Morning briefing (8am PT daily)
-
-Sent via Telegram:
-- Today's deadlines
-- This week's deadlines
-- Grades needing attention (below 80%)
-- Unread Berkeley email count
-
-### Heartbeat (every 3 hours via Canvas, hourly for reminders)
-
-| Alert | Trigger |
-|-------|---------|
-| Deadline urgency | Assignment due within 7 days |
-| Deadline change | Professor moved a due date |
-| Grade change | Score went up or down |
-| Unsubmitted assignment | Due in last 24 hours, not submitted |
-| New announcement | Posted in last 3 hours |
-| New Berkeley email | Unread from @berkeley.edu |
-| Reminder due | Student-set reminder past due time |
-
-### Notification format
-
-```
-Deadline update 🐻
-📚 Info Law & Policy — Lab 2 (Submit) (due Mar 31, 3d)
-📚 NLP — Midterm report (due Apr 01, 4d)
-📚 Big Data — 4. Midterm report (due Apr 02, 5d)
-```
-
----
-
-## 14. Privacy & Security
-
-### Data storage
-
-| Data | Location | Sent to LLM? |
-|------|----------|--------------|
-| Config (API tokens) | ~/.openmind/config.json | Never |
-| Student profile | ~/.openmind/profile.json | Yes (for personalization) |
-| Conversation memory | ~/.openmind/memory.json | Summaries in system prompt |
-| Reminders | ~/.openmind/reminders.json | Never |
-| Heartbeat state | ~/.openmind/state/*.json | Never |
-| Study guides | ~/.openmind/study_guides/*.pdf | Never |
-| REPL history | ~/.openmind/repl_history | Never |
-| Gmail OAuth tokens | ~/.openmind/gmail/ | To Google APIs only |
-| Resume PDF | Original file | Never uploaded |
-
-### Security measures
-
-- **SSRF protection**: fail-closed DNS, private IP blocking, redirect validation
-- **Canvas HTTPS enforcement**: rejects http:// URLs
-- **Per-turn tool authorization**: prevents prompt injection from tool results
-- **Profile field allowlist**: only 15 specific fields can be written
-- **Prompt secrecy**: system instructions never revealed
-- **Atomic file writes**: tempfile + rename prevents corruption
-- **File permissions**: sensitive files created with 0600
-
-### What's sent to the LLM
-
-- Your messages and the bot's responses
-- Course list and profile fields (for personalization)
-- Canvas data fetched during conversation
-- Gmail/Slack/Calendar content when you ask about it
-
-### What's NEVER sent
-
-- API tokens (sent only to their own service)
-- Raw resume PDF file
-- Heartbeat state files
-- Terminal command history
-
-### Delete everything
-
-```bash
-rm -rf ~/.openmind
-pip uninstall openmind-berkeley
-```
-
----
-
-## 15. Architecture
-
-### Module structure
-
-```
-src/openmind/
-├── cli.py              # Typer CLI entry point
-├── repl.py             # Terminal REPL with prompt-toolkit
-├── bot.py              # Telegram bot (TelegramBotService)
-├── llm.py              # OpenRouter LLM client + tool execution
-├── personality.py       # System prompt (persona + playbooks + policy)
-├── universities.py      # Berkeley config + spirit phrases
-├── config.py           # Config management + validation
-├── memory.py           # Conversation memory persistence
-├── heartbeat.py         # Background alerts + auto-sync
-├── banner.py           # ASCII art banner
-├── tools/
-│   ├── __init__.py     # Tool registry + dispatch
-│   ├── canvas.py       # 13 Canvas API tools
-│   ├── berkeley.py     # Campus events, library, study rooms
-│   ├── courses.py      # 11K course catalog search
-│   ├── gpa.py          # GPA calculator
-│   ├── profile.py      # Student profile management
-│   ├── studyguide.py   # PDF generation (Opus)
-│   ├── reminders.py    # Reminder scheduling
-│   ├── gmail.py        # Gmail integration
-│   ├── calendar.py     # Google Calendar
-│   ├── slack.py        # Slack integration
-│   ├── todoist.py      # Todoist integration
-│   ├── obsidian.py     # Obsidian vault
-│   ├── web.py          # Web fetch + search (SSRF protected)
-│   └── pdf.py          # PDF reading
-```
-
-### System prompt layers
-
-1. **Persona** — Berkeley voice and personality
-2. **Context** — Student name, courses, profile, current date/time
-3. **Playbooks** — Task-specific instructions (deadlines, learning, planning, etc.)
-4. **Policy** — Security rules, read-only enforcement, prompt secrecy
-5. **Memory** — Prior conversation context
-
-### Multi-model architecture
-
-| Component | Model |
-|-----------|-------|
-| Chat + Canvas + Tools | Student's choice (MiMo default) |
-| Study guides + Cheatsheets | Claude Opus (automatic) |
-
----
-
-## 16. Testing Guide
-
-### Automated tests
-
-```bash
-# Run all 22 tests
-python -m pytest tests/ -v
-
-# Run specific test files
-python -m pytest tests/test_cli_and_setup.py
-python -m pytest tests/test_release_contract.py
-python -m pytest tests/test_heartbeat_runtime.py
-```
-
-### Lint
-
-```bash
-python -m ruff check src/
-```
-
-### Manual testing checklist
-
-#### First-run experience
-- [ ] `pip install git+https://github.com/qazybekb/openmind.git`
-- [ ] Run `openmind` — setup wizard starts
-- [ ] Enter bCourses token — courses discovered
-- [ ] Choose model — 4 options with prices shown
-- [ ] Enter OpenRouter key — validates OK
-- [ ] Welcome message shows all integrations
-- [ ] Banner, spirit phrase, and tips display correctly
-
-#### REPL
-- [ ] Type `/` — autocomplete menu appears
-- [ ] "What's due?" — shows deadlines with course names
-- [ ] "How are my grades?" — shows all course grades
-- [ ] `/gpa` — estimates GPA
-- [ ] `/gpa 3.5` — what-if analysis
-- [ ] `/learn [topic]` — Socratic tutoring starts
-- [ ] `/plan` — creates study plan with time blocks
-- [ ] `/sync` — syncs Canvas → Todoist
-- [ ] `/setup telegram` — inline setup works
-- [ ] `/setup model` — model changes immediately
-- [ ] `/new` — saves context, clears conversation
-- [ ] `/restart` — restarts the process
-- [ ] Ctrl+C during response — cancels cleanly
-- [ ] `/quit` — exits with "Go Bears!"
-- [ ] Response metadata shows (time + model + tool count)
-- [ ] Tool progress spinner updates ("Checking deadlines...")
-
-#### Telegram
-- [ ] Welcome message with buttons on startup
-- [ ] /start — greeting with buttons
-- [ ] /help — full command list
-- [ ] Tap Deadlines button — shows deadlines
-- [ ] Type "Hi" — streaming response with placeholder editing
-- [ ] Send a PDF — extracted and summarized
-- [ ] /study [course] — generates and sends PDF
-- [ ] /plan — creates study plan
-- [ ] /sync — syncs to Todoist
-- [ ] /setup — redirects to terminal
-- [ ] Unauthorized user gets "private bot" message
-
-#### Canvas accuracy
-- [ ] "What's due?" catches ALL upcoming deadlines (including Big Data)
-- [ ] Grades are accurate across all courses
-- [ ] Announcements show recent posts
-- [ ] Course files are listed
-- [ ] Assignment details include descriptions
-
-#### Time management
-- [ ] /sync creates Todoist tasks for all deadlines
-- [ ] Background auto-sync creates Calendar events (5+ point assignments)
-- [ ] Calendar events have reminders (1 day + 1 hour)
-- [ ] /plan checks Calendar for free time
-- [ ] No duplicate tasks/events on repeated sync
-
-#### Error handling
-- [ ] Wrong bCourses token — helpful error + retry
-- [ ] Wrong OpenRouter key — "check at openrouter.ai/keys"
-- [ ] Out of credits — "top up at openrouter.ai/credits"
-- [ ] Network timeout — actionable error message
-- [ ] Canvas 500 error — graceful partial results
-
----
-
-## 17. Troubleshooting
-
-### "openmind: command not found"
-
-```bash
-pip install git+https://github.com/qazybekb/openmind.git
-```
-
-### Telegram bot not responding
-
-1. Make sure `openmind` is running in a terminal
-2. Only ONE instance should run at a time
-3. Check: `ps aux | grep openmind`
-4. Kill all and restart: `pkill -f openmind && openmind`
-
-### "Failed to parse Canvas timestamp: None"
-
-This is a debug-level log, not an error. Canvas returns null timestamps for some assignments. Harmless.
-
-### Study guide fails ("pdflatex not installed")
-
-```bash
-# macOS
-brew install --cask basictex
-sudo /Library/TeX/texbin/tlmgr install enumitem titlesec
-
-# Linux
-sudo apt install texlive
-```
-
-### OAuth browser window pops up
-
-Normal for first-time Gmail or Calendar use. Authorize once and it won't ask again.
-
-### Reset everything
-
-```bash
-rm -rf ~/.openmind
-openmind   # Starts fresh setup
-```
-
-### Change model
-
-```
-/setup model
-```
-
-### Update to latest version
-
-```bash
-pip install git+https://github.com/qazybekb/openmind.git --force-reinstall --no-deps
-```
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| "command not found" | `pip install git+https://github.com/qazybekb/openmind.git` |
+| Telegram not responding | Make sure openmind is running. Kill old instances: `pkill -f openmind` |
+| "pdflatex not installed" | `brew install --cask basictex` (macOS) |
+| OAuth browser popup | Normal for first Gmail/Calendar use. Authorize once. |
+| Want to change model | `/setup model` |
+| Reset everything | `rm -rf ~/.openmind && openmind` |
+| Update to latest | `pip install git+https://github.com/qazybekb/openmind.git --force-reinstall --no-deps` |
 
 ---
 
 **Built at UC Berkeley School of Information**
 
-Go Bears! 🐻
-
 Website: openmindbot.io | GitHub: github.com/qazybekb/openmind
+
+Go Bears!
