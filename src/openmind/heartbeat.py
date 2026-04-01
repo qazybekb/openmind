@@ -876,7 +876,7 @@ def _check_emails(cfg: ConfigDict) -> list[str]:
             preview = ""
 
         # Smart email processing: LLM summarize + auto-Todoist
-        smart = cfg.get("smart_emails", False)
+        smart = cfg.get("smart_emails", True)
         llm_summary = ""
         todoist_task = ""
 
