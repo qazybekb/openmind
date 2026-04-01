@@ -875,22 +875,24 @@ def _check_emails(cfg: ConfigDict) -> list[str]:
         except Exception:
             preview = ""
 
-        # Smart summary: one-line description of what the email is about
-        summary = subject
-        if preview:
-            # Use first sentence of preview as summary if shorter
-            first_sentence = preview.split(".")[0].strip()
-            if len(first_sentence) > 10 and len(first_sentence) < len(subject):
-                summary = first_sentence
+        # Smart email processing: LLM summarize + auto-Todoist
+        smart = cfg.get("smart_emails", False)
+        llm_summary = ""
+        todoist_task = ""
+
+        if smart and preview:
+            llm_summary, todoist_task = _smart_email_process(cfg, sender, subject, preview)
 
         # Format notification (nanobot-style)
-        line = f"\u2709\ufe0f {summary}"
-        line += f"\nFrom: {sender}"
+        if llm_summary:
+            line = f"\u2709\ufe0f {llm_summary}"
+        else:
+            line = f"\u2709\ufe0f {subject}"
+        line += f"\n\nFrom: {sender}"
         line += f"\nSubject: {subject}"
 
-        # Auto-add actionable emails to Todoist if smart_emails enabled
-        if cfg.get("smart_emails") and cfg.get("todoist", {}).get("enabled"):
-            _auto_todoist_from_email(cfg, subject, preview)
+        if todoist_task:
+            line += f"\n\n\u2705 Added to Todoist: {todoist_task}"
 
         new_items.append(line)
 
@@ -904,51 +906,85 @@ def _check_emails(cfg: ConfigDict) -> list[str]:
     return []
 
 
-# Actionable email keywords that suggest a Todoist task
-_ACTION_KEYWORDS = (
-    "submit", "deadline", "due", "reminder", "rsvp", "register",
-    "sign up", "apply", "form", "request", "survey", "complete",
-    "attend", "conference", "workshop", "meeting",
-)
+def _smart_email_process(cfg: ConfigDict, sender: str, subject: str, preview: str) -> tuple[str, str]:
+    """Use LLM to summarize an email and extract actionable task for Todoist.
 
+    Returns (summary, todoist_task). Either can be empty string.
+    """
+    api_key = str(cfg.get("openrouter_api_key", ""))
+    model = str(cfg.get("model", "xiaomi/mimo-v2-pro"))
+    if not api_key:
+        return ("", "")
 
-def _auto_todoist_from_email(cfg: ConfigDict, subject: str, preview: str) -> None:
-    """Auto-add actionable emails to Todoist if they match action keywords."""
-    todoist = cfg.get("todoist", {})
-    token = str(todoist.get("token", ""))
-    if not token:
-        return
-
-    combined = (subject + " " + preview).lower()
-    if not any(kw in combined for kw in _ACTION_KEYWORDS):
-        return
-
-    # Extract a due date hint from the text
-    import re
-    date_match = re.search(
-        r'(?:by|before|due|on)\s+'
-        r'(\w+\s+\d{1,2}(?:st|nd|rd|th)?,?\s*\d{0,4})',
-        combined,
+    prompt = (
+        "You are processing a Berkeley email notification. Do TWO things:\n\n"
+        "1. Write a ONE-LINE summary (casual, like telling a friend). "
+        "Start with what's happening, not 'This email is about...'\n"
+        "Example: 'Heads up — MIMS sent a reminder to submit Outside Unit Requests by May 1st'\n"
+        "Example: 'There's an upcoming NOVA Robotics conference on April 29 at Spieker Forum'\n\n"
+        "2. If the email has an ACTION the student should take (submit something, attend something, "
+        "RSVP, register, apply, complete a form), write a short Todoist task.\n"
+        "Example: 'Submit the Outside Unit Request Form by May 1st'\n"
+        "Example: 'RSVP for NOVA Robotics Conference on April 29'\n"
+        "If no action needed, leave task empty.\n\n"
+        "Reply in EXACTLY this format (two lines only):\n"
+        "SUMMARY: [your one-line summary]\n"
+        "TASK: [todoist task or NONE]\n\n"
+        f"From: {sender}\n"
+        f"Subject: {subject}\n"
+        f"Preview: {preview[:300]}"
     )
-    due_string = date_match.group(1).strip() if date_match else ""
-
-    task_content = f"[email] {subject[:100]}"
 
     try:
-        body: dict[str, str] = {"content": task_content}
-        if due_string:
-            body["due_string"] = due_string
-
-        resp = httpx.post(
-            "https://api.todoist.com/api/v1/tasks",
-            json=body,
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=15.0,
+        from openai import OpenAI
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+            timeout=30.0,
         )
-        if resp.status_code == 200:
-            logger.info("Auto-added email to Todoist: %s", task_content)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
+        )
+        if not response.choices:
+            return ("", "")
+
+        text = response.choices[0].message.content or ""
+        summary = ""
+        task = ""
+
+        for line in text.strip().split("\n"):
+            line = line.strip()
+            if line.upper().startswith("SUMMARY:"):
+                summary = line[8:].strip()
+            elif line.upper().startswith("TASK:"):
+                task_text = line[5:].strip()
+                if task_text.upper() != "NONE" and task_text:
+                    task = task_text
+
+        # Add to Todoist if we have a task
+        if task:
+            todoist = cfg.get("todoist", {})
+            token = str(todoist.get("token", ""))
+            if token:
+                try:
+                    resp = httpx.post(
+                        "https://api.todoist.com/api/v1/tasks",
+                        json={"content": task},
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=15.0,
+                    )
+                    if resp.status_code != 200:
+                        task = ""  # Don't show "Added to Todoist" if it failed
+                except Exception:
+                    task = ""
+
+        return (summary, task)
+
     except Exception:
-        logger.warning("Failed to auto-add email to Todoist", exc_info=True)
+        logger.warning("Smart email processing failed", exc_info=True)
+        return ("", "")
 
 
 def _send_telegram(bot_token: str, chat_id: str, text: str) -> None:
