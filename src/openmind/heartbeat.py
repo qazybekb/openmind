@@ -875,10 +875,22 @@ def _check_emails(cfg: ConfigDict) -> list[str]:
         except Exception:
             preview = ""
 
-        # Format notification
-        line = f"\u2709\ufe0f {sender} \u2014 {subject}"
+        # Smart summary: one-line description of what the email is about
+        summary = subject
         if preview:
-            line += f"\n   [dim]{preview}[/dim]" if len(new_items) < 3 else ""
+            # Use first sentence of preview as summary if shorter
+            first_sentence = preview.split(".")[0].strip()
+            if len(first_sentence) > 10 and len(first_sentence) < len(subject):
+                summary = first_sentence
+
+        # Format notification (nanobot-style)
+        line = f"\u2709\ufe0f {summary}"
+        line += f"\nFrom: {sender}"
+        line += f"\nSubject: {subject}"
+
+        # Auto-add actionable emails to Todoist if smart_emails enabled
+        if cfg.get("smart_emails") and cfg.get("todoist", {}).get("enabled"):
+            _auto_todoist_from_email(cfg, subject, preview)
 
         new_items.append(line)
 
@@ -888,8 +900,55 @@ def _check_emails(cfg: ConfigDict) -> list[str]:
     _save_state("emails", {"seen": sorted(all_ids)})
 
     if new_items:
-        return ["New Berkeley emails \U0001f43b\n" + "\n".join(new_items)]
+        return ["New Berkeley emails \U0001f43b\n\n" + "\n\n".join(new_items)]
     return []
+
+
+# Actionable email keywords that suggest a Todoist task
+_ACTION_KEYWORDS = (
+    "submit", "deadline", "due", "reminder", "rsvp", "register",
+    "sign up", "apply", "form", "request", "survey", "complete",
+    "attend", "conference", "workshop", "meeting",
+)
+
+
+def _auto_todoist_from_email(cfg: ConfigDict, subject: str, preview: str) -> None:
+    """Auto-add actionable emails to Todoist if they match action keywords."""
+    todoist = cfg.get("todoist", {})
+    token = str(todoist.get("token", ""))
+    if not token:
+        return
+
+    combined = (subject + " " + preview).lower()
+    if not any(kw in combined for kw in _ACTION_KEYWORDS):
+        return
+
+    # Extract a due date hint from the text
+    import re
+    date_match = re.search(
+        r'(?:by|before|due|on)\s+'
+        r'(\w+\s+\d{1,2}(?:st|nd|rd|th)?,?\s*\d{0,4})',
+        combined,
+    )
+    due_string = date_match.group(1).strip() if date_match else ""
+
+    task_content = f"[email] {subject[:100]}"
+
+    try:
+        body: dict[str, str] = {"content": task_content}
+        if due_string:
+            body["due_string"] = due_string
+
+        resp = httpx.post(
+            "https://api.todoist.com/api/v1/tasks",
+            json=body,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=15.0,
+        )
+        if resp.status_code == 200:
+            logger.info("Auto-added email to Todoist: %s", task_content)
+    except Exception:
+        logger.warning("Failed to auto-add email to Todoist", exc_info=True)
 
 
 def _send_telegram(bot_token: str, chat_id: str, text: str) -> None:

@@ -57,6 +57,7 @@ def run_repl(cfg: ConfigDict) -> None:
         ("slack", cfg.get("slack", {}).get("enabled"), "[cyan]/setup slack[/cyan]    \u2014 search course Slack channels"),
         ("todoist", cfg.get("todoist", {}).get("enabled"), "[cyan]/setup todoist[/cyan]  \u2014 sync tasks"),
         ("obsidian", cfg.get("obsidian", {}).get("enabled"), "[cyan]/setup obsidian[/cyan] \u2014 save notes to your vault"),
+        ("smart_emails", cfg.get("smart_emails"), "[cyan]/smart-emails[/cyan]  \u2014 auto-add actionable emails to Todoist"),
     ]
 
     tips = [tip for _, enabled, tip in all_tips if not enabled]
@@ -132,6 +133,7 @@ def run_repl(cfg: ConfigDict) -> None:
             ("/setup todoist", "Sync tasks"),
             ("/setup obsidian", "Save notes to vault"),
             ("/setup model", "Change your LLM"),
+            ("/smart-emails", "Toggle auto-add emails to Todoist"),
             ("/config", "Show config path"),
             ("/restart", "Restart OpenMind"),
             ("/exit", "Exit"),
@@ -381,6 +383,20 @@ def _handle_command(
         if scope:
             return False, f"Create a detailed study plan for: {scope}. Check my deadlines, estimate time per task, look at my calendar for free time, and give me specific day-by-day time blocks. Offer to add them to Google Calendar and Todoist."
         return False, "Create a study plan for this week. Check my deadlines, estimate how long each task will take, look at my calendar for free time, and give me specific day-by-day time blocks with locations (Moffitt, Doe, etc). Offer to add them to Google Calendar and Todoist."
+
+    if cmd == "/smart-emails":
+        from openmind.config import load_config, save_config
+        current = cfg.get("smart_emails", False)
+        new_value = not current
+        cfg["smart_emails"] = new_value
+        save_config(cfg)
+        status = "ON" if new_value else "OFF"
+        console.print(f"[bold]Smart emails: {status}[/bold]")
+        if new_value:
+            console.print("[dim]Actionable Berkeley emails will be auto-added to Todoist.[/dim]")
+        else:
+            console.print("[dim]Email notifications only. No auto-Todoist.[/dim]")
+        return True, None
 
     if cmd == "/sync":
         if not cfg.get("todoist", {}).get("enabled"):
