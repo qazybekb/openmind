@@ -28,7 +28,10 @@ from openmind.materials import Chunk, cite
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION: Final[str] = "1"
+SCHEMA_VERSION: Final[str] = "2"
+# A material that failed is retried on an explicit refresh, but not forever: a file the
+# instructor deleted from storage would otherwise be re-requested on every run.
+MAX_ATTEMPTS: Final[int] = 3
 MAX_COURSE_CHARS: Final[int] = 20 * 1024 * 1024
 SNIPPET_CHARS: Final[int] = 320
 MAX_CHUNKS_PER_MATERIAL: Final[int] = 2
@@ -58,6 +61,7 @@ CREATE TABLE IF NOT EXISTS materials (
     status_note TEXT,
     char_count INTEGER DEFAULT 0,
     truncated INTEGER DEFAULT 0,
+    attempts INTEGER NOT NULL DEFAULT 0,
     indexed_at TEXT,
     UNIQUE (course_id, kind, canvas_id)
 );
@@ -165,6 +169,7 @@ def connect(path: Path | None = None, *, create: bool = True) -> Iterator[sqlite
         connection.execute("PRAGMA journal_mode = WAL")
         if create:
             connection.executescript(_SCHEMA)
+            _migrate(connection)
             connection.execute(
                 "INSERT INTO meta (key, value) VALUES ('schema_version', ?) "
                 "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
@@ -179,6 +184,13 @@ def connect(path: Path | None = None, *, create: bool = True) -> Iterator[sqlite
         yield connection
     finally:
         connection.close()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add columns an older index is missing. Cheap, and CREATE TABLE IF NOT EXISTS will not."""
+    have = {row["name"] for row in conn.execute("PRAGMA table_info(materials)")}
+    if "attempts" not in have:
+        conn.execute("ALTER TABLE materials ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0")
 
 
 # -- writes -------------------------------------------------------------------
@@ -235,7 +247,7 @@ def store_chunks(conn: sqlite3.Connection, material_id: int, title: str, chunks:
         total += len(text)
     conn.execute(
         "UPDATE materials SET status = 'indexed', status_note = NULL, char_count = ?, page_count = ?, "
-        "truncated = ?, indexed_at = ? WHERE id = ?",
+        "truncated = ?, attempts = 0, indexed_at = ? WHERE id = ?",
         (total, page_count, 1 if truncated else 0, datetime.now(UTC).isoformat(), material_id),
     )
     conn.commit()
@@ -245,21 +257,40 @@ def store_chunks(conn: sqlite3.Connection, material_id: int, title: str, chunks:
 def mark(conn: sqlite3.Connection, material_id: int, status: str, note: str | None = None) -> None:
     """Record why a material was skipped or failed, so the student is told rather than left guessing."""
     conn.execute(
-        "UPDATE materials SET status = ?, status_note = ?, indexed_at = ? WHERE id = ?",
-        (status, note, datetime.now(UTC).isoformat(), material_id),
+        "UPDATE materials SET status = ?, status_note = ?, indexed_at = ?, "
+        "attempts = attempts + CASE WHEN ? = 'failed' THEN 1 ELSE 0 END WHERE id = ?",
+        (status, note, datetime.now(UTC).isoformat(), status, material_id),
     )
     conn.commit()
 
 
-def pending(conn: sqlite3.Connection, course_id: str, limit: int = 50) -> list[sqlite3.Row]:
-    """Return materials waiting to be extracted, biggest-value first."""
+def pending(conn: sqlite3.Connection, course_id: str, limit: int = 50, *,
+            retry_failed: bool = False) -> list[sqlite3.Row]:
+    """Return materials waiting to be extracted, biggest-value first.
+
+    With *retry_failed*, materials that failed a transient error are included again. A
+    503 from Canvas is not a permanent property of a document, and without this a page
+    that failed once stayed unreadable until its ``updated_at`` happened to change.
+    """
+    states = "('pending','failed')" if retry_failed else "('pending')"
     return list(
         conn.execute(
-            "SELECT * FROM materials WHERE course_id = ? AND status = 'pending' "
-            "ORDER BY module_position IS NULL, module_position, item_position, id LIMIT ?",
-            (course_id, limit),
+            f"SELECT * FROM materials WHERE course_id = ? AND status IN {states} AND attempts < ? "
+            "ORDER BY status = 'failed', module_position IS NULL, module_position, item_position, id LIMIT ?",
+            (course_id, MAX_ATTEMPTS, limit),
         )
     )
+
+
+def outstanding_failures(conn: sqlite3.Connection, course_id: str) -> list[str]:
+    """Return the titles of materials still failing, so a caller can report the total."""
+    return [
+        str(row["title"])
+        for row in conn.execute(
+            "SELECT title FROM materials WHERE course_id = ? AND status = 'failed' ORDER BY title",
+            (course_id,),
+        )
+    ]
 
 
 def course_stats(conn: sqlite3.Connection, course_id: str) -> dict[str, int]:
@@ -282,6 +313,32 @@ def last_indexed_at(conn: sqlite3.Connection, course_id: str) -> str | None:
         "SELECT MAX(indexed_at) FROM materials WHERE course_id = ? AND status = 'indexed'", (course_id,)
     ).fetchone()
     return str(row[0]) if row and row[0] else None
+
+
+def tombstone_missing(conn: sqlite3.Connection, course_id: str, kind: str, present: set[str]) -> int:
+    """Mark materials of one kind that a successful listing did not mention as deleted.
+
+    Only ever called with the result of a listing that worked. Its chunks go too, so a
+    page the instructor took down stops turning up in search with a stale excerpt.
+    """
+    rows = [
+        int(row["id"])
+        for row in conn.execute(
+            "SELECT id, canvas_id FROM materials WHERE course_id = ? AND kind = ? AND status != 'deleted'",
+            (course_id, kind),
+        )
+        if str(row["canvas_id"]) not in present
+    ]
+    if not rows:
+        return 0
+    marks = ",".join("?" * len(rows))
+    conn.execute(f"DELETE FROM chunks WHERE material_id IN ({marks})", rows)
+    conn.execute(
+        f"UPDATE materials SET status = 'deleted', status_note = 'removed from bCourses', char_count = 0 "
+        f"WHERE id IN ({marks})",
+        rows,
+    )
+    return len(rows)
 
 
 def course_chars(conn: sqlite3.Connection, course_id: str) -> int:

@@ -40,6 +40,8 @@ MAX_RUBRIC_ROWS: Final[int] = 12
 MAX_GRADED: Final[int] = 20
 # Room kept back for the "continues, call again with cursor=N" line.
 _CONTINUATION_ALLOWANCE: Final[int] = 160
+# Slack for JSON escaping of the prose plus the cursor field it may add.
+_JSON_STRING_OVERHEAD: Final[int] = 220
 
 BUDGETS: Final[dict[str, int]] = {
     "list_courses": 1_500,
@@ -103,6 +105,28 @@ def shrink(payload: dict[str, Any], budget: int) -> dict[str, Any]:
 def _omission_note(dropped: int) -> str:
     """Say plainly that results were left out, and what to do about it."""
     return f"{dropped} more result(s) omitted to stay within the response size limit; narrow the query."
+
+
+def fit_prose(payload: dict[str, Any], field: str, text: str, offset: int, requested: int,
+              budget: int, *, cursor_field: str) -> None:
+    """Put as much of *text* into the payload as the budget allows, and page the rest.
+
+    `shrink` only drops whole list items, so a single long string sails past the budget
+    once every list is empty. A caller asking for 8,000 characters against a 5,000-byte
+    tool gets what actually fits and a cursor for the remainder, rather than an
+    oversized payload or a silent truncation.
+    """
+    payload[field] = ""
+    payload.pop(cursor_field, None)
+    fixed = len(json.dumps(payload, default=str))
+    room = max(0, budget - fixed - _JSON_STRING_OVERHEAD)
+    take = min(requested, room)
+
+    window, _ = materials.truncate(text, take, offset=offset)
+    payload[field] = window
+    consumed = offset + len(window)
+    if consumed < len(text):
+        payload[cursor_field] = consumed
 
 
 def fit_page(payload: dict[str, Any], records: Sequence[tuple[str, Any]], budget: int) -> int:
@@ -484,7 +508,7 @@ class Session:
         start_day, start_now = agenda.start_by(due_local, estimate.hours, reference, self.cfg.capacity_hours_per_day)
 
         submission = raw.get("submission") if isinstance(raw.get("submission"), dict) else {}
-        description, next_cursor, total = materials.summarise_html(str(raw.get("description") or ""), max_chars, cursor)
+        description_text = materials.html_to_text(str(raw.get("description") or ""))
 
         payload: dict[str, Any] = {
             "course_id": course_id,
@@ -498,8 +522,8 @@ class Session:
             "est_hours": estimate.hours,
             "est_confidence": estimate.confidence,
             "url": str(raw.get("html_url") or ""),
-            "description": description,
-            "description_chars": total,
+            "description": "",
+            "description_chars": len(description_text),
             "submission": {
                 "state": str(submission.get("workflow_state") or "unsubmitted"),
                 "submitted_at": str(submission.get("submitted_at") or "") or None,
@@ -522,15 +546,16 @@ class Session:
             payload["start_by"] = start_day.isoformat()
             if start_now:
                 payload["start_note"] = "start now"
-        if next_cursor is not None:
-            payload["description_cursor"] = next_cursor
-
         rubric = _rubric(raw)
         if rubric:
             payload["rubric"] = rubric[:MAX_RUBRIC_ROWS]
         if raw.get("allowed_attempts") not in (None, -1):
             payload["allowed_attempts"] = raw.get("allowed_attempts")
-        return shrink(payload, BUDGETS["get_assignment"])
+
+        payload = shrink(payload, BUDGETS["get_assignment"])
+        fit_prose(payload, "description", description_text, cursor, max_chars,
+                  BUDGETS["get_assignment"], cursor_field="description_cursor")
+        return payload
 
     # -- course overview ---------------------------------------------------
 
@@ -546,7 +571,7 @@ class Session:
         except CanvasError as exc:
             raise ServiceError(str(exc)) from exc
 
-        syllabus, next_cursor, total = materials.summarise_html(str(raw.get("syllabus_body") or ""), max_chars, cursor)
+        syllabus_text = materials.html_to_text(str(raw.get("syllabus_body") or ""))
 
         modules: list[dict[str, Any]] = []
         try:
@@ -586,17 +611,18 @@ class Session:
             "course_id": course_id,
             "name": str(raw.get("name") or self.cfg.nickname(course_id)),
             "code": str(raw.get("course_code") or ""),
-            "syllabus": syllabus,
-            "syllabus_chars": total,
+            "syllabus": "",
+            "syllabus_chars": len(syllabus_text),
             "modules": modules,
             "announcements": announcements[:MAX_ANNOUNCEMENTS],
             **self.stamp(warnings),
         }
-        if next_cursor is not None:
-            payload["syllabus_cursor"] = next_cursor
-        if not syllabus:
+        if not syllabus_text:
             payload["syllabus_note"] = "This course has no syllabus page in bCourses."
-        return shrink(payload, BUDGETS["get_course_overview"])
+        payload = shrink(payload, BUDGETS["get_course_overview"])
+        fit_prose(payload, "syllabus", syllabus_text, cursor, max_chars,
+                  BUDGETS["get_course_overview"], cursor_field="syllabus_cursor")
+        return payload
 
     # -- grades ------------------------------------------------------------
 
@@ -842,8 +868,12 @@ class Session:
         deadline = time.monotonic() + budget
         with index.connect() as conn:
             discovered = self._discover_materials(conn, course_id, warnings, refresh=refresh)
-            done, failed, capped = self._extract_pending(conn, course_id, deadline)
+            # An explicit refresh is a student saying "try again", so a page that 503'd
+            # last time is re-requested rather than left failed until Canvas happens to
+            # bump its updated_at.
+            done, failed, capped = self._extract_pending(conn, course_id, deadline, retry_failed=refresh)
             stats = index.course_stats(conn, course_id)
+            still_failing = index.outstanding_failures(conn, course_id)
         if capped:
             warnings.append(
                 f"This course has reached the {index.MAX_COURSE_CHARS // (1024 * 1024)} MB local index limit; "
@@ -858,10 +888,21 @@ class Session:
             "indexed": stats.get("indexed", 0),
             "pending": stats.get("pending", 0),
             "skipped": stats.get("skipped", 0),
-            "failed": failed,
+            # The outstanding total, not this pass's: "failed: 0" while a document is
+            # still broken is how a student concludes their index is complete.
+            "failed": len(still_failing),
+            "failed_this_pass": failed,
             "next": "Call index_course again to continue." if stats.get("pending") else None,
             **self.stamp(warnings),
         }
+        if still_failing:
+            warnings.append(
+                f"{len(still_failing)} material(s) could not be read and are not searchable: "
+                + ", ".join(still_failing[:5])
+                + (" and others" if len(still_failing) > 5 else "")
+                + ". Call index_course again to retry them."
+            )
+            payload.update(self.stamp(warnings))
         payload["message"] = (
             f"Indexed {done} item(s) this pass; {stats.get('indexed', 0)} ready, {stats.get('pending', 0)} left."
         )
@@ -869,8 +910,15 @@ class Session:
 
     def _discover_materials(self, conn: sqlite3.Connection, course_id: str, warnings: list[str], *,
                             refresh: bool) -> int:
-        """Record every material in a course as pending, without downloading anything yet."""
+        """Record every material in a course as pending, without downloading anything yet.
+
+        A listing that succeeded is authoritative about what exists, so anything it does
+        not mention has been removed and is tombstoned. A listing that *failed* says
+        nothing, so nothing is removed on its account — deleting a course's materials
+        because Canvas had a bad minute is a far worse error than keeping one stale page.
+        """
         count = 0
+        seen: dict[str, set[str]] = {}
         try:
             course = self.canvas.course(course_id, refresh=refresh)
             if course.get("syllabus_body"):
@@ -880,6 +928,7 @@ class Session:
                     source_updated_at=str(course.get("updated_at") or ""),
                 )
                 count += 1
+            seen["syllabus"] = {course_id} if course.get("syllabus_body") else set()
         except CanvasError:
             warnings.append("The syllabus could not be read for this course.")
 
@@ -894,18 +943,23 @@ class Session:
             warnings.append("Module structure could not be read; materials will not be grouped by week.")
 
         try:
+            found: set[str] = set()
             for page in self.canvas.pages(course_id, refresh=refresh):
+                slug = str(page.get("url") or "")
                 index.upsert_material(
-                    conn, course_id=course_id, kind="page", canvas_id=str(page.get("url") or ""),
+                    conn, course_id=course_id, kind="page", canvas_id=slug,
                     title=str(page.get("title") or "Untitled"),
                     html_url=str(page.get("html_url") or ""),
                     source_updated_at=str(page.get("updated_at") or ""),
                 )
+                found.add(slug)
                 count += 1
+            seen["page"] = found
         except CanvasError:
             warnings.append("Course pages could not be read.")
 
         try:
+            found = set()
             for record in self.canvas.files(course_id, refresh=refresh):
                 summary = materials.file_summary(record)
                 if not summary["canvas_id"]:
@@ -920,15 +974,25 @@ class Session:
                     html_url=summary["html_url"], content_type=summary["content_type"],
                     size_bytes=summary["size_bytes"], source_updated_at=summary["source_updated_at"],
                 )
+                found.add(summary["canvas_id"])
                 count += 1
+            seen["file"] = found
         except CanvasError:
             warnings.append(
                 "This course does not share its file list with students; only pages and the syllabus were indexed."
             )
+
+        for kind, present in seen.items():
+            removed = index.tombstone_missing(conn, course_id, kind, present)
+            if removed:
+                warnings.append(
+                    f"{removed} {kind}(s) were removed from bCourses since the last index and have been dropped."
+                )
         conn.commit()
         return count
 
-    def _extract_pending(self, conn: sqlite3.Connection, course_id: str, deadline: float) -> tuple[int, int, bool]:
+    def _extract_pending(self, conn: sqlite3.Connection, course_id: str, deadline: float, *,
+                         retry_failed: bool = False) -> tuple[int, int, bool]:
         """Extract pending materials until the time or size budget runs out.
 
         Returns ``(indexed, failed, capped)``. The size cap is per course rather than
@@ -939,7 +1003,7 @@ class Session:
         failed = 0
         stored = index.course_chars(conn, course_id)
 
-        for row in index.pending(conn, course_id):
+        for row in index.pending(conn, course_id, retry_failed=retry_failed):
             if time.monotonic() > deadline:
                 break
             if stored >= index.MAX_COURSE_CHARS:
@@ -1055,6 +1119,10 @@ class Session:
         course_id = self.cfg.require_enabled(course_id)
         package = self.build_package(course_id, topic, mode=mode, assignment_id=assignment_id)
         payload = {**package.to_dict(), "course_id": course_id, **self.stamp()}
+        # The assignment description and rubric live inside `facts`, where `shrink`
+        # cannot see them: it only drops top-level list items. Trim them first, worst
+        # offender at a time, so the rules and evidence survive.
+        _trim_facts(payload, BUDGETS["prepare_study_session"])
         return shrink(payload, BUDGETS["prepare_study_session"])
 
     def build_package(self, course_id: str, topic: str, *, mode: str = "tutor",
@@ -1255,6 +1323,24 @@ class Session:
 
 
 # -- helpers -----------------------------------------------------------------
+
+
+def _trim_facts(payload: dict[str, Any], budget: int, *, floor: int = 400) -> None:
+    """Shrink the nested assignment prose in a study package until it fits its budget."""
+    facts = payload.get("facts")
+    if not isinstance(facts, dict):
+        return
+
+    while len(json.dumps(payload, default=str)) > budget:
+        rubric = facts.get("rubric")
+        description = str(facts.get("description") or "")
+        if isinstance(rubric, list) and len(rubric) > 3:
+            rubric.pop()
+            continue
+        if len(description) > floor:
+            facts["description"] = description[: max(floor, int(len(description) * 0.8))].rstrip() + "..."
+            continue
+        return
 
 
 def _render_material(chunks: list[Any], *, paged: bool) -> tuple[str, Any]:
