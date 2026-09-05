@@ -309,3 +309,31 @@ def test_clear_says_what_it_will_delete_before_doing_it(config, capsys):
 )
 def test_course_nicknames_are_readable(name: str, code: str, expected: str):
     assert cli._nickname(name, code) == expected
+
+
+# -- Windows console -----------------------------------------------------------
+
+
+def test_the_console_is_switched_to_utf8_before_anything_prints(monkeypatch, capsys):
+    """A legacy Windows console is cp1252, and this CLI prints em dashes."""
+    seen: list[dict] = []
+
+    class FakeStream:
+        def reconfigure(self, **kwargs):
+            seen.append(kwargs)
+
+    monkeypatch.setattr(cli.sys, "stdout", FakeStream())
+    monkeypatch.setattr(cli.sys, "stderr", FakeStream())
+    cli._use_utf8()
+
+    assert seen == [{"encoding": "utf-8", "errors": "replace"}] * 2
+
+
+def test_a_stream_that_cannot_be_reconfigured_is_not_fatal(monkeypatch):
+    class Stubborn:
+        def reconfigure(self, **kwargs):
+            raise ValueError("detached")
+
+    monkeypatch.setattr(cli.sys, "stdout", Stubborn())
+    monkeypatch.setattr(cli.sys, "stderr", object())
+    cli._use_utf8()  # must not raise

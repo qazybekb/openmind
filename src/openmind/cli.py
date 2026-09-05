@@ -8,6 +8,7 @@ deletion are separate commands the student runs themselves.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
 import os
@@ -28,6 +29,22 @@ MAX_NICKNAME_LENGTH: Final[int] = 40
 TOKEN_HELP: Final[str] = (
     "Create one in bCourses: Account -> Settings -> Approved Integrations -> + New Access Token."
 )
+
+
+def _use_utf8() -> None:
+    """Make the console tolerate the characters this CLI actually prints.
+
+    A legacy Windows console defaults to cp1252 and raises on an em dash, which would
+    turn a helpful setup message into a traceback. Reconfiguring to UTF-8 with a
+    replacing error handler means the worst case is a substituted character, never a
+    crash mid-setup.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            # A detached or already-closed stream is not worth failing setup over.
+            with contextlib.suppress(ValueError, OSError):
+                reconfigure(encoding="utf-8", errors="replace")
 
 
 def out(message: str = "") -> None:
@@ -518,6 +535,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     """Run the CLI."""
+    _use_utf8()
     logging.basicConfig(level=logging.WARNING, stream=sys.stderr, format="%(levelname)s: %(message)s")
     parser = build_parser()
     args = parser.parse_args(argv)
