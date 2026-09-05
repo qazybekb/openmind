@@ -240,3 +240,31 @@ def test_a_tool_called_without_setup_returns_an_actionable_error(home, monkeypat
     assert result.is_error
     message = " ".join(block.text for block in result.content if hasattr(block, "text"))
     assert "openmind setup" in message
+
+
+# -- public tools ---------------------------------------------------------------
+
+
+def test_the_catalog_tools_work_without_a_canvas_account(home, sample_catalog):
+    """A student can ask what to take next semester before handing over any credential."""
+    from openmind.server import _app, mcp
+
+    _app.close()
+    _app._config = None
+
+    async def run():
+        async with Client(mcp) as client:
+            return (
+                await client.call_tool("search_catalog", {"query": "causal inference", "limit": 2}),
+                await client.call_tool("get_catalog_course", {"subject": "COMPSCI", "number": "189"}),
+                await client.call_tool("list_courses", {}),
+            )
+
+    catalog_result, detail_result, canvas_result = anyio.run(run)
+    _app.close()
+    _app._config = None
+
+    assert not catalog_result.is_error, catalog_result.content[0].text
+    assert not detail_result.is_error, detail_result.content[0].text
+    assert canvas_result.is_error, "Canvas tools must still require setup"
+    assert "openmind setup" in canvas_result.content[0].text

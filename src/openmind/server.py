@@ -81,6 +81,19 @@ class AppContext:
             self._client = CanvasClient(cfg.canvas_url, token, cache=self.cache)
         return Session(cfg, self._client, cache=self.cache)
 
+    def public_session(self) -> Session:
+        """Return a session for the tools that only read public Berkeley data.
+
+        The catalog and the class schedule are public, so a student can ask what to take
+        next semester before deciding to connect a Canvas account at all.
+        """
+        if self._config is None:
+            try:
+                self._config = load_config()
+            except ConfigError:
+                self._config = Config()
+        return Session(self._config, self._client, cache=self.cache)
+
     def close(self) -> None:
         """Drop the Canvas connection and everything cached in memory."""
         if self._client is not None:
@@ -116,6 +129,12 @@ def _session(ctx: Context) -> Session:
         return app.session()
     except (ConfigError, CanvasError) as exc:
         raise ToolError(str(exc)) from exc
+
+
+def _public(ctx: Context) -> Session:
+    """Return a session for a tool that reads only public Berkeley data."""
+    app: AppContext = ctx.request_context.lifespan_context
+    return app.public_session()
 
 
 def _json(payload: dict[str, Any]) -> str:
@@ -334,7 +353,7 @@ def search_catalog(
     prefer courses with known offerings, flag prerequisites you find in descriptions,
     and never claim a course satisfies a requirement.
     """
-    return _guard("search_catalog", lambda: _json(_session(ctx).search_catalog(
+    return _guard("search_catalog", lambda: _json(_public(ctx).search_catalog(
         query=query, subject=subject, level=level, units=units, offered_term=offered_term, limit=limit,
     )))
 
@@ -346,7 +365,7 @@ def get_catalog_course(
     number: Annotated[str, Field(description="Course number, e.g. 189 or 61A.")],
 ) -> str:
     """Get one Berkeley course's full description, units, repeat rules, and known terms."""
-    return _guard("get_catalog_course", lambda: _json(_session(ctx).catalog_course(subject, number)))
+    return _guard("get_catalog_course", lambda: _json(_public(ctx).catalog_course(subject, number)))
 
 
 @mcp.tool(title="Check live offerings", annotations=READ_ONLY, structured_output=False)
@@ -361,7 +380,7 @@ def check_offering(
     term ahead at most, so a future term may not exist yet; the result says when that is
     the case.
     """
-    return _guard("check_offering", lambda: _json(_session(ctx).check_offering(course_code, term)))
+    return _guard("check_offering", lambda: _json(_public(ctx).check_offering(course_code, term)))
 
 
 # -- prompts -------------------------------------------------------------------
@@ -445,7 +464,7 @@ def explain_assignment(course: str, assignment: str) -> str:
 @mcp.prompt(title="Plan next semester's courses")
 def course_planner(interests: str, constraints: str = "", term: str = "") -> str:
     """Course suggestions from the Berkeley catalog, filtered to what is actually offered."""
-    session = _prompt_session()
+    session = _public_prompt_session()
     try:
         current = session.list_courses()
         enrolled = ", ".join(
@@ -504,6 +523,11 @@ def _prompt_session() -> Session:
         return _app.session()
     except (ConfigError, CanvasError) as exc:
         raise ToolError(str(exc)) from exc
+
+
+def _public_prompt_session() -> Session:
+    """Return a prompt session that does not require a Canvas account."""
+    return _app.public_session()
 
 
 def _resolve_course(session: Session, name: str) -> str:

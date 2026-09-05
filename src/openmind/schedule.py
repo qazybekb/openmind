@@ -385,6 +385,21 @@ def term_sort_key(name: str) -> tuple[int, int]:
     return (int(match.group(2)), _SEASON_ORDER.get(match.group(1).lower(), 0))
 
 
+def is_full_semester(name: str) -> bool:
+    """Return whether a term facet is a full semester rather than a summer sub-session.
+
+    The schedule lists "Summer Sessions 2026" alongside its own sub-sessions ("12W",
+    "A: May 26-July 2", …), so counting the umbrella entry would double-count every
+    summer section. Course planning means Fall and Spring.
+    """
+    return term_sort_key(name) != (-1, -1) and "Sessions" not in name
+
+
+def full_semesters(terms: list[Facet]) -> list[Facet]:
+    """Filter a facet list down to full semesters."""
+    return [term for term in terms if is_full_semester(term.name)]
+
+
 def newest_term(terms: list[Facet]) -> Facet | None:
     """Return the latest full semester the schedule publishes.
 
@@ -392,7 +407,7 @@ def newest_term(terms: list[Facet]) -> Facet | None:
     actually sign up for" — and when Spring 2027 appears, it becomes the answer with no
     code change.
     """
-    semesters = [t for t in terms if term_sort_key(t.name) != (-1, -1) and "Sessions" not in t.name]
+    semesters = full_semesters(terms)
     if not semesters:
         return terms[0] if terms else None
     return max(semesters, key=lambda t: term_sort_key(t.name))
@@ -400,8 +415,7 @@ def newest_term(terms: list[Facet]) -> Facet | None:
 
 def sorted_terms(terms: list[Facet]) -> list[Facet]:
     """Return full semesters newest first."""
-    semesters = [t for t in terms if term_sort_key(t.name) != (-1, -1) and "Sessions" not in t.name]
-    return sorted(semesters, key=lambda t: term_sort_key(t.name), reverse=True)
+    return sorted(full_semesters(terms), key=lambda t: term_sort_key(t.name), reverse=True)
 
 
 def find_sections(course_code: str, term_facet: str | None = None, *, client: Any = None,

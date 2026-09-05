@@ -122,13 +122,27 @@ class CourseFacts:
 class Session:
     """One student's read-only view of bCourses, the catalog, and their own index."""
 
-    def __init__(self, cfg: Config, client: CanvasClient, *, cache: TTLCache | None = None,
+    def __init__(self, cfg: Config, client: CanvasClient | None = None, *, cache: TTLCache | None = None,
                  clock: datetime | None = None) -> None:
         self.cfg = cfg
-        self.canvas = client
-        self.cache = cache if cache is not None else client.cache
+        self._client = client
+        self.cache = cache if cache is not None else (client.cache if client else TTLCache())
         self.tz = cfg.time_zone
         self._clock = clock
+
+    @property
+    def canvas(self) -> CanvasClient:
+        """Return the bCourses client, or explain what is missing.
+
+        The catalog and class-schedule tools are public data and work without one, so a
+        student can ask "what should I take next semester" before they have decided to
+        hand over a Canvas token at all.
+        """
+        if self._client is None:
+            raise ServiceError(
+                "That needs your bCourses account. Run `openmind setup` in a terminal, then restart your AI app."
+            )
+        return self._client
 
     # -- basics ------------------------------------------------------------
 

@@ -151,7 +151,7 @@ def current_and_future_terms(terms: list[schedule.Facet], today: date, limit: in
     """
     season = 2 if today.month >= 8 else (1 if today.month >= 6 else 0)
     floor = (today.year, season)
-    upcoming = [term for term in terms if schedule.term_sort_key(term.name) >= floor]
+    upcoming = [term for term in schedule.full_semesters(terms) if schedule.term_sort_key(term.name) >= floor]
     return sorted(upcoming, key=lambda t: schedule.term_sort_key(t.name))[:limit]
 
 
