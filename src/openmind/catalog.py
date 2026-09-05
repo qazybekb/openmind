@@ -24,7 +24,7 @@ import sqlite3
 import tarfile
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from importlib import resources
 from pathlib import Path
 from typing import Any, Final
@@ -222,7 +222,7 @@ def build(path: Path | None = None, *, source_dir: Path | None = None) -> dict[s
             "offerings_as_of": meta.get("offerings_as_of") or ("" if not offerings else date.today().isoformat()),
             "terms_known": json.dumps(meta.get("terms_known") or terms),
             "data_sha256": meta.get("data_sha256") or "",
-            "built_at": datetime.now(timezone.utc).isoformat(),
+            "built_at": datetime.now(UTC).isoformat(),
         }.items():
             conn.execute(
                 "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
@@ -502,12 +502,21 @@ def format_course(conn: sqlite3.Connection, row: sqlite3.Row, *, preview: bool) 
     return course
 
 
+# Berkeley course numbers can carry a letter prefix (C = cross-listed, W = web,
+# N = summer, H = honors), so "INTEGBI C156" is subject INTEGBI, number C156 — not
+# subject "INTEGBI C". Subjects are one to three words ("MEC ENG", "L & S").
+COURSE_CODE = re.compile(
+    r"^\s*([A-Za-z]+(?:[ &/-]+[A-Za-z]+){0,2}?)\s*[- ]?\s*([A-Za-z]{0,2}[0-9][0-9A-Za-z]*)\s*$"
+)
+
+
 def parse_course_code(code: str) -> tuple[str, str] | None:
-    """Split ``"STAT 156"`` or ``"COMPSCI 61A"`` into a subject and number."""
-    match = re.match(r"^\s*([A-Za-z][A-Za-z &/-]*?)\s*[- ]?\s*([0-9][0-9A-Za-z]*)\s*$", code or "")
+    """Split ``"STAT 156"``, ``"COMPSCI 61A"``, or ``"INTEGBI C156"`` into subject and number."""
+    match = COURSE_CODE.match(code or "")
     if not match:
         return None
-    return match.group(1).strip().upper().replace("  ", " "), match.group(2).strip().upper()
+    subject = " ".join(match.group(1).upper().split())
+    return subject, match.group(2).strip().upper()
 
 
 # -- public data updates ------------------------------------------------------
@@ -530,7 +539,7 @@ def _record_check() -> None:
     """Record that an update check just happened."""
     try:
         _stamp_path().parent.mkdir(parents=True, exist_ok=True)
-        _stamp_path().write_text(str(datetime.now(timezone.utc).timestamp()), encoding="utf-8")
+        _stamp_path().write_text(str(datetime.now(UTC).timestamp()), encoding="utf-8")
     except OSError:  # pragma: no cover
         logger.debug("Could not record the data update check time.")
 
@@ -543,7 +552,7 @@ def maybe_update(*, enabled: bool, force: bool = False, path: Path | None = None
     """
     if not enabled:
         return None
-    now = datetime.now(timezone.utc).timestamp()
+    now = datetime.now(UTC).timestamp()
     if not force and now - _last_check() < UPDATE_INTERVAL_S:
         return None
     _record_check()
@@ -606,6 +615,9 @@ def _download_and_rebuild(manifest: dict[str, Any], as_of: str, expected_hash: s
     try:
         _extract_asset(bytes(buffer), staging)
         counts = build(target, source_dir=staging)
+        # Record what was actually verified, not what the archive says about itself.
+        # Trusting the inner manifest would make a mislabelled asset re-download daily.
+        _stamp(target, {"catalog_as_of": as_of, "data_sha256": expected_hash})
     except Exception as exc:
         logger.warning("Could not rebuild the catalog from the downloaded data: %s", type(exc).__name__)
         return None
@@ -613,6 +625,17 @@ def _download_and_rebuild(manifest: dict[str, Any], as_of: str, expected_hash: s
         _remove_tree(staging)
 
     return f"Updated the Berkeley catalog to the {as_of} snapshot ({counts['courses']} courses)."
+
+
+def _stamp(target: Path, values: dict[str, str]) -> None:
+    """Overwrite provenance fields in a built catalog."""
+    with connect(target) as conn:
+        for key, value in values.items():
+            conn.execute(
+                "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+                (key, value),
+            )
+        conn.commit()
 
 
 def _extract_asset(body: bytes, destination: Path) -> None:

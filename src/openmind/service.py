@@ -70,26 +70,36 @@ def shrink(payload: dict[str, Any], budget: int) -> dict[str, Any]:
     list has no way to know it. Dropping whole entries and adding a ``truncated`` note
     keeps the JSON valid and the omission visible.
     """
-    encoded = json.dumps(payload, default=str)
-    if len(encoded) <= budget:
+    if len(json.dumps(payload, default=str)) <= budget:
         return payload
 
     trimmed = dict(payload)
     dropped = 0
+
+    def size_with_note() -> int:
+        """Measure the payload as it will actually be returned, note included."""
+        preview = dict(trimmed)
+        preview["truncated"] = True
+        preview["warnings"] = [*(trimmed.get("warnings") or []), _omission_note(dropped or 1)]
+        return len(json.dumps(preview, default=str))
+
     for key in _LIST_KEYS:
         values = trimmed.get(key)
-        while isinstance(values, list) and values and len(json.dumps(trimmed, default=str)) > budget:
+        while isinstance(values, list) and values and size_with_note() > budget:
             values.pop()
             dropped += 1
-        if len(json.dumps(trimmed, default=str)) <= budget:
+        if size_with_note() <= budget:
             break
 
     if dropped:
-        notes = list(trimmed.get("warnings") or [])
-        notes.append(f"{dropped} more result(s) omitted to stay within the response size limit; narrow the query.")
-        trimmed["warnings"] = notes
+        trimmed["warnings"] = [*(trimmed.get("warnings") or []), _omission_note(dropped)]
         trimmed["truncated"] = True
     return trimmed
+
+
+def _omission_note(dropped: int) -> str:
+    """Say plainly that results were left out, and what to do about it."""
+    return f"{dropped} more result(s) omitted to stay within the response size limit; narrow the query."
 
 
 @dataclass
@@ -876,7 +886,7 @@ class Session:
             size = int(row["size_bytes"] or 0)
             if size and size > materials.MAX_DOWNLOAD_BYTES:
                 return materials.Extraction(
-                    status="skipped", note=f"file is {size // (1024 * 1024)} MB, over the extraction limit"
+                    status="skipped", note=f"file is {materials.human_size(size)}, over the extraction limit"
                 )
             record = self.canvas.file(str(row["canvas_id"]))
             url = str(record.get("url") or "")

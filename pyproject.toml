@@ -36,6 +36,7 @@ dev = [
     "hypothesis",
     "ruff",
     "mcp[cli]>=2.1,<3",
+    "reportlab>=4",
 ]
 
 [project.urls]

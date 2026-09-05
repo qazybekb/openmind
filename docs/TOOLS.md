@@ -1,136 +1,56 @@
-# OpenMind — Tools Reference
+# Tools and prompts
 
-OpenMind uses LLM function calling (tool use) to interact with external services. The LLM decides which tools to call based on the student's question. This document describes all 43 tools.
+OpenMind gives your AI app twelve tools and five prompts. Every tool reads; only
+`index_course` writes anything, and only to a file on your own machine.
 
-## Core Tools (30 — always available)
+Every payload carries `as_of`, `tz`, `partial`, and `warnings[]`. When something could
+not be read, the result says so instead of coming back short — an empty list from
+OpenMind means "nothing is due", never "the request failed".
 
-### Canvas API — 13 tools
+## Tools
 
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `lookup_course_id` | `nickname` (required) | Look up a course ID from a nickname. Exact match first, then substring. |
-| `get_upcoming_assignments` | — | Fetch upcoming assignments across all courses. Filters out calendar events. |
-| `get_course_assignments` | `course_id` (required) | Fetch assignments for a course with submission status. Paginated. |
-| `get_grades` | `course_id` (required) | Get grades/enrollment for a specific course. |
-| `get_all_grades` | — | Get grades for all active courses at once. |
-| `get_assignment_details` | `course_id`, `assignment_id` (both required) | Full assignment details: description, rubric, due date. |
-| `get_assignment_groups` | `course_id` (required) | Assignment group weights for grade calculations. |
-| `get_modules` | `course_id` (required) | Course modules with items. Paginated. |
-| `get_page_content` | `course_id`, `page_url` (both required) | HTML content of a Canvas page. |
-| `get_course_files` | `course_id` (required), `search_term` (optional) | List files with download URLs. Paginated. |
-| `get_announcements` | `course_id` (optional) | Recent announcements for one or all courses. Paginated. |
-| `get_syllabus` | `course_id` (required) | Syllabus body for a course. |
-| `get_discussion_topics` | `course_id` (required) | Discussion topics for a course. Paginated. |
+| Tool | Parameters | Returns |
+|---|---|---|
+| `list_courses` | `refresh` | Your enabled courses: `id`, `name`, `nickname`, `code`, `term`, `ends_human`, `current_score`, `current_grade`, `indexed`. **Call this first** to turn a course name into a `course_id`. |
+| `get_deadlines` | `range` (`today`/`this_week`/`next_7_days`/`2weeks`/`month`), `course_id`, `status` (`open`/`all`/`submitted`/`graded`/`missing`/`undated`), `limit`, `offset`, `refresh` | `overdue[]`, `items[]`, `counts`, `notes[]`, `source`, `next_offset`. Each item has `due_human`, `days`, `priority`, `reason`, `weight_pct`, `est_hours`, `start_by`. |
+| `get_assignment` | `course_id`, `assignment_id`, `max_chars`, `cursor`, `refresh` | Instructions, rubric, due and lock times, points, weight, hour estimate, start-by date, and your submission status. Dates are yours, so extensions are reflected. |
+| `get_course_overview` | `course_id`, `announcements_days`, `max_chars`, `cursor`, `refresh` | Syllabus text, module structure, and recent announcements. |
+| `get_grades` | `course_id`, `refresh` | Your own scores. With a `course_id`: assignment-group breakdown, the last 20 graded items, and how many are still ungraded. |
+| `find_materials` | `course_id`, `query`, `kind`, `limit`, `cursor`, `refresh` | Cited excerpts from an indexed course, or title and module matches from one that is not indexed — which it tells you. |
+| `read_material` | `material_id`, `page`, `cursor` | An indexed document as Markdown with `--- p. N ---` markers. Scanned or unsupported files return one line saying so. |
+| `index_course` | `course_id`, `enable` | Builds (or deletes) a local searchable index of one course's materials. Runs in 20-second passes; call again while `pending` is above zero. |
+| `prepare_study_session` | `course_id`, `topic`, `mode` (`tutor`/`practice`/`explain_assignment`/`weekly_plan`), `assignment_id` | Tutoring rules, a hint ladder, up to four cited excerpts, your course's AI policy, and an opening move. |
+| `search_catalog` | `query`, `subject`, `level`, `units`, `offered_term`, `limit` | Berkeley catalog matches with units, department, description, and the terms each course is known to be offered. |
+| `get_catalog_course` | `subject`, `number` | One course in full: description, units range, repeat rules, cross-listings, known offerings. |
+| `check_offering` | `course_code`, `term` | Live sections from classes.berkeley.edu: times, instructors, seats, instruction mode. One request, cached for a day. |
 
-### Berkeley Campus — 3 tools
+### What the deadline fields mean
 
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `berkeley_events` | `category`, `search`, `featured`, `limit` (all optional) | Live events from events.berkeley.edu JSON API. |
-| `berkeley_library_hours` | `library` (optional) | Current library hours (scraped from lib.berkeley.edu). |
-| `berkeley_study_rooms` | `library` (optional) | LibCal booking links for study rooms. |
+- `priority` — **HIGH**: due within 2 days, or worth 20% or more of the grade. **MED**:
+  due within 5 days. **LOW**: everything else in the window. Anything past due and
+  unsubmitted is listed separately in `overdue[]` and is always HIGH.
+- `weight_pct` — the share of your final grade, computed from the course's assignment
+  group weights. Reported as unknown rather than guessed when Canvas will not say.
+- `est_hours` — a rough estimate from the assignment type, title, and points, with a
+  floor for heavily weighted work. Used to compute `start_by`, not to predict your evening.
+- `start_by` — the last day you can start and still finish at about 2 hours a day.
+  `start_note: "start now"` means that day has already passed.
+- `due_human` — the deadline in your Canvas time zone, formatted for reading. Show it
+  as written; do not recompute it.
 
-### Course Catalog — 3 tools
+## Prompts
 
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `berkeley_course_search` | `query`, `subject`, `level`, `limit` (all optional) | Search 11K courses by keyword, subject, or level. |
-| `berkeley_course_details` | `subject`, `number` (both required) | Full details for a specific course. |
-| `berkeley_list_subjects` | — | List all 240 departments with course counts. |
+| Prompt | Arguments | What it does |
+|---|---|---|
+| `tutor` | `course`, `topic`, `level` | Socratic tutoring on a topic, with excerpts from your own materials. Asks before it tells; climbs a hint ladder rather than handing over answers. `/answer` overrides that. |
+| `practice` | `course`, `topic`, `count` | Retrieval practice: one question at a time, a confidence rating before the reveal, feedback with citations, and a recap of what you missed. |
+| `weekly_plan` | `days`, `course` | A study plan built from your real deadlines, respecting start-by dates and a capacity assumption. |
+| `explain_assignment` | `course`, `assignment` | What the assignment asks, what the rubric rewards, an outline, and a time plan — with no text written for you to submit. |
+| `course_planner` | `interests`, `constraints`, `term` | Course suggestions from the Berkeley catalog, filtered to what is actually offered, with the advisor caveat attached. |
 
-### Student Profile — 3 tools
+## What OpenMind will not do
 
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `get_profile` | — | Read the student's profile. Returns `missing_fields` when incomplete. |
-| `update_profile` | `field`, `value` (both required) | Update a profile field. Used when student shares new info. |
-| `import_resume` | `resume_text`, `parsed_skills` (required), `parsed_experience`, `parsed_projects`, `parsed_education` (optional) | Save structured resume data to profile. |
-
-### PDF & Web — 3 tools
-
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `read_pdf` | `url` (required) | Download a PDF and extract text. SSRF protected. |
-| `web_fetch` | `url` (required) | Fetch a web page. SSRF protected. Redirects PDF to read_pdf. |
-| `web_search` | `query` (required) | Search DuckDuckGo. |
-
-### GPA Calculator — 1 tool
-
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `gpa_calculator` | `target_gpa` (optional) | Calculate current GPA and what-if scenarios for target GPA. |
-
-### Study Guide & Cheatsheet Generator — 2 tools
-
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `generate_study_guide` | `course_name`, `source_material` (required), `scope` (optional) | Generate a 10-25 page teaching-quality study guide PDF. Uses Claude Opus. |
-| `generate_cheatsheet` | `course_name`, `source_material` (required), `scope` (optional) | Generate a 2-page ultra-dense exam cheatsheet PDF. Uses Claude Opus. |
-
-### Reminders — 2 tools
-
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `remind_me` | `message`, `due_at` (required, ISO 8601) | Set a reminder. Delivered via Telegram when due. |
-| `list_reminders` | — | List all pending reminders. |
-
----
-
-## Optional Tools (13 — enabled per integration)
-
-### Obsidian — 3 tools (enable: `openmind setup obsidian`)
-
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `obsidian_read` | `path` (required) | Read a note. Path traversal protected. |
-| `obsidian_write` | `path`, `content` (both required) | Write/update a note. Creates directories. |
-| `obsidian_search` | `query` (required) | Search notes by filename or content (max 20 results). |
-
-### Todoist — 2 tools (enable: `openmind setup todoist`)
-
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `todoist_add_task` | `content` (required), `due_string` (optional) | Create a task with optional due date. |
-| `todoist_list_tasks` | — | List active tasks (max 30). |
-
-### Gmail — 2 tools (enable: `openmind setup gmail`)
-
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `gmail_search` | `query` (required), `max_results` (optional) | Search emails using Gmail syntax. |
-| `gmail_read` | `message_id` (required) | Read full email content by ID. |
-
-### Slack — 3 tools (enable: `openmind setup slack`)
-
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `slack_search` | `query` (required) | Search messages across channels. |
-| `slack_read_channel` | `channel` (required), `limit` (optional) | Read recent messages. Resolves channel names to IDs. |
-| `slack_list_channels` | — | List accessible channels with topics. |
-
-### Google Calendar — 3 tools (enable: `openmind setup calendar`)
-
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `calendar_list_events` | `days_ahead` (optional, default 7) | List upcoming calendar events. |
-| `calendar_add_event` | `title`, `date` (required), `time`, `duration_minutes` (optional) | Create a timed or all-day event. |
-| `calendar_add_deadlines` | `assignments` (required, list) | Bulk-add Canvas deadlines with reminders. |
-
----
-
-## Error Handling
-
-All tools return errors as JSON: `{"error": "description"}`. The LLM receives the error and explains it to the student.
-
-Canvas-specific error mapping:
-- **401** → "Canvas token is invalid or expired. Run: openmind setup"
-- **403** → "Access denied. Check token permissions."
-- **429** → "Rate limit hit. Wait a minute."
-
-## Security
-
-- **SSRF protection** on `web_fetch` and `read_pdf` — blocks localhost, private IPs, validates redirects
-- **Path traversal protection** on Obsidian tools — `is_relative_to()` check before any file I/O
-- **Canvas URL validation** — only `bcourses.berkeley.edu` is allowed
-- **Prompt injection guardrail** — system prompt declares tool results as untrusted data
-- **Sensitive integration gating** — Gmail, Slack, Calendar, Todoist, and Obsidian tools require explicit recent user intent
+There is no tool to submit work, post a discussion reply, send a message, upload a file,
+change a grade, edit a calendar, or fetch an arbitrary URL. The Canvas routes are fixed
+in code, course access is limited to the courses you chose at setup, and grades are
+requested for `self` only.

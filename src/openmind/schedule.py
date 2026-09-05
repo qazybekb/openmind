@@ -293,9 +293,11 @@ def normalise_course_code(code: str) -> str:
 
 
 def subject_of(course_code: str) -> str:
-    """Return the subject part of a course code."""
-    match = re.match(r"^([A-Z][A-Z &/-]*?)\s+[0-9]", normalise_course_code(course_code))
-    return match.group(1).strip() if match else ""
+    """Return the subject part of a course code, or "" when it is not one."""
+    from openmind.catalog import parse_course_code
+
+    parsed = parse_course_code(normalise_course_code(course_code))
+    return parsed[0] if parsed else ""
 
 
 # -- HTTP ----------------------------------------------------------------------

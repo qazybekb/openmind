@@ -28,14 +28,13 @@ from pydantic import Field
 from openmind import __version__
 from openmind.cache import TTLCache
 from openmind.canvas import CanvasClient, CanvasError
+from openmind.catalog import CatalogError
 from openmind.config import Config, ConfigError, load_config
 from openmind.index import IndexError_
 from openmind.materials import MaterialError
-from openmind.pedagogy import MODES
 from openmind.schedule import ScheduleError
 from openmind.secrets import get_token
 from openmind.service import ServiceError, Session
-from openmind.catalog import CatalogError
 
 logger = logging.getLogger("openmind")
 
@@ -128,6 +127,8 @@ def _guard(operation: str, call: Any) -> str:
     """Run an operation and convert every expected failure into a clean tool error."""
     try:
         return call()
+    except ToolError:
+        raise  # already carries a message written for the student
     except (ServiceError, CanvasError, ConfigError, CatalogError, ScheduleError, MaterialError, IndexError_) as exc:
         raise ToolError(str(exc)) from exc
     except Exception as exc:  # pragma: no cover - defensive

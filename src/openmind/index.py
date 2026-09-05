@@ -19,7 +19,7 @@ import stat
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
@@ -236,7 +236,7 @@ def store_chunks(conn: sqlite3.Connection, material_id: int, title: str, chunks:
     conn.execute(
         "UPDATE materials SET status = 'indexed', status_note = NULL, char_count = ?, page_count = ?, "
         "truncated = ?, indexed_at = ? WHERE id = ?",
-        (total, page_count, 1 if truncated else 0, datetime.now(timezone.utc).isoformat(), material_id),
+        (total, page_count, 1 if truncated else 0, datetime.now(UTC).isoformat(), material_id),
     )
     conn.commit()
     return total
@@ -246,7 +246,7 @@ def mark(conn: sqlite3.Connection, material_id: int, status: str, note: str | No
     """Record why a material was skipped or failed, so the student is told rather than left guessing."""
     conn.execute(
         "UPDATE materials SET status = ?, status_note = ?, indexed_at = ? WHERE id = ?",
-        (status, note, datetime.now(timezone.utc).isoformat(), material_id),
+        (status, note, datetime.now(UTC).isoformat(), material_id),
     )
     conn.commit()
 

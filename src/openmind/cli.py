@@ -23,6 +23,7 @@ from openmind.config import CANVAS_URL, Config, ConfigError, config_path, home_d
 
 logger = logging.getLogger(__name__)
 
+MIN_PYTHON: Final[tuple[int, int]] = (3, 11)
 MAX_NICKNAME_LENGTH: Final[int] = 40
 TOKEN_HELP: Final[str] = (
     "Create one in bCourses: Account -> Settings -> Approved Integrations -> + New Access Token."
@@ -251,8 +252,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     out(f"OpenMind {__version__}")
     out(f"Python {sys.version.split()[0]}  ({sys.executable})")
-    if sys.version_info < (3, 11):
-        err("  Python 3.11 or newer is required.")
+    if sys.version_info[:2] < MIN_PYTHON:
+        err(f"  Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]} or newer is required.")
         problems += 1
 
     out(f"Home: {home_dir()}")
@@ -402,10 +403,9 @@ def cmd_clear(args: argparse.Namespace) -> int:
     if args.all:
         targets.extend(["the catalog index", "your config", "your stored bCourses token"])
     out("This will delete: " + ", ".join(targets) + ".")
-    if not args.yes and sys.stdin.isatty():
-        if input("Type 'yes' to continue: ").strip().lower() != "yes":
-            out("Nothing was deleted.")
-            return 0
+    if not args.yes and sys.stdin.isatty() and input("Type 'yes' to continue: ").strip().lower() != "yes":
+        out("Nothing was deleted.")
+        return 0
 
     removed = index.clear_all()
     out("Deleted the course materials index." if removed else "No materials index was present.")

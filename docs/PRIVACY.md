@@ -1,89 +1,100 @@
-# OpenMind — Privacy & Security
+# Privacy
 
-## How OpenMind works
+OpenMind runs on your computer, under your account, with your own bCourses token. This
+document says exactly what that does and does not mean.
 
-OpenMind is a Python CLI that runs on your laptop. It connects to external services to function:
+## What "local" means here, and what it does not
 
-1. **bCourses** (Canvas API) — to read your assignments, grades, files, and announcements
-2. **OpenRouter** — to send your messages to an LLM (Gemini, Claude, GPT-4, etc.) for processing
-3. **Optional integrations** — Gmail, Slack, Google Calendar, Todoist (when you enable them)
+**It means** you hold the credential, the data lives on your machine, and no OpenMind
+server exists to hold either. There is no OpenMind account, no sign-up, no hosted
+service, and nobody at OpenMind can see your courses.
 
-There is no OpenMind server. But your data does leave your machine when you chat — it goes to your chosen LLM provider via OpenRouter.
+**It does not mean the AI is local.** OpenMind is a connector for Claude, Cursor, or
+ChatGPT. When you ask one of those apps a question, it calls OpenMind, gets your course
+data back, and sends that data to its own provider to write the answer. Your deadlines,
+grades, and quoted course material go to whichever AI provider you chose, under their
+privacy policy — not OpenMind's. If that is not acceptable for a particular course, do
+not enable that course.
 
-## What stays on your machine
+No LLM runs inside OpenMind. The server does arithmetic and retrieval; the host model
+does the talking.
 
-| Data | Location | Transmitted? |
-|------|----------|-------------|
-| API tokens (Canvas, OpenRouter, Telegram, Slack, Google) | `~/.openmind/config.json` | **Yes, but only to the service they authenticate with** — never to the LLM as prompt content |
-| Student profile (major, interests, career goals) | `~/.openmind/profile.json` | **Fields are included** in every LLM request as context when present |
-| Resume PDF (if imported) | Your filesystem | **Never** — only extracted text passes through LLM once |
-| Heartbeat state (deadlines, grades, submissions, announcements) | `~/.openmind/state/deadlines.json`, `grades.json`, etc. | **Never** |
-| Email check state | `~/.openmind/state/emails.json` | **Never** |
-| Morning briefing state | `~/.openmind/state/briefing.json` | **Never** |
-| Conversation memory (topic summaries) | `~/.openmind/memory.json` | **Summaries included** in system prompt for context |
-| Reminders | `~/.openmind/reminders.json` | **Never** — checked locally by heartbeat |
-| Generated study guides / cheatsheets | `~/.openmind/study_guides/*.pdf` | **Never** — stored locally |
-| Terminal command history | `~/.openmind/repl_history` | **Never** |
-| Google OAuth tokens | `~/.openmind/gmail/` | **Yes, to Google APIs only** — never to the LLM |
-| Course catalog (11K courses) | Bundled in package | **Never** — searched locally |
+## Every place OpenMind connects to
 
-## What goes to external services
+Four destinations. There is no general web-fetch tool, so there is no fifth.
 
-### On every conversation turn (sent to OpenRouter → your chosen LLM):
-- **System prompt** containing:
-  - Berkeley personality instructions
-  - Your name and course list
-  - Your profile fields: level, major, school, year, expected graduation, interests, career goals, GPA goal, strengths, areas to improve, dream companies, study and learning preferences
-  - Resume-extracted data: skills, experience summaries, project names (if you imported a resume)
-  - Tool definitions (function names and descriptions)
-  - Safety and security rules
-- **Your messages** and the bot's previous responses (last 40 messages)
-- **Tool results** from the current conversation (Canvas data, PDF text, web content, etc.)
+| Destination | When | What is sent |
+|---|---|---|
+| `bcourses.berkeley.edu` | Every tool call that reads course data | Your bCourses token, in an `Authorization` header |
+| The file host bCourses redirects to (currently AWS S3) | Only when a course document is downloaded for indexing or reading | Nothing. The token is **dropped** before the redirect is followed |
+| `raw.githubusercontent.com` / `github.com` | At most once a day, when a catalog tool runs | Nothing about you — a public file request. Turn it off with `openmind config --set data_updates=false` |
+| `classes.berkeley.edu` | Only when `check_offering` is called | The course code you asked about. No token, no identifier |
 
-### When you ask about specific services:
-- **Gmail content** — fetched from Gmail API, then passed to LLM for summarization
-- **Slack messages** — fetched from Slack API, then passed to LLM
-- **Google Calendar events** — fetched from Google Calendar API, then passed to LLM
+Set `data_updates: false` and the GitHub request never happens; the catalog then stays
+at whatever snapshot shipped with your version.
 
-### Sent to bCourses (Canvas API):
-- Your Canvas API token (as Bearer auth header)
-- API requests for assignments, grades, files, modules, announcements
+## What is stored, and where
 
-### Sent to Telegram (if enabled):
-- Bot responses and heartbeat notifications
-- Your Telegram messages
+Everything lives under `~/.openmind/mcp/` (or `$OPENMIND_HOME`).
 
-## What OpenMind can never do
+| File | Contents | When it exists |
+|---|---|---|
+| OS credential store | Your bCourses token | After `openmind setup`. Not a file — macOS Keychain, Windows Credential Manager, or Secret Service |
+| `config.json` (mode 0600) | Enabled course ids and nicknames, your Canvas time zone, your name, preferences | After setup |
+| `index.db` (mode 0600) | Extracted text of course materials, **only for courses you explicitly index** | Only after you run `openmind index` or the `index_course` tool |
+| `catalog.db` | The public Berkeley course catalog | After setup |
+| `data_check` | A timestamp of the last catalog update check | If updates are on |
 
-| Action | Enforced by |
-|--------|------------|
-| Submit assignments | Canvas tools are read-only — no POST/PUT endpoints |
-| Post discussions | No write endpoints exposed |
-| Send or delete emails | Gmail OAuth scoped to `gmail.readonly` |
-| Post to Slack | Slack tools use read-only API methods |
-| Modify grades | No write endpoints |
-| Send data to OpenMind servers | There are no OpenMind servers |
+`token` (mode 0600) appears only if you ran setup with `--allow-file-secrets` on a
+machine with no credential store, and setup prints a warning when it does.
 
-**Exception:** Google Calendar can create events (this is the only write integration).
+## What is not stored, ever
 
-## Security measures
+- **Deadlines and grades.** Fetched live, held in memory for five minutes, gone when the
+  server stops. Nothing about your grades is written to disk.
+- **Conversations.** OpenMind never sees your chat with the AI app, only the tool calls.
+- **Your answers during tutoring.** No learning profile, no progress tracking, no
+  spaced-repetition state.
+- **Telemetry.** No analytics, no crash reporting, no usage counters, no phone-home.
+- **Course materials for courses you did not index.** Nothing is stored by default.
 
-| Measure | Implementation |
-|---------|---------------|
-| SSRF protection | `web.py` blocks localhost, private IPs, non-http schemes, and validates redirect targets |
-| Path traversal | `obsidian.py` checks `is_relative_to()` before any file I/O |
-| Prompt injection | System prompt declares tool results as untrusted data |
-| Sensitive integration gating | `llm.py` blocks Gmail/Slack/Calendar/Todoist/Obsidian tool calls unless recent user messages explicitly ask for them |
-| Canvas URL validation | `config.py` allowlists `bcourses.berkeley.edu` only |
-| File permissions | Config/profile/Google credential files created by OpenMind use owner-only permissions |
-| Atomic writes | Config and profile use temp-file + rename |
-| Token logging | No logger or print statement interpolates stored tokens |
+## Reading your data is opt-in twice
+
+At setup you pick which courses OpenMind may read at all — courses you leave out are
+invisible to every tool. Storing materials on disk is a second, separate choice, made
+per course. `list_courses` shows which courses are indexed.
 
 ## Deleting everything
 
 ```bash
-rm -rf ~/.openmind
-pip uninstall openmind
+openmind clear          # delete the indexed course materials
+openmind clear --all    # also delete the catalog, your config, and your stored token
 ```
 
-This removes all configuration, profile data, tokens, and state.
+Your bCourses account is untouched. To cut access off at the source, delete the access
+token in bCourses: Account → Settings → Approved Integrations.
+
+## What OpenMind cannot do
+
+Read-only is enforced in code, not by convention. There is no tool that submits work,
+posts a reply, sends a message, uploads a file, or writes to your calendar. The Canvas
+routes are a fixed list in `canvas.py`; course ids are checked against your enabled
+courses on every call; grade requests are scoped to `self`; and downloads are checked
+against SSRF rules on every redirect.
+
+Text from your course documents is passed to the AI app as *evidence*, in a labelled
+block marked untrusted. A document that contains instructions cannot change what any
+tool does — the tool surface is fixed before any document is read.
+
+## Questions worth asking
+
+**Is this allowed?** You are using your own access token to read your own courses on
+your own machine, which is what personal access tokens are for. OpenMind never asks for
+anyone else's credentials and never operates a shared service.
+
+**Can my instructor see this?** No. OpenMind makes the same read requests bCourses
+serves to your browser.
+
+**What if I stop using it?** Run `openmind clear --all`, uninstall the package, and
+delete the token in bCourses. Nothing remains anywhere else, because there is nowhere
+else.

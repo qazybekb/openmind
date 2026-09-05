@@ -126,6 +126,15 @@ def is_safe_url(url: str) -> str | None:
     return "Blocked: private and local IP addresses are not allowed." if _is_blocked_ip(ip) else None
 
 
+def human_size(byte_count: int) -> str:
+    """Render a byte count the way a student would read it."""
+    if byte_count >= 1024 * 1024:
+        return f"{byte_count / (1024 * 1024):.0f} MB"
+    if byte_count >= 1024:
+        return f"{byte_count / 1024:.0f} KB"
+    return f"{byte_count} bytes"
+
+
 def _on_canvas(url: str) -> bool:
     """Return whether a URL points at the allowed bCourses host."""
     return (urlparse(url).hostname or "").lower().rstrip(".") in ALLOWED_CANVAS_HOSTS
@@ -167,7 +176,7 @@ def download(url: str, *, token: str | None = None, max_bytes: int = MAX_DOWNLOA
                 declared = response.headers.get("content-length")
                 if declared and declared.isdigit() and int(declared) > max_bytes:
                     raise MaterialError(
-                        f"That file is {int(declared) // (1024 * 1024)} MB, over the {max_bytes // (1024 * 1024)} MB "
+                        f"That file is {human_size(int(declared))}, larger than the {human_size(max_bytes)} "
                         "limit. Open it in bCourses instead."
                     )
 
@@ -176,7 +185,7 @@ def download(url: str, *, token: str | None = None, max_bytes: int = MAX_DOWNLOA
                     buffer.extend(chunk)
                     if len(buffer) > max_bytes:
                         raise MaterialError(
-                            f"That file is larger than the {max_bytes // (1024 * 1024)} MB limit. "
+                            f"That file is larger than the {human_size(max_bytes)} limit. "
                             "Open it in bCourses instead."
                         )
                 return bytes(buffer), response.headers.get("content-type", "").lower(), str(response.url)

@@ -8,13 +8,17 @@ September 5th in Berkeley; printing the UTC date would move it to Saturday and m
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Final
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 logger = logging.getLogger(__name__)
 
-UTC: Final[timezone] = timezone.utc
+# Re-exported so callers convert to UTC through this module rather than reaching
+# for datetime themselves — every timestamp in OpenMind passes through here.
+__all__ = ["UTC", "cal_days", "day_bounds", "due_in", "human", "human_date", "iso", "now",
+           "parse_canvas_dt", "to_local", "week_bounds", "zone"]
+
 FALLBACK_TZ: Final[str] = "America/Los_Angeles"
 
 
