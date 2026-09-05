@@ -249,3 +249,205 @@ def test_doctor_reports_a_stale_entry_pointing_at_another_install(host_dir: Path
 def test_host_status_is_none_for_hosts_without_a_config_file(host_dir: Path):
     assert hosts.status(hosts.find("chatgpt")) is None
     assert hosts.status(hosts.find("claude-code")) is None
+
+
+# -- resolving this install's launcher ---------------------------------------------
+
+
+@pytest.fixture
+def fake_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """An interpreter with an `openmind-mcp` beside it, and nothing useful on PATH."""
+    bin_dir = tmp_path / "install" / "bin"
+    bin_dir.mkdir(parents=True)
+    interpreter = bin_dir / "python"
+    interpreter.write_text("#!/bin/sh\n", encoding="utf-8")
+    interpreter.chmod(0o755)
+    script = bin_dir / "openmind-mcp"
+    script.write_text("#!/bin/sh\nexec python -m openmind.server\n", encoding="utf-8")
+    script.chmod(0o755)
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.setattr(hosts.sys, "executable", str(interpreter))
+    monkeypatch.setattr(hosts.sys, "argv", [str(bin_dir / "openmind")])
+    monkeypatch.setenv("PATH", str(empty))
+    return script
+
+
+@pytest.fixture
+def no_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An interpreter with no launcher anywhere: not beside it, not on PATH."""
+    bin_dir = tmp_path / "bare" / "bin"
+    bin_dir.mkdir(parents=True)
+    interpreter = bin_dir / "python"
+    interpreter.write_text("#!/bin/sh\n", encoding="utf-8")
+    interpreter.chmod(0o755)
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.setattr(hosts.sys, "executable", str(interpreter))
+    monkeypatch.setattr(hosts.sys, "argv", [str(bin_dir / "openmind")])
+    monkeypatch.setenv("PATH", str(empty))
+
+
+def test_the_launcher_is_found_beside_the_interpreter_when_path_is_empty(fake_install: Path):
+    """A host does not inherit PATH, and neither does an IDE terminal."""
+    assert hosts.find_server_script() == fake_install
+    assert hosts.command_line() == str(fake_install)
+
+
+def test_a_symlinked_interpreter_is_not_followed_to_its_target(tmp_path: Path, monkeypatch):
+    """Resolving the venv symlink lands on a base interpreter with no openmind at all."""
+    real_bin = tmp_path / "base" / "bin"
+    real_bin.mkdir(parents=True)
+    (real_bin / "python3").write_text("#!/bin/sh\n", encoding="utf-8")
+    (real_bin / "python3").chmod(0o755)
+
+    venv_bin = tmp_path / "venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    (venv_bin / "python").symlink_to(real_bin / "python3")
+    script = venv_bin / "openmind-mcp"
+    script.write_text("#!/bin/sh\n", encoding="utf-8")
+    script.chmod(0o755)
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.setattr(hosts.sys, "executable", str(venv_bin / "python"))
+    monkeypatch.setattr(hosts.sys, "argv", [str(venv_bin / "openmind")])
+    monkeypatch.setenv("PATH", str(empty))
+
+    assert hosts.find_server_script() == script
+    assert str(real_bin) not in hosts.command_line()
+
+
+def test_a_directory_entry_named_like_the_script_is_not_mistaken_for_it(tmp_path: Path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "python").write_text("#!/bin/sh\n", encoding="utf-8")
+    (bin_dir / "openmind-mcp").mkdir()
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.setattr(hosts.sys, "executable", str(bin_dir / "python"))
+    monkeypatch.setattr(hosts.sys, "argv", [str(bin_dir / "openmind")])
+    monkeypatch.setenv("PATH", str(empty))
+
+    assert hosts.find_server_script() is None
+
+
+def test_a_non_executable_script_is_not_offered_to_a_host(tmp_path: Path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "python").write_text("#!/bin/sh\n", encoding="utf-8")
+    (bin_dir / "openmind-mcp").write_text("#!/bin/sh\n", encoding="utf-8")
+    (bin_dir / "openmind-mcp").chmod(0o644)
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.setattr(hosts.sys, "executable", str(bin_dir / "python"))
+    monkeypatch.setattr(hosts.sys, "argv", [str(bin_dir / "openmind")])
+    monkeypatch.setenv("PATH", str(empty))
+
+    assert hosts.find_server_script() is None
+
+
+def test_the_missing_launcher_error_names_where_it_looked(no_install):
+    with pytest.raises(hosts.HostError) as excinfo:
+        hosts.command_line()
+
+    message = str(excinfo.value)
+    assert "uv tool install openmind-berkeley" in message
+    for directory in hosts.searched_directories():
+        assert str(directory) in message
+
+
+def test_writing_refuses_when_the_launcher_cannot_be_found(host_dir: Path, no_install, capsys):
+    """A config naming a launcher that does not exist fails silently inside the host."""
+    code, _, err = run(["mcp", "--write", "claude-desktop", "--yes"], capsys)
+
+    assert code == 1
+    assert "Could not find the `openmind-mcp` launcher" in err
+    assert not hosts.claude_desktop_path().exists()
+    assert list(host_dir.glob("*.bak")) == []
+
+
+def test_a_refused_write_leaves_an_existing_config_untouched(host_dir: Path, no_install, capsys):
+    before = json.dumps({"mcpServers": {"other": {"command": "/bin/true"}}}, indent=2)
+    hosts.cursor_path().write_text(before, encoding="utf-8")
+
+    code, _, err = run(["mcp", "--write", "cursor", "--yes"], capsys)
+
+    assert code == 1
+    assert "Could not find" in err
+    assert hosts.cursor_path().read_text(encoding="utf-8") == before
+    assert list(host_dir.glob("*.bak")) == []
+
+
+def test_printing_the_snippet_refuses_too_rather_than_naming_a_dead_path(host_dir: Path, no_install, capsys):
+    code, out, err = run(["mcp"], capsys)
+
+    assert code == 1
+    assert "Could not find" in err
+    assert "mcpServers" not in out
+
+
+def test_the_written_command_is_the_sibling_script_not_a_module_fallback(host_dir: Path, fake_install: Path, capsys):
+    """`python -m openmind.server` on a base interpreter cannot import the server."""
+    code, _, _ = run(["mcp", "--write", "claude-desktop", "--yes"], capsys)
+
+    assert code == 0
+    written = json.loads(hosts.claude_desktop_path().read_text(encoding="utf-8"))["mcpServers"]["openmind"]
+    assert written == {"command": str(fake_install)}
+    assert "args" not in written
+
+
+def test_doctor_calls_a_sibling_script_entry_current_even_with_an_empty_path(host_dir: Path, fake_install: Path,
+                                                                            capsys):
+    """The old comparison was against a formatted string, so a correct entry read as stale."""
+    hosts.claude_desktop_path().write_text(
+        json.dumps({"mcpServers": {"openmind": {"command": str(fake_install)}}}), encoding="utf-8"
+    )
+
+    _, out, _ = run(["doctor"], capsys)
+
+    assert "Claude Desktop: configured and current" in out
+
+
+def test_doctor_reports_a_missing_launcher(host_dir: Path, no_install, capsys):
+    code, _, err = run(["doctor"], capsys)
+
+    assert code == 1
+    assert "was not found next to this install" in err
+    assert "uv tool install openmind-berkeley" in err
+
+
+def test_an_entry_reached_by_a_different_but_equivalent_path_is_current(host_dir: Path, fake_install: Path,
+                                                                       tmp_path: Path, capsys):
+    """A symlinked bin directory is the same install, not a stale one."""
+    alias = tmp_path / "alias"
+    alias.symlink_to(fake_install.parent)
+    hosts.claude_desktop_path().write_text(
+        json.dumps({"mcpServers": {"openmind": {"command": str(alias / "openmind-mcp")}}}), encoding="utf-8"
+    )
+
+    _, out, _ = run(["doctor"], capsys)
+
+    assert "configured and current" in out
+
+
+def test_claude_code_registration_uses_the_resolved_script(host_dir: Path, fake_install: Path, monkeypatch, capsys):
+    calls: list[list[str]] = []
+
+    class Result:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "/usr/local/bin/claude")
+    import subprocess
+
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: calls.append(cmd) or Result())
+
+    run(["mcp", "--write", "claude-code", "--yes"], capsys)
+
+    assert calls[0][-1] == str(fake_install)

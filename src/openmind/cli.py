@@ -217,13 +217,22 @@ def _index_courses(cfg: Config, client: CanvasClient, course_ids: list[str]) -> 
 
 def _server_path() -> str:
     """Return the command that launches the MCP server, as a shell would spell it."""
-    return hosts.command_line()
+    try:
+        return hosts.command_line()
+    except hosts.HostError:
+        return "not found — see the AI app configuration section below"
 
 
-def _print_host_config() -> None:
+def _print_host_config() -> int:
     """Print copy-paste config for each supported AI host. No secrets appear here."""
-    snippet = json.dumps({"mcpServers": {hosts.ENTRY_NAME: hosts.entry()}}, indent=2)
-    command = hosts.command_line()
+    try:
+        snippet = json.dumps({"mcpServers": {hosts.ENTRY_NAME: hosts.entry()}}, indent=2)
+        command = hosts.command_line()
+    except hosts.HostError as exc:
+        # A snippet naming a launcher that does not exist is worse than no snippet: the
+        # host would accept it and then fail silently at startup.
+        err(str(exc))
+        return 1
 
     out("Connect OpenMind to your AI app")
     out("=" * 32)
@@ -247,6 +256,7 @@ def _print_host_config() -> None:
     out("  openmind mcp --write claude-code")
     out("")
     out('Then restart the app and ask: "what\'s due this week?"')
+    return 0
 
 
 def _confirm(question: str, *, assume_yes: bool) -> bool:
@@ -267,12 +277,18 @@ def _write_host_config(key: str, *, assume_yes: bool) -> int:
         err(str(exc))
         return 1
 
+    try:
+        command = hosts.command_line()
+    except hosts.HostError as exc:
+        err(str(exc))
+        return 1
+
     if key == "claude-code":
-        return _write_claude_code(assume_yes=assume_yes)
+        return _write_claude_code(command, assume_yes=assume_yes)
     if not host.writable:
         out(f"{host.label} has no config file to write. Add it in the app:")
         out(f"  {host.note}")
-        out(f"  Command: {hosts.command_line()}")
+        out(f"  Command: {command}")
         return 0
 
     assert host.path is not None
@@ -309,9 +325,9 @@ def _write_host_config(key: str, *, assume_yes: bool) -> int:
     return 0
 
 
-def _write_claude_code(*, assume_yes: bool) -> int:
+def _write_claude_code(server_command: str, *, assume_yes: bool) -> int:
     """Register the server with Claude Code, which owns its own config."""
-    command = ["claude", "mcp", "add", "--scope", "user", hosts.ENTRY_NAME, "--", *hosts.command_line().split(" ")]
+    command = ["claude", "mcp", "add", "--scope", "user", hosts.ENTRY_NAME, "--", *server_command.split(" ")]
     printable = " ".join(command)
 
     if shutil.which("claude") is None:
@@ -340,8 +356,7 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     """Print host configuration snippets, or write one for the student."""
     if args.write:
         return _write_host_config(args.write, assume_yes=args.yes)
-    _print_host_config()
-    return 0
+    return _print_host_config()
 
 
 # -- doctor --------------------------------------------------------------------
@@ -364,6 +379,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     # Reported before the bCourses checks: this half is about the AI app, and it is
     # worth seeing even when setup has not been run yet.
+    if hosts.find_server_script() is None:
+        err("Launcher: `openmind-mcp` was not found next to this install.")
+        for directory in hosts.searched_directories():
+            err(f"  looked in {directory}")
+        err("  Reinstall with `uv tool install openmind-berkeley` so AI apps have something to run.")
+        problems += 1
+
     out("AI app configuration:")
     for host in hosts.hosts():
         report = hosts.status(host)

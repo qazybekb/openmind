@@ -13,6 +13,7 @@ replaced, and backed up first.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -46,16 +47,67 @@ class Host:
         return self.path is not None
 
 
-def server_command() -> tuple[str, list[str]]:
-    """Return the command and arguments that launch the MCP server.
+SCRIPT_NAMES: Final[tuple[str, ...]] = (
+    ("openmind-mcp.exe", "openmind-mcp") if os.name == "nt" else ("openmind-mcp",)
+)
 
-    Prefers the installed ``openmind-mcp`` console script, because a host does not
-    inherit the shell's PATH and needs an absolute path it can execute directly.
+
+def searched_directories() -> list[Path]:
+    """Return the directories checked for this install's ``openmind-mcp``, in order.
+
+    ``sys.executable`` is deliberately **not** resolved. In a virtualenv it is a symlink
+    to a base interpreter that usually has no ``openmind`` installed at all; following it
+    is how the old code ended up writing a launch command that could not import the
+    server.
     """
-    found = shutil.which("openmind-mcp")
-    if found:
-        return str(Path(found).resolve()), []
-    return str(Path(sys.executable).resolve()), ["-m", "openmind.server"]
+    directories: list[Path] = [Path(sys.executable).parent]
+    if sys.argv and sys.argv[0]:
+        with contextlib.suppress(OSError):  # an unresolvable argv[0] is not worth failing over
+            directories.append(Path(sys.argv[0]).resolve().parent)
+    seen: list[Path] = []
+    for directory in directories:
+        if directory not in seen:
+            seen.append(directory)
+    return seen
+
+
+def find_server_script() -> Path | None:
+    """Return this install's ``openmind-mcp``, or ``None`` when it cannot be found.
+
+    A host does not inherit the shell's PATH, so it needs an absolute path to an
+    executable. Looking beside the running interpreter finds the right one even when
+    OpenMind was launched by absolute path from a terminal that has never seen its bin
+    directory; PATH is only the last resort.
+    """
+    for directory in searched_directories():
+        for name in SCRIPT_NAMES:
+            candidate = directory / name
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return candidate
+    for name in SCRIPT_NAMES:
+        found = shutil.which(name)
+        if found:
+            return Path(found)
+    return None
+
+
+def server_script() -> Path:
+    """Return this install's ``openmind-mcp``, or explain where it was looked for."""
+    script = find_server_script()
+    if script is not None:
+        return script
+    places = "\n  ".join(str(directory) for directory in searched_directories())
+    raise HostError(
+        "Could not find the `openmind-mcp` launcher for this install. Looked in:\n  "
+        f"{places}\n  and on your PATH.\n"
+        "Install OpenMind so the launcher exists, then run this again:\n"
+        "  uv tool install openmind-berkeley   (or: pipx install openmind-berkeley)"
+    )
+
+
+def server_command() -> tuple[str, list[str]]:
+    """Return the command and arguments that launch the MCP server."""
+    return str(server_script()), []
 
 
 def entry() -> dict[str, Any]:
@@ -68,6 +120,21 @@ def command_line() -> str:
     """Return the launch command as a shell would spell it."""
     command, args = server_command()
     return " ".join([command, *args])
+
+
+def same_script(command: str) -> bool:
+    """Return whether a host entry's command is this install's launcher.
+
+    Both sides are resolved before comparing, so a symlinked bin directory or a
+    ``/private`` prefix on macOS does not read as a different install.
+    """
+    script = find_server_script()
+    if script is None or not command:
+        return False
+    try:
+        return Path(command.split(" ")[0]).resolve() == script.resolve()
+    except OSError:  # pragma: no cover - unresolvable path in a config
+        return False
 
 
 def _override_dir() -> Path | None:
@@ -101,12 +168,24 @@ def cursor_path() -> Path:
     return Path.home() / ".cursor" / "mcp.json"
 
 
+def _command_or_placeholder() -> str:
+    """Return the launch command, or a placeholder when the launcher is missing.
+
+    `hosts()` describes what is possible; it must not raise just because this install is
+    incomplete. The refusal belongs at the point of writing.
+    """
+    try:
+        return command_line()
+    except HostError:
+        return "<path to openmind-mcp>"
+
+
 def hosts() -> list[Host]:
     """Return every supported host, in the order the CLI presents them."""
     return [
         Host("claude-desktop", "Claude Desktop", claude_desktop_path(), "mcpServers"),
         Host("claude-code", "Claude Code", None, None,
-             note=f"claude mcp add --scope user {ENTRY_NAME} -- {command_line()}"),
+             note=f"claude mcp add --scope user {ENTRY_NAME} -- {_command_or_placeholder()}"),
         Host("cursor", "Cursor", cursor_path(), "mcpServers"),
         Host("chatgpt", "ChatGPT desktop", None, None,
              note="Add a local (STDIO) MCP server in the app's settings with the command above."),
@@ -213,7 +292,7 @@ class Status:
         if not self.current:
             return (
                 f"{self.host.label}: entry points at {self.command}, but this install is "
-                f"{command_line()} — run `openmind mcp --write {self.host.key}` to update it"
+                f"{_command_or_placeholder()} — run `openmind mcp --write {self.host.key}` to update it"
             )
         return f"{self.host.label}: configured and current"
 
@@ -245,6 +324,6 @@ def status(host: Host) -> Status | None:
             command = " ".join([str(found.get("command") or ""), *(str(a) for a in found.get("args") or [])]).strip()
             executable = Path(str(found.get("command") or ""))
             runnable = executable.exists() and os.access(executable, os.X_OK)
-            current = command == command_line()
+            current = same_script(command)
 
     return Status(host, exists=exists, configured=configured, command=command, runnable=runnable, current=current)
