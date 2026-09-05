@@ -18,7 +18,7 @@ from getpass import getpass
 from pathlib import Path
 from typing import Any, Final
 
-from openmind import __version__, catalog, index, secrets
+from openmind import __version__, catalog, hosts, index, secrets
 from openmind.canvas import CanvasClient, CanvasError
 from openmind.config import CANVAS_URL, Config, ConfigError, config_path, home_dir, load_config
 
@@ -212,49 +212,130 @@ def _index_courses(cfg: Config, client: CanvasClient, course_ids: list[str]) -> 
 
 
 def _server_path() -> str:
-    """Return the absolute path of the `openmind-mcp` launcher for a host config."""
-    found = shutil.which("openmind-mcp")
-    if found:
-        return str(Path(found).resolve())
-    return f"{Path(sys.executable).resolve()} -m openmind.server"
+    """Return the command that launches the MCP server, as a shell would spell it."""
+    return hosts.command_line()
 
 
 def _print_host_config() -> None:
     """Print copy-paste config for each supported AI host. No secrets appear here."""
-    command = _server_path()
-    parts = command.split(" -m ")
-    if len(parts) == 2:
-        json_entry: dict[str, Any] = {"command": parts[0], "args": ["-m", parts[1]]}
-        cli_command = f"{parts[0]} -m {parts[1]}"
-    else:
-        json_entry = {"command": command}
-        cli_command = command
-
-    snippet = json.dumps({"mcpServers": {"openmind": json_entry}}, indent=2)
+    snippet = json.dumps({"mcpServers": {hosts.ENTRY_NAME: hosts.entry()}}, indent=2)
+    command = hosts.command_line()
 
     out("Connect OpenMind to your AI app")
     out("=" * 32)
     out("")
     out("Claude Desktop — add this to claude_desktop_config.json, then restart Claude:")
-    out("  macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json")
-    out("  Windows: %APPDATA%\\Claude\\claude_desktop_config.json")
+    out(f"  {hosts.claude_desktop_path()}")
     out("")
     out(snippet)
     out("")
     out("Claude Code — run:")
-    out(f"  claude mcp add --scope user openmind -- {cli_command}")
+    out(f"  claude mcp add --scope user {hosts.ENTRY_NAME} -- {command}")
     out("")
-    out("Cursor — add the same JSON block to ~/.cursor/mcp.json")
+    out(f"Cursor — add the same JSON block to {hosts.cursor_path()}")
     out("")
     out("ChatGPT desktop — add a local (STDIO) MCP server with this command:")
-    out(f"  {cli_command}")
+    out(f"  {command}")
+    out("")
+    out("Or let OpenMind write it for you:")
+    out("  openmind mcp --write claude-desktop")
+    out("  openmind mcp --write cursor")
+    out("  openmind mcp --write claude-code")
     out("")
     out('Then restart the app and ask: "what\'s due this week?"')
 
 
+def _confirm(question: str, *, assume_yes: bool) -> bool:
+    """Ask a yes/no question, unless the student already said yes on the command line."""
+    if assume_yes:
+        return True
+    if not sys.stdin.isatty():
+        err("Refusing to create a file without confirmation. Re-run with --yes.")
+        return False
+    return input(f"{question} [y/N]: ").strip().lower() in {"y", "yes"}
+
+
+def _write_host_config(key: str, *, assume_yes: bool) -> int:
+    """Merge OpenMind's entry into one host's config file."""
+    try:
+        host = hosts.find(key)
+    except hosts.HostError as exc:
+        err(str(exc))
+        return 1
+
+    if key == "claude-code":
+        return _write_claude_code(assume_yes=assume_yes)
+    if not host.writable:
+        out(f"{host.label} has no config file to write. Add it in the app:")
+        out(f"  {host.note}")
+        out(f"  Command: {hosts.command_line()}")
+        return 0
+
+    assert host.path is not None
+    try:
+        before = hosts.read_config(host.path)
+    except hosts.HostError as exc:
+        err(str(exc))
+        return 1
+
+    if not host.path.exists() and not _confirm(f"Create {host.path}?", assume_yes=assume_yes):
+        out("Nothing was written.")
+        return 1
+
+    try:
+        after, change = hosts.merge(host, before)
+    except hosts.HostError as exc:
+        err(str(exc))
+        return 1
+
+    if change == "unchanged":
+        out(f"{host.label} already points at this install. Nothing to do.")
+        return 0
+
+    if host.path.exists():
+        backup = hosts.back_up(host.path)
+        out(f"Backed up {host.path.name} to {backup.name}")
+
+    hosts.write_config(host.path, after)
+    out(f"{change.capitalize()} the openmind entry in {host.path}")
+    for line in hosts.diff(before, after):
+        out(f"  {line}")
+    out("")
+    out(f"Restart {host.label} completely, then ask: what's due this week?")
+    return 0
+
+
+def _write_claude_code(*, assume_yes: bool) -> int:
+    """Register the server with Claude Code, which owns its own config."""
+    command = ["claude", "mcp", "add", "--scope", "user", hosts.ENTRY_NAME, "--", *hosts.command_line().split(" ")]
+    printable = " ".join(command)
+
+    if shutil.which("claude") is None:
+        out("The `claude` command is not on your PATH. Once Claude Code is installed, run:")
+        out(f"  {printable}")
+        return 0
+    if not _confirm(f"Run: {printable}?", assume_yes=assume_yes):
+        out("Nothing was run. The command above registers OpenMind with Claude Code.")
+        return 1
+
+    import subprocess
+
+    result = subprocess.run(command, capture_output=True, text=True)
+    for line in (result.stdout or "").splitlines():
+        out(line)
+    for line in (result.stderr or "").splitlines():
+        err(line)
+    if result.returncode != 0:
+        err(f"`claude mcp add` exited {result.returncode}.")
+        return result.returncode
+    out("Registered with Claude Code.")
+    return 0
+
+
 def cmd_mcp(args: argparse.Namespace) -> int:
-    """Print host configuration snippets."""
-    del args
+    """Print host configuration snippets, or write one for the student."""
+    if args.write:
+        return _write_host_config(args.write, assume_yes=args.yes)
     _print_host_config()
     return 0
 
@@ -275,6 +356,19 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     out(f"Home: {home_dir()}")
     out(f"Credential store: {secrets.backend_name()}")
+    out(f"Server command: {_server_path()}")
+
+    # Reported before the bCourses checks: this half is about the AI app, and it is
+    # worth seeing even when setup has not been run yet.
+    out("AI app configuration:")
+    for host in hosts.hosts():
+        report = hosts.status(host)
+        if report is None:
+            out(f"  {host.label}: configured inside the app, not in a file")
+            continue
+        out(f"  {report.describe()}")
+        if not report.healthy:
+            problems += 1
 
     try:
         cfg = load_config(required=True)
@@ -341,7 +435,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         problems += 1
 
     out(f"Public data updates: {'on' if cfg.data_updates else 'off'}")
-    out(f"Server command: {_server_path()}")
+
 
     out("")
     if problems:
@@ -512,6 +606,9 @@ def build_parser() -> argparse.ArgumentParser:
     setup.set_defaults(func=cmd_setup)
 
     server = subparsers.add_parser("mcp", help="print config snippets for Claude, Cursor, and ChatGPT")
+    server.add_argument("--write", choices=[host.key for host in hosts.hosts()],
+                        help="write the entry into that app's config instead of printing it")
+    server.add_argument("--yes", action="store_true", help="do not ask before creating a file or running a command")
     server.set_defaults(func=cmd_mcp)
 
     doctor = subparsers.add_parser("doctor", help="check the setup end to end")

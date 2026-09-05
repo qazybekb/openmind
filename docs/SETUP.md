@@ -89,6 +89,16 @@ openmind mcp
 This prints copy-paste configuration for each supported app, with the absolute path of
 the server. Nothing secret appears in it — the token stays in your credential store.
 
+Or let OpenMind write the config for you:
+
+```bash
+openmind mcp --write claude-desktop     # or: cursor, claude-code
+```
+
+It backs up the existing file first, merges the `openmind` entry without touching any
+other server you have configured, and prints the diff. It will not create a config file
+that does not exist unless you add `--yes`.
+
 ### Claude Desktop
 
 Open `claude_desktop_config.json`:

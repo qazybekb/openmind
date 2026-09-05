@@ -82,7 +82,7 @@ def test_setup_stores_courses_and_prints_host_config(home: Path, canvas, monkeyp
     assert "Connected as Test Student" in out
     assert "claude_desktop_config.json" in out
     assert "claude mcp add" in out
-    assert "~/.cursor/mcp.json" in out
+    assert "cursor" in out.lower() and "mcp.json" in out
     assert "ChatGPT desktop" in out
 
 

@@ -244,6 +244,18 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return target
 
 
+@pytest.fixture(autouse=True)
+def isolated_host_configs(tmp_path_factory, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Keep every test away from the developer's real Claude and Cursor configs.
+
+    Autouse and unconditional: `openmind doctor` reads these paths, so without this a
+    test outcome would depend on whether the machine running it happens to use Claude.
+    """
+    target = tmp_path_factory.mktemp("hostconfig")
+    monkeypatch.setenv("OPENMIND_HOST_CONFIG_DIR", str(target))
+    return target
+
+
 @pytest.fixture
 def config(home: Path) -> Config:
     """A config sharing the two synthetic courses."""
