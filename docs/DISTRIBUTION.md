@@ -53,7 +53,7 @@ python -m twine upload dist/*
 git tag v2.0.0 && git push --tags
 ```
 
-Before tagging, run through [the acceptance checklist](#acceptance) below.
+Before tagging, run through [docs/ACCEPTANCE.md](ACCEPTANCE.md) — the manual checks that need a real host and a real account — and the summary below.
 
 ## Data releases are separate from code releases
 
