@@ -180,12 +180,23 @@ class Session:
         return now(self.tz)
 
     def stamp(self, warnings: list[str] | None = None, *, partial: bool = False) -> dict[str, Any]:
-        """Return the provenance fields every payload carries."""
+        """Return the provenance fields every payload carries.
+
+        A list that stopped at the client's page limit is folded in here rather than at
+        each call site, because the failure it guards against — a short list read as the
+        whole set — applies to every payload built from one.
+        """
+        notes = list(warnings or [])
+        if self._client is not None and self._client.incomplete:
+            notes.append(
+                f"bCourses returned more pages than OpenMind reads in one go for "
+                f"{len(self._client.incomplete)} request(s); some records are missing from this answer."
+            )
         return {
             "as_of": iso(self.now()),
             "tz": self.tz,
-            "partial": partial or bool(warnings),
-            "warnings": warnings or [],
+            "partial": partial or bool(notes),
+            "warnings": notes,
         }
 
     # -- courses -----------------------------------------------------------
@@ -831,8 +842,13 @@ class Session:
         deadline = time.monotonic() + budget
         with index.connect() as conn:
             discovered = self._discover_materials(conn, course_id, warnings, refresh=refresh)
-            done, failed = self._extract_pending(conn, course_id, deadline)
+            done, failed, capped = self._extract_pending(conn, course_id, deadline)
             stats = index.course_stats(conn, course_id)
+        if capped:
+            warnings.append(
+                f"This course has reached the {index.MAX_COURSE_CHARS // (1024 * 1024)} MB local index limit; "
+                "the remaining files were left unindexed."
+            )
 
         payload = {
             "course_id": course_id,
@@ -912,13 +928,22 @@ class Session:
         conn.commit()
         return count
 
-    def _extract_pending(self, conn: sqlite3.Connection, course_id: str, deadline: float) -> tuple[int, int]:
-        """Extract pending materials until the time budget runs out."""
+    def _extract_pending(self, conn: sqlite3.Connection, course_id: str, deadline: float) -> tuple[int, int, bool]:
+        """Extract pending materials until the time or size budget runs out.
+
+        Returns ``(indexed, failed, capped)``. The size cap is per course rather than
+        per file: a hundred readable PDFs are as capable of filling a laptop as one
+        pathological one.
+        """
         done = 0
         failed = 0
+        stored = index.course_chars(conn, course_id)
+
         for row in index.pending(conn, course_id):
             if time.monotonic() > deadline:
                 break
+            if stored >= index.MAX_COURSE_CHARS:
+                return done, failed, True
             material_id = int(row["id"])
             kind = str(row["kind"])
             title = str(row["title"])
@@ -933,10 +958,10 @@ class Session:
                 index.mark(conn, material_id, "skipped", note)
                 continue
             chunks = materials.chunk_pages(extraction.pages, slides=_is_slides(title, str(row["content_type"] or "")))
-            index.store_chunks(conn, material_id, title, chunks, page_count=extraction.page_count,
-                               truncated=extraction.truncated)
+            stored += index.store_chunks(conn, material_id, title, chunks, page_count=extraction.page_count,
+                                         truncated=extraction.truncated)
             done += 1
-        return done, failed
+        return done, failed, stored >= index.MAX_COURSE_CHARS
 
     def _extract_one(self, course_id: str, kind: str, row: sqlite3.Row) -> materials.Extraction | None:
         """Fetch and extract one material."""

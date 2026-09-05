@@ -284,6 +284,15 @@ def last_indexed_at(conn: sqlite3.Connection, course_id: str) -> str | None:
     return str(row[0]) if row and row[0] else None
 
 
+def course_chars(conn: sqlite3.Connection, course_id: str) -> int:
+    """Return how many characters of this course's materials are already stored."""
+    row = conn.execute(
+        "SELECT COALESCE(SUM(char_count), 0) FROM materials WHERE course_id = ? AND status = 'indexed'",
+        (course_id,),
+    ).fetchone()
+    return int(row[0] or 0)
+
+
 def indexed_courses(conn: sqlite3.Connection) -> list[str]:
     """Return course ids that have at least one indexed material."""
     return [str(row["course_id"]) for row in conn.execute(

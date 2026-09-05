@@ -26,6 +26,7 @@ TIMEOUT_S: Final[float] = 30.0
 DEFAULT_PAGE_SIZE: Final[str] = "100"
 MAX_PAGES: Final[int] = 20
 RETRY_AFTER_S: Final[float] = 2.0
+API_PREFIX: Final[str] = "/api/v1/"
 
 JsonList = list[dict[str, Any]]
 Params = Mapping[str, str | int | Sequence[str]]
@@ -96,6 +97,9 @@ class CanvasClient:
         self.base_url = base_url.rstrip("/")
         self._token = token
         self.cache = cache if cache is not None else TTLCache()
+        # Routes whose last read stopped at the page limit, so the service layer can
+        # mark the payload partial rather than presenting a short list as the whole set.
+        self.incomplete: set[str] = set()
         self._client = httpx.Client(
             base_url=f"{self.base_url}/api/v1",
             headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
@@ -156,8 +160,9 @@ class CanvasClient:
         merged = dict(params or {})
         merged.setdefault("per_page", DEFAULT_PAGE_SIZE)
         items: JsonList = []
+        complete = True
         response = self._request(path, merged)
-        for _ in range(max_pages):
+        for page in range(max_pages):
             payload = response.json()
             if not isinstance(payload, list):
                 raise CanvasError("bCourses returned an unexpected response for a list endpoint.")
@@ -165,10 +170,25 @@ class CanvasClient:
             next_url = _next_link(response.headers.get("link", ""))
             if not next_url:
                 break
+            if page + 1 >= max_pages:
+                # Stop before spending a request we would only discard, and remember
+                # that the answer is short: a capped list cached as complete is how a
+                # student ends up being told about half their assignments.
+                logger.warning("Stopping at the %d-page limit for %s; more results exist.", max_pages, path)
+                complete = False
+                break
             response = self._request(next_url, None, absolute=True)
 
         self.cache.set(key, items, ttl)
+        if not complete:
+            self.incomplete.add(key)
+        else:
+            self.incomplete.discard(key)
         return items
+
+    def was_truncated(self, path: str, params: Params | None = None) -> bool:
+        """Return whether the last paginated read of this route hit the page limit."""
+        return make_key("paged:" + path, dict(params or {})) in self.incomplete
 
     # -- fixed routes ------------------------------------------------------
 
@@ -295,14 +315,33 @@ class CanvasClient:
         )
 
 
+def is_safe_hop(url: str) -> str | None:
+    """Return why a pagination or redirect target is unsafe, or ``None`` when it is fine.
+
+    The Bearer token rides on every hop, so a hop is only followed when it is HTTPS, on
+    bCourses, and under ``/api/v1/``. Checking the hostname alone let a ``Link:`` header
+    naming ``http://bcourses.berkeley.edu/...`` downgrade the connection and put the
+    token on the wire in the clear.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme.lower() != "https":
+        return f"scheme {parsed.scheme or 'none'!r} would send the token unencrypted"
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if host not in ALLOWED_CANVAS_HOSTS:
+        return f"host {host or 'none'!r} is not bCourses"
+    if not parsed.path.startswith(API_PREFIX):
+        return f"path {parsed.path!r} is outside {API_PREFIX}"
+    return None
+
+
 def _next_link(header: str) -> str | None:
-    """Extract the ``rel="next"`` URL from a Canvas Link header."""
+    """Extract the ``rel="next"`` URL from a Canvas Link header, when it is safe to follow."""
     for part in header.split(","):
         if 'rel="next"' in part:
             url = part.split(";")[0].strip().strip("<>")
-            host = (urlparse(url).hostname or "").lower().rstrip(".")
-            if host not in ALLOWED_CANVAS_HOSTS:
-                logger.warning("Ignoring pagination link pointing off bCourses.")
+            problem = is_safe_hop(url)
+            if problem is not None:
+                logger.warning("Ignoring pagination link: %s.", problem)
                 return None
             return url
     return None

@@ -32,6 +32,9 @@ MAX_DOWNLOAD_BYTES: Final[int] = 25 * 1024 * 1024
 MAX_PAGES: Final[int] = 400
 MAX_CHARS: Final[int] = 400_000
 MAX_SECONDS: Final[float] = 20.0
+# One zip member may expand to at most this much; the whole document to MAX_CHARS.
+MAX_MEMBER_BYTES: Final[int] = 64 * 1024 * 1024
+_ZIP_BLOCK: Final[int] = 256 * 1024
 MAX_REDIRECTS: Final[int] = 5
 DOWNLOAD_TIMEOUT_S: Final[float] = 60.0
 
@@ -262,6 +265,7 @@ def extract_pdf(body: bytes) -> Extraction:
                 return Extraction(status="skipped", note="the PDF is password protected")
         raw_pages: list[str] = []
         empty = 0
+        characters = 0
         for number, page in enumerate(reader.pages):
             if number >= MAX_PAGES or time.monotonic() - started > MAX_SECONDS:
                 return _finish_pdf(raw_pages, empty, truncated=True)
@@ -272,6 +276,11 @@ def extract_pdf(body: bytes) -> Extraction:
             if not text:
                 empty += 1
             raw_pages.append(text)
+            characters += len(text)
+            # Checked after the page as well: one pathological page can outlast the
+            # whole budget on its own, and a pre-loop check would never notice.
+            if characters >= MAX_CHARS or time.monotonic() - started > MAX_SECONDS:
+                return _finish_pdf(raw_pages, empty, truncated=True)
     except PdfReadError as exc:
         logger.debug("PDF could not be parsed: %s", exc)
         return Extraction(status="failed", note="the PDF could not be read")
@@ -330,23 +339,59 @@ _PPTX_NS: Final[str] = "{http://schemas.openxmlformats.org/drawingml/2006/main}t
 _DOCX_NS: Final[str] = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
+class _ExpansionLimit(Exception):
+    """A zip member expanded past what we are willing to hold in memory."""
+
+
+def read_member(archive: zipfile.ZipFile, name: str, budget: int) -> bytes:
+    """Read one zip member, refusing to decompress more than *budget* bytes.
+
+    ``ZipFile.read`` decompresses the whole member before returning it, so a 600-byte
+    archive can become hundreds of megabytes in memory. Streaming with a hard cap means
+    a malformed or hostile deck costs a bounded amount of work either way.
+    """
+    collected = bytearray()
+    with archive.open(name) as stream:
+        while True:
+            block = stream.read(_ZIP_BLOCK)
+            if not block:
+                break
+            collected.extend(block)
+            if len(collected) > budget:
+                raise _ExpansionLimit(name)
+    return bytes(collected)
+
+
 def extract_pptx(body: bytes) -> Extraction:
     """Extract slide text from a .pptx, one page per slide."""
     names: list[str] = []
     pages: list[str] = []
+    truncated = False
     try:
         with zipfile.ZipFile(io.BytesIO(body)) as archive:
             names = sorted(
                 (n for n in archive.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)),
                 key=lambda n: int(re.search(r"(\d+)", n.rsplit("/", 1)[-1]).group(1)),
             )
+            budget = MAX_CHARS
             for name in names[:MAX_PAGES]:
+                if budget <= 0:
+                    truncated = True
+                    break
                 try:
-                    root = ElementTree.fromstring(archive.read(name))
+                    root = ElementTree.fromstring(read_member(archive, name, MAX_MEMBER_BYTES))
                 except ElementTree.ParseError:
                     continue
+                except _ExpansionLimit:
+                    truncated = True
+                    break
                 lines = [(node.text or "").strip() for node in root.iter(_PPTX_NS)]
-                pages.append("\n".join(line for line in lines if line))
+                slide = "\n".join(line for line in lines if line)
+                if len(slide) > budget:
+                    slide = slide[:budget]
+                    truncated = True
+                budget -= len(slide)
+                pages.append(slide)
     except (zipfile.BadZipFile, KeyError, OSError):
         return Extraction(status="failed", note="the slide deck could not be read")
 
@@ -356,7 +401,7 @@ def extract_pptx(body: bytes) -> Extraction:
         pages=pages,
         page_count=len(pages),
         char_count=sum(len(page) for page in pages),
-        truncated=len(names) > MAX_PAGES,
+        truncated=truncated or len(names) > MAX_PAGES,
     )
 
 
@@ -364,7 +409,9 @@ def extract_docx(body: bytes) -> Extraction:
     """Extract paragraph text from a .docx."""
     try:
         with zipfile.ZipFile(io.BytesIO(body)) as archive:
-            root = ElementTree.fromstring(archive.read("word/document.xml"))
+            root = ElementTree.fromstring(read_member(archive, "word/document.xml", MAX_MEMBER_BYTES))
+    except _ExpansionLimit:
+        return Extraction(status="skipped", note="the document is too large to extract")
     except (zipfile.BadZipFile, KeyError, OSError, ElementTree.ParseError):
         return Extraction(status="failed", note="the document could not be read")
 
