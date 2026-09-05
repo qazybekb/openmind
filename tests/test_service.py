@@ -391,3 +391,59 @@ def test_every_payload_is_stamped(session: Session):
         assert payload["tz"] == "America/Los_Angeles"
         assert isinstance(payload["partial"], bool)
         assert isinstance(payload["warnings"], list)
+
+
+# -- live offerings -------------------------------------------------------------
+
+
+def test_check_offering_reads_the_class_schedule_and_caches_it(session: Session, monkeypatch):
+    """Two requests on the first call, then none: the term list is stable for months."""
+    from pathlib import Path
+
+    import openmind.schedule as schedule_module
+
+    fixtures = Path(__file__).parent / "fixtures" / "schedule"
+    calls: list[str] = []
+
+    def fake_fetch(url: str, *, client=None) -> str:
+        calls.append(url)
+        if "search=" in url:
+            return (fixtures / "search_stat156_fall2026.html").read_text(encoding="utf-8")
+        return (fixtures / "facets.html").read_text(encoding="utf-8")
+
+    monkeypatch.setattr(schedule_module, "fetch", fake_fetch)
+
+    payload = session.check_offering("stat 156")
+    assert payload["term"] == "Fall 2026"
+    assert payload["sections"][0]["instructors"] == "Peng Ding"
+    assert payload["sections"][0]["ccn"] == "21143"
+    assert payload["source"] == "classes.berkeley.edu"
+    assert len(calls) == 2
+
+    session.check_offering("stat 156")
+    assert len(calls) == 2, "the whole answer is cached for a day"
+
+    session.check_offering("compsci 189")
+    assert len(calls) == 3, "a different course costs one request, not two"
+
+
+def test_check_offering_says_when_a_term_is_not_posted_yet(session: Session, monkeypatch):
+    from pathlib import Path
+
+    import openmind.schedule as schedule_module
+
+    fixtures = Path(__file__).parent / "fixtures" / "schedule"
+    monkeypatch.setattr(
+        schedule_module, "fetch",
+        lambda url, client=None: (fixtures / "facets.html").read_text(encoding="utf-8"),
+    )
+
+    payload = session.check_offering("STAT 156", term="Spring 2028")
+    assert payload["sections"] == []
+    assert "not posted on the class schedule yet" in payload["note"]
+    assert "Fall 2026" in payload["note"]
+
+
+def test_a_string_that_is_not_a_course_code_is_refused(session: Session):
+    with pytest.raises(ServiceError, match="does not look like a course code"):
+        session.check_offering("something about machine learning")

@@ -89,9 +89,12 @@ class AppContext:
         """
         if self._config is None:
             try:
+                # Not cached on failure: the student may run `openmind setup` while the
+                # host is still running, and an empty config remembered here would
+                # outlive it.
                 self._config = load_config()
             except ConfigError:
-                self._config = Config()
+                return Session(Config(), self._client, cache=self.cache)
         return Session(self._config, self._client, cache=self.cache)
 
     def close(self) -> None:

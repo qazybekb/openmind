@@ -1094,6 +1094,23 @@ class Session:
             )
         return shrink(payload, BUDGETS["get_catalog_course"])
 
+    def _schedule_terms(self) -> list[schedule.Facet]:
+        """Return the schedule's term list, cached for a day.
+
+        The term list changes when the Registrar posts a new semester, so re-reading it
+        on every lookup would spend a request on an answer that is stable for months.
+        Caching it keeps the common path to a single request against the schedule site.
+        """
+        cached = self.cache.get("schedule:terms")
+        if cached is not None:
+            return cached
+        try:
+            terms = schedule.list_terms()
+        except schedule.ScheduleError as exc:
+            raise ServiceError(str(exc)) from exc
+        self.cache.set("schedule:terms", terms, OFFERING_CACHE_S)
+        return terms
+
     def check_offering(self, course_code: str, term: str | None = None) -> dict[str, Any]:
         """Ask classes.berkeley.edu for a course's live sections. One request, cached a day."""
         parsed = catalog.parse_course_code(course_code)
@@ -1106,10 +1123,7 @@ class Session:
         if cached is not None:
             return cached
 
-        try:
-            terms = schedule.list_terms()
-        except schedule.ScheduleError as exc:
-            raise ServiceError(str(exc)) from exc
+        terms = self._schedule_terms()
 
         if term:
             match = next((t for t in terms if t.name.lower() == term.strip().lower()), None)
