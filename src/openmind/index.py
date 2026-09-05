@@ -276,6 +276,14 @@ def course_stats(conn: sqlite3.Connection, course_id: str) -> dict[str, int]:
     return stats
 
 
+def last_indexed_at(conn: sqlite3.Connection, course_id: str) -> str | None:
+    """Return when this course was last indexed, so results can say how fresh they are."""
+    row = conn.execute(
+        "SELECT MAX(indexed_at) FROM materials WHERE course_id = ? AND status = 'indexed'", (course_id,)
+    ).fetchone()
+    return str(row[0]) if row and row[0] else None
+
+
 def indexed_courses(conn: sqlite3.Connection) -> list[str]:
     """Return course ids that have at least one indexed material."""
     return [str(row["course_id"]) for row in conn.execute(

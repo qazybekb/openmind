@@ -60,6 +60,12 @@ CATALOG_DEFAULTS: dict[str, tuple[str, tuple[str, ...]]] = {
 
 MIN_ROWS = {"undergraduate": 5_000, "graduate": 3_000}
 MIN_SUBJECTS = 200
+# A term with fewer offerings than this is a failed crawl, not a quiet semester:
+# Fall 2026 has about 2,700 courses scheduled.
+MIN_OFFERINGS_PER_TERM = 500
+# Above this share of failed subjects the snapshot is too patchy to publish, even with
+# the previous rows carried forward.
+MAX_FAILURE_FRACTION = 0.10
 
 
 def log(message: str) -> None:
@@ -156,10 +162,15 @@ def current_and_future_terms(terms: list[schedule.Facet], today: date, limit: in
 
 
 def crawl_offerings(subjects: list[str], terms: list[schedule.Facet], delay: float,
-                    limit: int | None = None) -> tuple[list[dict[str, str]], list[str]]:
-    """Crawl the class schedule for each subject in each term."""
+                    limit: int | None = None) -> tuple[list[dict[str, str]], list[tuple[str, str, str]]]:
+    """Crawl the class schedule for each subject in each term.
+
+    Returns the rows found and the ``(term, subject, reason)`` triples that failed. The
+    caller decides what to do about the failures; this function does not get to make a
+    thin snapshot look complete.
+    """
     rows: list[dict[str, str]] = []
-    problems: list[str] = []
+    failures: list[tuple[str, str, str]] = []
     targets = subjects[:limit] if limit else subjects
 
     for term in terms:
@@ -169,7 +180,7 @@ def crawl_offerings(subjects: list[str], terms: list[schedule.Facet], delay: flo
             try:
                 sections = schedule.crawl_subject(subject, term.facet_id, delay=delay)
             except schedule.ScheduleError as exc:
-                problems.append(f"{term.name} {subject}: {exc}")
+                failures.append((term.name, subject, str(exc)))
                 continue
             offerings = schedule.collapse(sections, term.name)
             rows.extend(offering.to_row() for offering in offerings)
@@ -177,7 +188,69 @@ def crawl_offerings(subjects: list[str], terms: list[schedule.Facet], delay: flo
             if position % 25 == 0:
                 log(f"  {position}/{len(targets)} subjects, {found} courses so far")
         log(f"  {term.name}: {found} courses offered")
-    return rows, problems
+    return rows, failures
+
+
+def read_previous_offerings(out: Path) -> list[dict[str, str]]:
+    """Read the offerings snapshot already on disk, if there is one."""
+    path = out / "term_offerings.csv"
+    if not path.exists():
+        return []
+    with path.open(encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def carry_forward(rows: list[dict[str, str]], previous: list[dict[str, str]],
+                  failures: list[tuple[str, str, str]]) -> tuple[list[dict[str, str]], list[str]]:
+    """Reuse the last good rows for subjects whose crawl failed this time.
+
+    A subject that failed is unknown, not empty. Dropping its rows would tell every
+    student in that department that none of their courses are offered — the exact
+    failure this whole snapshot exists to avoid. Carrying the previous rows and naming
+    the subject as stale is honest; silently publishing a hole is not.
+    """
+    stale: list[str] = []
+    by_key = {(row["term"], row["subject"]) for row in rows}
+    for term, subject, _ in failures:
+        if (term, subject) in by_key:
+            continue
+        recovered = [row for row in previous if row.get("term") == term and row.get("subject") == subject]
+        if recovered:
+            rows.extend(recovered)
+            stale.append(f"{subject} ({term})")
+    return rows, sorted(set(stale))
+
+
+def coverage_problems(rows: list[dict[str, str]], previous: list[dict[str, str]],
+                      terms: list[schedule.Facet], failures: list[tuple[str, str, str]],
+                      subject_count: int) -> list[str]:
+    """Return the reasons this snapshot must not be published, if any."""
+    problems: list[str] = []
+    fresh_terms = {term.name for term in terms}
+
+    for term in fresh_terms:
+        count = sum(1 for row in rows if row.get("term") == term)
+        if count < MIN_OFFERINGS_PER_TERM:
+            problems.append(f"{term}: only {count} course offerings, expected at least {MIN_OFFERINGS_PER_TERM}")
+
+    for term in fresh_terms:
+        expected = {row["subject"] for row in previous if row.get("term") == term}
+        if not expected:
+            continue
+        have = {row["subject"] for row in rows if row.get("term") == term}
+        lost = sorted(expected - have)
+        if lost:
+            problems.append(
+                f"{term}: {len(lost)} subject(s) that had offerings last time have none now "
+                f"and could not be recovered: {', '.join(lost[:8])}"
+            )
+
+    if subject_count and len(failures) > subject_count * len(fresh_terms) * MAX_FAILURE_FRACTION:
+        problems.append(
+            f"{len(failures)} subject crawls failed, over the {MAX_FAILURE_FRACTION:.0%} tolerance — "
+            "the class schedule is probably down or has changed shape"
+        )
+    return problems
 
 
 # -- writing -------------------------------------------------------------------
@@ -209,6 +282,8 @@ def main() -> int:
     parser.add_argument("--terms", type=int, default=2, help="how many upcoming terms to crawl")
     parser.add_argument("--delay", type=float, default=schedule.POLITE_DELAY_S, help="seconds between page requests")
     parser.add_argument("--subject-limit", type=int, help="crawl only the first N subjects (for smoke runs)")
+    parser.add_argument("--allow-coverage-loss", action="store_true",
+                        help="publish even when a subject that had offerings last time now has none")
     args = parser.parse_args()
 
     out = Path(args.out)
@@ -230,16 +305,34 @@ def main() -> int:
 
     offerings: list[dict[str, str]] = []
     terms: list[schedule.Facet] = []
-    problems: list[str] = []
+    failures: list[tuple[str, str, str]] = []
+    stale_subjects: list[str] = []
     if not args.skip_offerings:
         log("== offerings ==")
         terms = current_and_future_terms(schedule.list_terms(), date.today(), args.terms)
         if not terms:
             raise SystemExit("the class schedule listed no current or upcoming terms. Refusing to ship.")
-        offerings, problems = crawl_offerings(subjects, terms, args.delay, args.subject_limit)
+        previous = read_previous_offerings(out)
+        offerings, failures = crawl_offerings(subjects, terms, args.delay, args.subject_limit)
         log(f"{len(offerings)} course-term offerings across {len(terms)} term(s)")
-        if problems:
-            log(f"{len(problems)} subject(s) failed: {problems[:5]}")
+        if failures:
+            log(f"{len(failures)} subject crawl(s) failed: {[f'{t} {s}' for t, s, _ in failures[:5]]}")
+            offerings, stale_subjects = carry_forward(offerings, previous, failures)
+            if stale_subjects:
+                log(f"carried forward the previous rows for {len(stale_subjects)} subject(s)")
+
+        crawled = subjects[: args.subject_limit] if args.subject_limit else subjects
+        blocking = coverage_problems(offerings, previous, terms, failures, len(crawled))
+        if blocking and args.allow_coverage_loss:
+            for problem in blocking:
+                log(f"coverage warning (overridden by --allow-coverage-loss): {problem}")
+            blocking = []
+        if blocking:
+            for problem in blocking:
+                log(f"REFUSING TO PUBLISH: {problem}")
+            log("Nothing was written. The existing snapshot is still the best available.")
+            log("If this is a real change rather than an outage, re-run with --allow-coverage-loss.")
+            return 1
 
     # A course that is scheduled but hidden by the catalog's default filters still
     # matters — it is one a student can actually enrol in.
@@ -282,7 +375,7 @@ def main() -> int:
         log(f"{path}: {len(offerings)} rows")
 
     today = date.today().isoformat()
-    manifest = {
+    manifest: dict[str, Any] = {
         "catalog_as_of": today,
         "offerings_as_of": today if offerings else "",
         "terms_known": [term.name for term in terms],
@@ -294,6 +387,9 @@ def main() -> int:
         ),
         "data_sha256": "",
     }
+    if stale_subjects:
+        # Named rather than hidden: a reader can tell which departments are a day old.
+        manifest["stale_subjects"] = stale_subjects
     manifest_path = out / "catalog_meta.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     written.append(manifest_path)

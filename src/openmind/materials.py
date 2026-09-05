@@ -480,13 +480,16 @@ def chunk_pages(pages: list[str], *, slides: bool = False) -> list[Chunk]:
             cleaned = text.strip()
             if not cleaned:
                 continue
-            if not buffer:
-                start_page = number
-            buffer.append(cleaned)
-            if sum(len(part) for part in buffer) >= SLIDE_MIN:
-                chunks.append(Chunk(ord=order, text="\n\n".join(buffer), page_start=start_page, page_end=number))
-                order += 1
-                buffer = []
+            # A single dense slide can be longer than a whole chunk. Split it rather
+            # than storing a chunk no reader can fit in one response.
+            for piece in _split_oversized(cleaned):
+                if not buffer:
+                    start_page = number
+                buffer.append(piece)
+                if sum(len(part) for part in buffer) >= SLIDE_MIN:
+                    chunks.append(Chunk(ord=order, text="\n\n".join(buffer), page_start=start_page, page_end=number))
+                    order += 1
+                    buffer = []
         if buffer:
             chunks.append(
                 Chunk(ord=order, text="\n\n".join(buffer), page_start=start_page, page_end=len(pages))
@@ -498,6 +501,23 @@ def chunk_pages(pages: list[str], *, slides: bool = False) -> list[Chunk]:
             chunks.append(Chunk(ord=order, text=piece, page_start=number, page_end=number, heading=heading))
             order += 1
     return chunks
+
+
+def _split_oversized(text: str, limit: int = CHUNK_MAX) -> list[str]:
+    """Break a single block that is longer than a chunk into chunk-sized pieces."""
+    if len(text) <= limit:
+        return [text]
+    pieces: list[str] = []
+    remaining = text
+    while len(remaining) > limit:
+        window = remaining[:limit]
+        cut = window.rfind(" ")
+        cut = cut if cut > limit // 2 else limit
+        pieces.append(window[:cut].strip())
+        remaining = remaining[cut:].lstrip()
+    if remaining:
+        pieces.append(remaining)
+    return pieces
 
 
 def _split_page(text: str) -> list[tuple[str, str | None]]:

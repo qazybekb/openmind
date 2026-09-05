@@ -20,6 +20,7 @@ import json
 import logging
 import sqlite3
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Final
@@ -37,6 +38,8 @@ OFFERING_CACHE_S: Final[float] = 24 * 3600
 MAX_ANNOUNCEMENTS: Final[int] = 10
 MAX_RUBRIC_ROWS: Final[int] = 12
 MAX_GRADED: Final[int] = 20
+# Room kept back for the "continues, call again with cursor=N" line.
+_CONTINUATION_ALLOWANCE: Final[int] = 160
 
 BUDGETS: Final[dict[str, int]] = {
     "list_courses": 1_500,
@@ -100,6 +103,30 @@ def shrink(payload: dict[str, Any], budget: int) -> dict[str, Any]:
 def _omission_note(dropped: int) -> str:
     """Say plainly that results were left out, and what to do about it."""
     return f"{dropped} more result(s) omitted to stay within the response size limit; narrow the query."
+
+
+def fit_page(payload: dict[str, Any], records: Sequence[tuple[str, Any]], budget: int) -> int:
+    """Fill a payload's list fields with as many records as the budget allows.
+
+    Returns how many records were emitted, which is what a cursor must advance by.
+    Deciding the page size *before* handing out a continuation is the whole point: a
+    cursor computed from the requested limit and then trimmed by `shrink` skips
+    everything in between, and the student never learns those items exist.
+
+    At least one record is always emitted, even if it alone exceeds the budget, because
+    a page of zero with a cursor pointing at itself is an infinite loop.
+    """
+    for key, _ in records:
+        payload.setdefault(key, [])
+
+    emitted = 0
+    for key, record in records:
+        payload[key].append(record)
+        if len(json.dumps(payload, default=str)) > budget and emitted:
+            payload[key].pop()
+            break
+        emitted += 1
+    return emitted
 
 
 @dataclass
@@ -314,7 +341,15 @@ class Session:
         upcoming = agenda.sort_items(upcoming)
         totals = agenda.counts(upcoming, overdue)
 
-        window_items = upcoming[offset : offset + limit]
+        # One cursor over both lists, overdue first. Two independent offsets would make
+        # "have I seen everything?" unanswerable, and overdue work is what a student most
+        # needs to reach.
+        records: list[tuple[str, dict[str, Any]]] = [
+            *(("overdue", item.to_dict(reference)) for item in overdue),
+            *(("items", item.to_dict(reference)) for item in upcoming),
+        ]
+        offset = max(0, min(offset, len(records)))
+
         notes: list[str] = []
         if overdue:
             notes.append(
@@ -332,20 +367,22 @@ class Session:
             f"start_by assumes about {capacity:g} hours of work a day."
         )
 
-        payload = {
+        payload: dict[str, Any] = {
             "range": window,
             "from": start.isoformat(),
             "to": end.isoformat(),
             "source": source,
-            "overdue": [item.to_dict(reference) for item in overdue],
-            "items": [item.to_dict(reference) for item in window_items],
+            "overdue": [],
+            "items": [],
             "counts": totals,
             "notes": notes,
             **self.stamp(warnings),
         }
-        if offset + limit < len(upcoming):
-            payload["next_offset"] = offset + limit
-        return shrink(payload, BUDGETS["get_deadlines"])
+        emitted = fit_page(payload, records[offset : offset + limit], BUDGETS["get_deadlines"])
+        if offset + emitted < len(records):
+            payload["next_offset"] = offset + emitted
+            payload["remaining"] = len(records) - (offset + emitted)
+        return payload
 
     def _planner_items(self, facts: dict[str, CourseFacts], weights: dict[str, agenda.WeightTable],
                        start: Any, end: Any, reference: datetime, capacity: float, *,
@@ -649,22 +686,29 @@ class Session:
         limit = max(1, min(int(limit), 25))
         indexed = course_id in self._indexed_course_ids()
 
+        cursor = max(0, int(cursor))
         hits: list[dict[str, Any]] = []
         listing: list[dict[str, Any]] = []
         pending_files = 0
+        indexed_at: str | None = None
+        # One more than asked for, so "is there another page?" is answered by looking
+        # rather than by assuming a full page means more exist.
+        window = limit + 1
 
         if indexed:
             with index.connect() as conn:
                 stats = index.course_stats(conn, course_id)
                 pending_files = stats.get("pending", 0)
+                indexed_at = index.last_indexed_at(conn, course_id)
                 if query.strip():
-                    hits = [hit.to_dict() for hit in index.search(conn, course_id, query, limit=limit, kind=kind,
+                    hits = [hit.to_dict() for hit in index.search(conn, course_id, query, limit=window, kind=kind,
                                                                   offset=cursor)]
                 else:
-                    listing = index.list_materials(conn, course_id, kind=kind, limit=limit, offset=cursor)
+                    listing = index.list_materials(conn, course_id, kind=kind, limit=window, offset=cursor)
         else:
-            listing, found, warn = self._live_materials(course_id, query=query, kind=kind, limit=limit, refresh=refresh)
-            hits = found
+            listing, hits, warn = self._live_materials(
+                course_id, query=query, kind=kind, limit=window, cursor=cursor, refresh=refresh
+            )
             warnings.extend(warn)
 
         payload: dict[str, Any] = {
@@ -672,10 +716,12 @@ class Session:
             "course": self.cfg.nickname(course_id),
             "query": query or None,
             "indexed": indexed,
-            "hits": hits,
-            "materials": listing,
+            "hits": [],
+            "materials": [],
             **self.stamp(warnings),
         }
+        if indexed_at:
+            payload["indexed_at"] = indexed_at
         if pending_files:
             payload["pending_files"] = pending_files
             payload["pending_note"] = (
@@ -686,11 +732,14 @@ class Session:
                 "This course is not indexed, so search covers titles, module names, the syllabus, and pages — "
                 "not the inside of slides or readings. Call index_course to change that."
             )
-        if (hits or listing) and len(hits) + len(listing) >= limit:
-            payload["next_cursor"] = cursor + limit
-        return shrink(payload, BUDGETS["find_materials"])
 
-    def _live_materials(self, course_id: str, *, query: str, kind: str | None, limit: int,
+        candidates = [*(("hits", hit) for hit in hits[:limit]), *(("materials", row) for row in listing[:limit])]
+        emitted = fit_page(payload, candidates, BUDGETS["find_materials"])
+        if emitted < len(candidates) or len(hits) > limit or len(listing) > limit:
+            payload["next_cursor"] = cursor + emitted
+        return payload
+
+    def _live_materials(self, course_id: str, *, query: str, kind: str | None, limit: int, cursor: int,
                         refresh: bool) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
         """List and search a course's materials without an index.
 
@@ -752,7 +801,8 @@ class Session:
 
         for entry in listing:
             entry.pop("position", None)
-        return listing[:limit], hits[:limit], warnings
+        # Skip before slicing: applying the limit first made every cursor return page one.
+        return listing[cursor : cursor + limit], hits[:limit], warnings
 
     def index_course(self, course_id: str, *, enable: bool = True, budget: float = INDEX_BUDGET_S,
                      refresh: bool = False) -> dict[str, Any]:
@@ -918,7 +968,12 @@ class Session:
         return None
 
     def read_material(self, material_id: int, *, page: int | None = None, cursor: int = 0) -> str:
-        """Return a material's text as Markdown with page markers."""
+        """Return a material's text as Markdown with page markers.
+
+        ``cursor`` is a character offset into the document, not a chunk index, so a
+        single slide longer than the response budget is still readable: every call makes
+        progress and every character is reachable.
+        """
         with index.connect(create=False) as conn:
             row = index.get_material(conn, int(material_id))
             if row is None:
@@ -937,32 +992,35 @@ class Session:
         if not chunks:
             return f"# {title}\n\n_No text on that page._"
 
-        paged = str(row["kind"]) == "file"
-        parts: list[str] = [f"# {title}"]
-        budget = BUDGETS["read_material"]
-        used = len(parts[0])
-        current_page = None
-        emitted = 0
-        for position, chunk in enumerate(chunks):
-            if position < cursor:
-                continue
-            text = str(chunk["text"])
-            header = ""
-            if paged and chunk["page_start"] != current_page:
-                current_page = chunk["page_start"]
-                header = f"\n--- p. {current_page} ---\n"
-            if used + len(text) + len(header) > budget:
-                parts.append(
-                    f"\n_Continues. Call read_material again with cursor={position} for the rest "
-                    f"({len(chunks) - position} sections left)._"
-                )
-                break
-            parts.append(header + text)
-            used += len(text) + len(header)
-            emitted += 1
-        if emitted == 0:
+        body, page_at = _render_material(chunks, paged=str(row["kind"]) == "file")
+        cursor = max(0, int(cursor))
+        if cursor >= len(body):
             return f"# {title}\n\n_Nothing left to read at cursor {cursor}._"
-        return "\n".join(parts)
+
+        heading = f"# {title}"
+        if cursor:
+            heading += f"\n\n_Continued from character {cursor}"
+            resumed = page_at(cursor)
+            if resumed is not None:
+                heading += f", page {resumed}"
+            heading += "._"
+
+        room = BUDGETS["read_material"] - len(heading) - _CONTINUATION_ALLOWANCE
+        window = body[cursor : cursor + max(room, 1)]
+        if cursor + len(window) < len(body):
+            # Break on a line so a page marker or sentence is not cut in half.
+            split = window.rfind("\n")
+            if split > len(window) // 2:
+                window = window[:split]
+
+        text = f"{heading}\n{window.rstrip()}"
+        remaining = len(body) - (cursor + len(window))
+        if remaining > 0:
+            text += (
+                f"\n\n_Continues. Call read_material again with cursor={cursor + len(window)} "
+                f"for the rest ({remaining} characters left)._"
+            )
+        return text
 
     # -- study sessions ----------------------------------------------------
 
@@ -1172,6 +1230,39 @@ class Session:
 
 
 # -- helpers -----------------------------------------------------------------
+
+
+def _render_material(chunks: list[Any], *, paged: bool) -> tuple[str, Any]:
+    """Render a material's chunks once, and return a way to look up the page at an offset."""
+    parts: list[str] = []
+    marks: list[tuple[int, int]] = []
+    length = 0
+    current_page: int | None = None
+
+    for chunk in chunks:
+        piece = ""
+        if paged and chunk["page_start"] != current_page:
+            current_page = int(chunk["page_start"] or 0)
+            piece += f"\n--- p. {current_page} ---\n"
+        piece += str(chunk["text"]) + "\n"
+        if current_page is not None:
+            marks.append((length, current_page))
+        parts.append(piece)
+        length += len(piece)
+
+    body = "".join(parts)
+
+    def page_at(offset: int) -> int | None:
+        """Return the page a character offset falls on, for a continuation header."""
+        found = None
+        for position, number in marks:
+            if position <= offset:
+                found = number
+            else:
+                break
+        return found
+
+    return body, page_at
 
 
 def _rubric(assignment: dict[str, Any]) -> list[dict[str, Any]]:

@@ -43,9 +43,13 @@ jobs:
       - name: Verify the schedule parser against saved fixtures
         run: python -m pytest tests/test_schedule.py tests/test_catalog.py -q
 
+      # pipefail matters here: without it the exit status is tee's, so a script that
+      # refused to publish an incomplete snapshot would look like a success and the job
+      # would carry on to commit and release it.
       - name: Refresh the data
         id: refresh
         run: |
+          set -o pipefail
           python3 scripts/refresh_catalog.py \
             --out src/openmind/data \
             ${{ inputs.skip_offerings && '--skip-offerings' || '' }} \

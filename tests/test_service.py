@@ -96,12 +96,16 @@ def test_undated_returns_only_work_without_a_due_date(session: Session):
     assert {item["title"] for item in payload["items"]} == {"Course survey"}
 
 
-def test_paging_reports_the_next_offset(session: Session):
-    payload = session.deadlines(window="month", limit=1)
-    assert len(payload["items"]) == 1
-    assert payload["next_offset"] == 1
+def test_paging_walks_overdue_and_upcoming_through_one_cursor(session: Session):
+    """One cursor over both lists, overdue first, so "have I seen everything?" has an answer."""
+    first = session.deadlines(window="month", limit=1)
+    assert len(first["overdue"]) == 1 and first["items"] == []
+    assert first["next_offset"] == 1
+    assert first["remaining"] > 0
+
     second = session.deadlines(window="month", limit=1, offset=1)
-    assert second["items"][0]["title"] != payload["items"][0]["title"]
+    assert len(second["items"]) == 1 and second["overdue"] == []
+    assert second["items"][0]["title"] != first["overdue"][0]["title"]
 
 
 def test_a_course_that_403s_makes_the_payload_partial_rather_than_empty(config, monkeypatch):
