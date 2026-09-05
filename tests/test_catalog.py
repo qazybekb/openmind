@@ -329,7 +329,9 @@ def test_a_full_page_of_results_fits_the_tool_budget(packaged: Path):
             payload = catalog.fit_previews(
                 {**catalog.search(conn, query=query, limit=10), **envelope}, BUDGETS["search_catalog"]
             )
-            assert len(payload["courses"]) == 10, query
+            # A query with fewer than ten distinct courses returns fewer; what must not
+            # happen is the budget silently dropping any of the ones it found.
+            assert len(payload["courses"]) == min(10, payload["total"]), query
             size = len(json.dumps(payload, default=str))
             assert size <= BUDGETS["search_catalog"], f"{query!r} produced {size} bytes"
 
@@ -337,8 +339,9 @@ def test_a_full_page_of_results_fits_the_tool_budget(packaged: Path):
 def test_gists_are_shortened_before_whole_courses_are_dropped(packaged: Path):
     """Losing twenty characters of every description beats losing the tenth course."""
     with catalog.connect(packaged) as conn:
-        full = catalog.search(conn, query="data science ethics", limit=10)
+        full = catalog.search(conn, query="research methods", limit=10)
     before = [len(str(c.get("description") or "")) for c in full["courses"]]
+    assert len(full["courses"]) == 10, "the fixture query must fill a page"
 
     fitted = catalog.fit_previews(json.loads(json.dumps(full)), 2_500)
     after = [len(str(c.get("description") or "")) for c in fitted["courses"]]
@@ -387,3 +390,142 @@ def test_the_catalog_builds_itself_on_first_use_without_any_setup(home: Path):
 def test_a_second_call_does_not_rebuild(home: Path):
     assert catalog.ensure_built() is not None
     assert catalog.ensure_built() is None
+
+
+# -- cross-listings ---------------------------------------------------------------
+
+
+def test_one_course_under_three_codes_is_one_result(packaged: Path):
+    """DATA C204, STS C204, and HISTORY C254 are the same class filling three of ten slots."""
+    with catalog.connect(packaged) as conn:
+        result = catalog.search(conn, query="data science ethics", limit=10)
+
+    ethics = [c for c in result["courses"] if c["title"] == "Human Contexts and Ethics of Data"]
+    assert len(ethics) == 1
+    assert (ethics[0]["subject"], ethics[0]["number"]) == ("DATA", "C204")
+    assert ethics[0]["also_listed_as"] == ["HISTORY C254", "STS C204"]
+
+
+def test_the_subject_filter_decides_which_code_is_shown(packaged: Path):
+    """A student who asked for STS should see the STS code, not the alphabetical one."""
+    with catalog.connect(packaged) as conn:
+        result = catalog.search(conn, query="data science ethics", subject="STS", limit=10)
+
+    primary = result["courses"][0]
+    assert (primary["subject"], primary["number"]) == ("STS", "C204")
+    assert primary["also_listed_as"] == ["DATA C204", "HISTORY C254"]
+
+
+def test_without_a_subject_filter_the_alphabetically_first_code_wins(packaged: Path):
+    """Stable across runs, and independent of which member the ranking surfaced."""
+    with catalog.connect(packaged) as conn:
+        for _ in range(3):
+            first = catalog.search(conn, query="data science ethics", limit=10)["courses"][0]
+            assert (first["subject"], first["number"]) == ("DATA", "C204")
+
+
+def test_the_total_counts_courses_not_listings(packaged: Path):
+    with catalog.connect(packaged) as conn:
+        result = catalog.search(conn, query="data science ethics", limit=30)
+        rows = conn.execute(
+            "SELECT COUNT(*) FROM catalog_fts JOIN catalog_courses c ON c.rowid = catalog_fts.rowid "
+            "WHERE catalog_fts MATCH ?",
+            [catalog._match_expression("data science ethics", "AND")],
+        ).fetchone()[0]
+
+    assert result["total"] < rows, "collapsing must reduce the count, not just the page"
+    assert result["total"] == len(result["courses"])
+
+
+def test_a_course_with_no_cross_listings_says_nothing_about_them(packaged: Path):
+    with catalog.connect(packaged) as conn:
+        course = catalog.search(conn, query="STAT 156")["courses"][0]
+    assert "also_listed_as" not in course
+
+
+def test_the_detail_tool_still_answers_for_every_code(packaged: Path):
+    """Collapsing is a search-result concern; get_catalog_course is unchanged."""
+    with catalog.connect(packaged) as conn:
+        for subject, number in [("DATA", "C204"), ("STS", "C204"), ("HISTORY", "C254")]:
+            course = catalog.details(conn, subject, number)
+            assert course is not None
+            assert course["title"] == "Human Contexts and Ethics of Data"
+            assert course["subject"] == subject
+
+
+def test_identically_titled_courses_are_ordered_by_code_not_relevance(packaged: Path):
+    """STAT 156 and STAT 256 are both "Causal Inference"; bm25 between them is noise."""
+    with catalog.connect(packaged) as conn:
+        for _ in range(3):
+            top = [(c["subject"], c["number"]) for c in
+                   catalog.search(conn, query="causal inference", limit=10)["courses"][:2]]
+            assert top == [("STAT", "156"), ("STAT", "256")], top
+
+
+def test_the_stat_156_acceptance_case_still_holds(packaged: Path):
+    with catalog.connect(packaged) as conn:
+        result = catalog.search(conn, query="causal inference", limit=10)
+
+    codes = [(c["subject"], c["number"]) for c in result["courses"][:3]]
+    assert ("STAT", "156") in codes
+    stat156 = next(c for c in result["courses"] if (c["subject"], c["number"]) == ("STAT", "156"))
+    assert stat156["in_printed_catalog"] is False
+    assert stat156["offered_terms"][0]["term"] == "Fall 2026"
+    assert len(result["courses"]) == 10
+
+
+# -- parsing the cross-listing column ---------------------------------------------
+
+
+SUBJECTS = {"DATA", "HISTORY", "STS", "HISTART", "CIVENG", "MECENG", "POLECON", "MEDIAST", "L & S"}
+
+
+@pytest.mark.parametrize(
+    ("cell", "expected"),
+    [
+        ("DATAC204 ETHICS OF DATA, HISTORYC254 ETHICS OF DATA", [("DATA", "C204"), ("HISTORY", "C254")]),
+        ("CIVENGC30 INTRO SOLID MECHNCS", [("CIVENG", "C30")]),
+        # HISTART, not HISTARTC — the longest subject that leaves a usable number wins.
+        ("HISTARTC196W SPECIAL RESEARCH", [("HISTART", "C196W")]),
+        ("", []),
+        ("-", []),
+        ("NOTASUBJECT101 SOMETHING", []),
+    ],
+)
+def test_cross_listing_codes_are_split_on_the_subject_not_the_first_digit(cell, expected):
+    assert catalog.parse_cross_listed(cell, SUBJECTS) == expected
+
+
+def test_groups_join_codes_named_in_only_one_direction():
+    """The catalog data is asymmetric in places; edges are followed both ways."""
+    rows = [
+        ("DATA", "C204", "graduate", "Ethics", "4", "4", "Data", "", "HISTORYC254 ETHICS", "", "", 1),
+        ("HISTORY", "C254", "graduate", "Ethics", "4", "4", "History", "", "", "", "", 1),
+        ("STAT", "156", "undergraduate", "Causal", "4", "4", "Stat", "", "", "", "", 1),
+    ]
+    groups = catalog.build_groups(rows)
+
+    assert groups[("DATA", "C204")] == groups[("HISTORY", "C254")] == "DATA C204"
+    assert groups[("STAT", "156")] == "STAT 156", "a course with no partners is its own group"
+
+
+def test_a_cross_listing_to_a_course_we_do_not_have_is_ignored():
+    rows = [("DATA", "C204", "graduate", "Ethics", "4", "4", "Data", "", "GONEC999 MISSING", "", "", 1)]
+    assert catalog.build_groups(rows) == {("DATA", "C204"): "DATA C204"}
+
+
+# -- rebuilding on a schema change -------------------------------------------------
+
+
+def test_an_index_built_by_an_older_version_is_rebuilt(home: Path, sample_catalog):
+    """group_key did not exist before; querying an old index would fail on the column."""
+    from openmind.config import catalog_db_path
+
+    with catalog.connect(catalog_db_path()) as conn:
+        conn.execute("UPDATE meta SET value = '1' WHERE key = 'schema_version'")
+        conn.commit()
+
+    assert catalog.ensure_built() is not None, "the stale index should have been rebuilt"
+
+    with catalog.connect() as conn:
+        assert catalog.meta(conn)["schema_version"] == catalog.SCHEMA_VERSION

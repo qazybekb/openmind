@@ -52,6 +52,12 @@ DESCRIPTION_PREVIEW: Final[int] = 300
 
 MIN_COURSES: Final[int] = 10_000
 MIN_SUBJECTS: Final[int] = 200
+# Bumped when the built shape changes, so an index from an older version is rebuilt
+# rather than queried with columns it does not have.
+SCHEMA_VERSION: Final[str] = "2"
+# A cross-listing set rarely exceeds three or four codes, so over-fetching this multiple
+# of the page size is enough to fill a page after collapsing duplicates.
+_GROUP_OVERFETCH: Final[int] = 6
 
 _CSV_FILES: Final[dict[str, str]] = {
     "undergraduate_courses.csv": "undergraduate",
@@ -72,8 +78,10 @@ CREATE TABLE IF NOT EXISTS catalog_courses (
     repeat_rules TEXT,
     offering_details TEXT,
     in_printed_catalog INTEGER NOT NULL DEFAULT 1,
+    group_key TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (subject, number)
 );
+CREATE INDEX IF NOT EXISTS catalog_group ON catalog_courses (group_key);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS catalog_fts USING fts5 (
     subject, number, title, description, content='catalog_courses'
@@ -117,6 +125,69 @@ def connect(path: Path | None = None, *, create: bool = False) -> Iterator[sqlit
 
 
 # -- building -----------------------------------------------------------------
+
+
+_CROSS_CODE = re.compile(r"^([A-Z]+)([A-Z]{0,2}[0-9][0-9A-Z]*)$")
+
+
+def parse_cross_listed(value: str, subjects: set[str]) -> list[tuple[str, str]]:
+    """Split a ``cross_listed`` cell into course codes.
+
+    The catalog writes these as ``DATAC204 ETHICS OF DATA, HISTORYC254 ETHICS OF DATA``
+    — subject and number run together, then an abbreviated title. There is no separator
+    to split on, so the subject is found by matching the longest known subject that
+    leaves a plausible course number behind: ``HISTARTC196W`` is HISTART C196W, not
+    HISTARTC 196W.
+    """
+    found: list[tuple[str, str]] = []
+    for part in (value or "").split(","):
+        token = part.strip().split(" ", 1)[0].upper()
+        match = _CROSS_CODE.match(token)
+        if not match:
+            continue
+        for cut in range(len(token) - 1, 0, -1):
+            subject, number = token[:cut], token[cut:]
+            if subject in subjects and _CROSS_CODE.match(f"{subject}{number}") and re.match(
+                r"^[A-Z]{0,2}[0-9][0-9A-Z]*$", number
+            ):
+                found.append((subject, number))
+                break
+    return found
+
+
+def build_groups(rows: list[tuple[Any, ...]], subject_index: int = 0, number_index: int = 1,
+                 cross_index: int = 8) -> dict[tuple[str, str], str]:
+    """Return a canonical group key for every course, joining cross-listed codes.
+
+    The data is asymmetric in places — one code names its partners, another does not —
+    so edges are followed in both directions and the group key is the alphabetically
+    first code in the connected set. That makes the choice stable across runs and
+    independent of which member the search happened to match.
+    """
+    known_subjects = {str(row[subject_index]) for row in rows}
+    parent: dict[tuple[str, str], tuple[str, str]] = {}
+
+    def find(key: tuple[str, str]) -> tuple[str, str]:
+        parent.setdefault(key, key)
+        while parent[key] != key:
+            parent[key] = parent[parent[key]]
+            key = parent[key]
+        return key
+
+    def union(left: tuple[str, str], right: tuple[str, str]) -> None:
+        a, b = find(left), find(right)
+        if a != b:
+            parent[max(a, b)] = min(a, b)
+
+    present = {(str(row[subject_index]), str(row[number_index])) for row in rows}
+    for row in rows:
+        key = (str(row[subject_index]), str(row[number_index]))
+        find(key)
+        for partner in parse_cross_listed(str(row[cross_index] or ""), known_subjects):
+            if partner in present:
+                union(key, partner)
+
+    return {key: " ".join(find(key)) for key in present}
 
 
 def _clean(value: str | None) -> str:
@@ -205,6 +276,8 @@ def build(path: Path | None = None, *, source_dir: Path | None = None) -> dict[s
                 )
             )
 
+    groups = build_groups(rows)
+    rows = [(*row, groups[(row[0], row[1])]) for row in rows]
     offerings = _read_offerings(source_dir)
 
     with connect(target, create=True) as conn:
@@ -213,8 +286,8 @@ def build(path: Path | None = None, *, source_dir: Path | None = None) -> dict[s
         conn.execute("DELETE FROM catalog_fts")
         conn.executemany(
             "INSERT INTO catalog_courses (subject, number, level, title, units_min, units_max, department, "
-            "description, cross_listed, repeat_rules, offering_details, in_printed_catalog) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "description, cross_listed, repeat_rules, offering_details, in_printed_catalog, group_key) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rows,
         )
         conn.executemany(
@@ -229,6 +302,7 @@ def build(path: Path | None = None, *, source_dir: Path | None = None) -> dict[s
             "offerings_as_of": meta.get("offerings_as_of") or ("" if not offerings else date.today().isoformat()),
             "terms_known": json.dumps(meta.get("terms_known") or terms),
             "data_sha256": meta.get("data_sha256") or "",
+            "schema_version": SCHEMA_VERSION,
             "built_at": datetime.now(UTC).isoformat(),
         }.items():
             conn.execute(
@@ -305,10 +379,20 @@ def ensure_built(path: Path | None = None) -> dict[str, int] | None:
     there.
     """
     target = path or catalog_db_path()
-    if target.exists():
+    if target.exists() and _schema_current(target):
         return None
-    logger.info("Building the Berkeley catalog index from packaged data (first run).")
+    reason = "first run" if not target.exists() else "the index predates the current shape"
+    logger.info("Building the Berkeley catalog index from packaged data (%s).", reason)
     return build(target)
+
+
+def _schema_current(target: Path) -> bool:
+    """Return whether an existing index was built by this version of the code."""
+    try:
+        with connect(target) as conn:
+            return meta(conn).get("schema_version") == SCHEMA_VERSION
+    except (CatalogError, sqlite3.DatabaseError):
+        return False
 
 
 # -- reads --------------------------------------------------------------------
@@ -382,14 +466,7 @@ def search(conn: sqlite3.Connection, *, query: str = "", subject: str | None = N
             ).fetchall()
             total = len(rows)
         if rows:
-            info = meta(conn)
-            return {
-                "courses": [format_course(conn, row, preview=True) for row in rows],
-                "total": total,
-                "catalog_as_of": info.get("catalog_as_of", "unknown"),
-                "offerings_as_of": info.get("offerings_as_of", "unknown"),
-                "terms_known": terms_known(conn),
-            }
+            return _result(conn, rows, total, limit, subject)
         for join in ("AND", "OR"):
             expression = _match_expression(query, join)
             if not expression:
@@ -400,19 +477,26 @@ def search(conn: sqlite3.Connection, *, query: str = "", subject: str | None = N
             # words. Title equality comes first, then the phrase appearing in a title,
             # then relevance. The MATCH expression is still the quoted-token one, so
             # nothing here reopens operator injection.
+            # Three tiers, then relevance. Inside tier 0 every title *is* the query, so
+            # bm25 is noise there and would reorder identically-titled courses run to
+            # run; the code decides instead, which is stable.
             sql = (
-                "SELECT c.*, bm25(catalog_fts, 4.0, 4.0, 8.0, 1.0) AS rank FROM catalog_fts "
-                "JOIN catalog_courses c ON c.rowid = catalog_fts.rowid "
-                f"WHERE {where} "
-                "ORDER BY CASE WHEN lower(c.title) = ? THEN 0 "
-                "              WHEN lower(c.title) LIKE ? ESCAPE '\\' THEN 1 "
-                "              ELSE 2 END, rank LIMIT ?"
+                "SELECT * FROM (SELECT c.*, bm25(catalog_fts, 4.0, 4.0, 8.0, 1.0) AS rank, "
+                "  CASE WHEN lower(c.title) = ? THEN 0 "
+                "       WHEN lower(c.title) LIKE ? ESCAPE '\\' THEN 1 "
+                "       ELSE 2 END AS tier "
+                "  FROM catalog_fts JOIN catalog_courses c ON c.rowid = catalog_fts.rowid "
+                f"  WHERE {where}) "
+                "ORDER BY tier, CASE WHEN tier = 0 THEN 0.0 ELSE rank END, subject, number LIMIT ?"
             )
             exact, phrase = _title_rank_patterns(query)
             try:
-                rows = conn.execute(sql, [expression, *params, exact, phrase, limit]).fetchall()
+                rows = conn.execute(
+                    sql, [exact, phrase, expression, *params, limit * _GROUP_OVERFETCH]
+                ).fetchall()
                 total = int(conn.execute(
-                    f"SELECT COUNT(*) FROM catalog_fts JOIN catalog_courses c ON c.rowid = catalog_fts.rowid WHERE {where}",
+                    "SELECT COUNT(DISTINCT c.group_key) FROM catalog_fts "
+                    f"JOIN catalog_courses c ON c.rowid = catalog_fts.rowid WHERE {where}",
                     [expression, *params],
                 ).fetchone()[0])
             except sqlite3.OperationalError:
@@ -424,18 +508,14 @@ def search(conn: sqlite3.Connection, *, query: str = "", subject: str | None = N
     else:
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
         rows = conn.execute(
-            f"SELECT c.* FROM catalog_courses c{where} ORDER BY c.subject, c.number LIMIT ?", [*params, limit]
+            f"SELECT c.* FROM catalog_courses c{where} ORDER BY c.subject, c.number LIMIT ?",
+            [*params, limit * _GROUP_OVERFETCH],
         ).fetchall()
-        total = int(conn.execute(f"SELECT COUNT(*) FROM catalog_courses c{where}", params).fetchone()[0])
+        total = int(conn.execute(
+            f"SELECT COUNT(DISTINCT c.group_key) FROM catalog_courses c{where}", params
+        ).fetchone()[0])
 
-    info = meta(conn)
-    return {
-        "courses": [format_course(conn, row, preview=True) for row in rows],
-        "total": total,
-        "catalog_as_of": info.get("catalog_as_of", "unknown"),
-        "offerings_as_of": info.get("offerings_as_of", "unknown"),
-        "terms_known": terms_known(conn),
-    }
+    return _result(conn, rows, total, limit, subject)
 
 
 def _like_search(conn: sqlite3.Connection, query: str, clauses: list[str], params: list[Any],
@@ -455,10 +535,78 @@ def _like_search(conn: sqlite3.Connection, query: str, clauses: list[str], param
         "ORDER BY CASE WHEN lower(c.title) = ? THEN 0 "
         "              WHEN lower(c.title) LIKE ? ESCAPE '\\' THEN 1 "
         "              ELSE 2 END, c.subject, c.number LIMIT ?",
-        [*values, *params, exact, phrase, limit],
+        [*values, *params, exact, phrase, limit * _GROUP_OVERFETCH],
     ).fetchall()
-    total = int(conn.execute(f"SELECT COUNT(*) FROM catalog_courses c WHERE {full}", [*values, *params]).fetchone()[0])
+    total = int(conn.execute(
+        f"SELECT COUNT(DISTINCT c.group_key) FROM catalog_courses c WHERE {full}", [*values, *params]
+    ).fetchone()[0])
     return rows, total
+
+
+def _result(conn: sqlite3.Connection, rows: list[sqlite3.Row], total: int, limit: int,
+            subject: str | None) -> dict[str, Any]:
+    """Render ranked rows as one entry per course, whatever it is cross-listed as."""
+    info = meta(conn)
+    return {
+        "courses": collapse_cross_listings(conn, rows, limit, subject),
+        "total": total,
+        "catalog_as_of": info.get("catalog_as_of", "unknown"),
+        "offerings_as_of": info.get("offerings_as_of", "unknown"),
+        "terms_known": terms_known(conn),
+    }
+
+
+def collapse_cross_listings(conn: sqlite3.Connection, rows: list[sqlite3.Row], limit: int,
+                            subject: str | None) -> list[dict[str, Any]]:
+    """Keep one row per cross-listing group, naming the other codes on it.
+
+    DATA C204, STS C204, and HISTORY C254 are one course; returning all three fills a
+    third of a page of suggestions with the same class. The row shown is the one the
+    student asked for when they filtered by subject, and otherwise the alphabetically
+    first code, so the choice does not depend on which member the ranking happened to
+    surface first.
+    """
+    wanted = (subject or "").strip().upper()
+    chosen: dict[str, sqlite3.Row] = {}
+    for row in rows:
+        key = str(row["group_key"]) or f"{row['subject']} {row['number']}"
+        current = chosen.get(key)
+        if current is None or _preferred(row, current, wanted):
+            chosen[key] = row
+
+    ordered = [chosen[key] for key in list(chosen)[:limit]]
+    rendered = []
+    for row in ordered:
+        course = format_course(conn, row, preview=True)
+        others = group_members(conn, str(row["group_key"]), exclude=(str(row["subject"]), str(row["number"])))
+        if others:
+            course["also_listed_as"] = others
+        rendered.append(course)
+    return rendered
+
+
+def _preferred(candidate: sqlite3.Row, current: sqlite3.Row, wanted_subject: str) -> bool:
+    """Return whether *candidate* should represent its group instead of *current*."""
+    if wanted_subject:
+        if str(candidate["subject"]) == wanted_subject and str(current["subject"]) != wanted_subject:
+            return True
+        if str(current["subject"]) == wanted_subject:
+            return False
+    return (str(candidate["subject"]), str(candidate["number"])) < (str(current["subject"]), str(current["number"]))
+
+
+def group_members(conn: sqlite3.Connection, group_key: str, *, exclude: tuple[str, str]) -> list[str]:
+    """Return the other codes a course is listed under."""
+    if not group_key:
+        return []
+    return [
+        f"{row['subject']} {row['number']}"
+        for row in conn.execute(
+            "SELECT subject, number FROM catalog_courses WHERE group_key = ? ORDER BY subject, number",
+            (group_key,),
+        )
+        if (str(row["subject"]), str(row["number"])) != exclude
+    ]
 
 
 def details(conn: sqlite3.Connection, subject: str, number: str) -> dict[str, Any] | None:
