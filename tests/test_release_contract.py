@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import io
+import os
 import re
+import subprocess
 import sys
 import tomllib
 from contextlib import redirect_stdout
@@ -23,6 +25,29 @@ EXPECTED_TOOLS = {
 EXPECTED_PROMPTS = {"tutor", "practice", "weekly_plan", "explain_assignment", "course_planner"}
 
 WRITE_WORDS = re.compile(r"\b(submit|upload|post|send|delete|create|update|write|enroll|drop|message|email)\b", re.I)
+
+#: Addresses the event loop talks to itself on. A connection to one of these is
+#: plumbing inside the process, not a network call.
+LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost", ""})
+
+
+def bare_environment() -> dict[str, str]:
+    """Return the smallest environment the server can be expected to start in.
+
+    The point of these checks is that a host can spawn the server with nothing
+    inherited from a shell. Windows draws that line in a different place: without
+    ``SYSTEMROOT`` the loader cannot initialise Winsock, and `import asyncio` — which
+    the MCP SDK does at import time — dies with WinError 10106 before a line of
+    OpenMind's own code runs. Those variables belong to the operating system, not to
+    OpenMind's configuration, so keeping them gives up nothing this check is about.
+    """
+    environment = {"PATH": "/usr/bin:/bin", "PYTHONPATH": str(REPO_ROOT / "src"), "HOME": "/tmp"}
+    if os.name == "nt":
+        for name in ("SYSTEMROOT", "PATHEXT", "TEMP", "TMP", "USERPROFILE"):
+            value = os.environ.get(name)
+            if value:
+                environment[name] = value
+    return environment
 
 
 def describe():
@@ -176,12 +201,9 @@ def test_the_version_is_consistent_across_the_package_and_the_changelog():
 
 def test_importing_the_server_prints_nothing_to_stdout():
     """Anything on stdout corrupts the protocol frame a host is waiting for."""
-    import subprocess
-
     result = subprocess.run(
         [sys.executable, "-c", "import openmind.server; import openmind.cli"],
-        capture_output=True, text=True, env={"PATH": "/usr/bin:/bin", "PYTHONPATH": str(REPO_ROOT / "src"),
-                                             "HOME": "/tmp"},
+        capture_output=True, text=True, env=bare_environment(),
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout == "", f"the server wrote to stdout on import: {result.stdout!r}"
@@ -195,14 +217,32 @@ def test_listing_tools_writes_nothing_to_stdout():
 
 
 def test_starting_the_server_makes_no_network_calls_and_reads_no_config(monkeypatch):
-    """A host spawns this process on launch; it must not touch Canvas or the disk yet."""
+    """A host spawns this process on launch; it must not touch Canvas or the disk yet.
+
+    Loopback is allowed and nothing else: asyncio's Windows proactor loop builds its
+    own wakeup pipe out of a connected socket pair on 127.0.0.1 the moment the loop is
+    created, which is the event loop starting, not the server reaching the network.
+    """
     import socket
 
-    def forbidden(*args, **kwargs):
-        raise AssertionError("the server opened a socket during startup")
+    real_connect = socket.socket.connect
+    real_getaddrinfo = socket.getaddrinfo
 
-    monkeypatch.setattr(socket.socket, "connect", forbidden)
-    monkeypatch.setattr(socket, "getaddrinfo", forbidden)
+    def host_of(address) -> str:
+        return str(address[0]) if isinstance(address, tuple) else str(address)
+
+    def connect(self, address, *args, **kwargs):
+        if host_of(address) not in LOOPBACK:
+            raise AssertionError(f"the server opened a socket to {host_of(address)} during startup")
+        return real_connect(self, address, *args, **kwargs)
+
+    def getaddrinfo(host, *args, **kwargs):
+        if host is not None and str(host) not in LOOPBACK:
+            raise AssertionError(f"the server resolved {host} during startup")
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
 
     from openmind.config import ConfigError
 
@@ -216,13 +256,11 @@ def test_starting_the_server_makes_no_network_calls_and_reads_no_config(monkeypa
 
 
 def test_pypdf_is_not_imported_until_a_document_is_read():
-    import subprocess
-
     result = subprocess.run(
         [sys.executable, "-c", "import sys, openmind.server; print('pypdf' in sys.modules)"],
-        capture_output=True, text=True,
-        env={"PATH": "/usr/bin:/bin", "PYTHONPATH": str(REPO_ROOT / "src"), "HOME": "/tmp"},
+        capture_output=True, text=True, env=bare_environment(),
     )
+    assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "False", "pypdf is imported at startup, slowing every launch"
 
 
