@@ -7,11 +7,15 @@ Nothing in this suite may go near a real Claude or Cursor config.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from pathlib import Path
 
 import pytest
 
 from openmind import cli, hosts
+
+WINDOWS_ONLY = pytest.mark.skipif(os.name != "nt", reason="Windows-only launcher layout")
 
 
 @pytest.fixture
@@ -182,7 +186,14 @@ def test_claude_code_is_registered_through_its_own_command(host_dir: Path, monke
 
 
 def test_claude_code_without_the_cli_prints_the_command_instead(host_dir: Path, monkeypatch, capsys):
-    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    """`cli.shutil` is the stdlib module itself, so a blind stub answers for every
+    lookup in the process — including the one that finds this install's launcher. Only
+    `claude` is missing here."""
+    real_which = shutil.which
+    monkeypatch.setattr(
+        cli.shutil, "which",
+        lambda name, *args, **kwargs: None if name == "claude" else real_which(name, *args, **kwargs),
+    )
 
     code, out, _ = run(["mcp", "--write", "claude-code", "--yes"], capsys)
 
@@ -234,10 +245,19 @@ def test_doctor_reports_an_entry_pointing_at_a_missing_binary(host_dir: Path, ca
     assert code == 1
 
 
-def test_doctor_reports_a_stale_entry_pointing_at_another_install(host_dir: Path, capsys):
-    """An upgrade that moved the binary leaves the host silently talking to nothing."""
+def test_doctor_reports_a_stale_entry_pointing_at_another_install(host_dir: Path, tmp_path: Path, capsys):
+    """An upgrade that moved the binary leaves the host silently talking to nothing.
+
+    The old install has to be runnable, or doctor rightly reports the simpler fault
+    instead. `SCRIPT_NAMES[0]` carries the extension Windows needs to consider a file
+    executable at all; the mode bit is what POSIX asks for.
+    """
+    other = tmp_path / "old-install" / hosts.SCRIPT_NAMES[0]
+    other.parent.mkdir()
+    other.write_text("#!/bin/sh\n", encoding="utf-8")
+    other.chmod(0o755)
     hosts.cursor_path().write_text(
-        json.dumps({"mcpServers": {"openmind": {"command": "/bin/sh"}}}), encoding="utf-8"
+        json.dumps({"mcpServers": {"openmind": {"command": str(other)}}}), encoding="utf-8"
     )
 
     code, out, _ = run(["doctor"], capsys)
@@ -256,13 +276,17 @@ def test_host_status_is_none_for_hosts_without_a_config_file(host_dir: Path):
 
 @pytest.fixture
 def fake_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """An interpreter with an `openmind-mcp` beside it, and nothing useful on PATH."""
+    """An interpreter with an `openmind-mcp` beside it, and nothing useful on PATH.
+
+    The launcher is named the way this platform names it — `openmind-mcp.exe` on
+    Windows — because an install that Windows cannot execute is not an install.
+    """
     bin_dir = tmp_path / "install" / "bin"
     bin_dir.mkdir(parents=True)
     interpreter = bin_dir / "python"
     interpreter.write_text("#!/bin/sh\n", encoding="utf-8")
     interpreter.chmod(0o755)
-    script = bin_dir / "openmind-mcp"
+    script = bin_dir / hosts.SCRIPT_NAMES[0]
     script.write_text("#!/bin/sh\nexec python -m openmind.server\n", encoding="utf-8")
     script.chmod(0o755)
 
@@ -306,7 +330,7 @@ def test_a_symlinked_interpreter_is_not_followed_to_its_target(tmp_path: Path, m
     venv_bin = tmp_path / "venv" / "bin"
     venv_bin.mkdir(parents=True)
     (venv_bin / "python").symlink_to(real_bin / "python3")
-    script = venv_bin / "openmind-mcp"
+    script = venv_bin / hosts.SCRIPT_NAMES[0]
     script.write_text("#!/bin/sh\n", encoding="utf-8")
     script.chmod(0o755)
 
@@ -324,7 +348,7 @@ def test_a_directory_entry_named_like_the_script_is_not_mistaken_for_it(tmp_path
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "python").write_text("#!/bin/sh\n", encoding="utf-8")
-    (bin_dir / "openmind-mcp").mkdir()
+    (bin_dir / hosts.SCRIPT_NAMES[0]).mkdir()
 
     empty = tmp_path / "empty"
     empty.mkdir()
@@ -336,6 +360,12 @@ def test_a_directory_entry_named_like_the_script_is_not_mistaken_for_it(tmp_path
 
 
 def test_a_non_executable_script_is_not_offered_to_a_host(tmp_path: Path, monkeypatch):
+    """A file the operating system will not run is not a launcher.
+
+    Each platform is asked in its own terms: POSIX reads the mode bit, and Windows —
+    where every readable file passes `os.access(X_OK)` — reads the extension, and an
+    `openmind-mcp` with no extension is not something it can execute.
+    """
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "python").write_text("#!/bin/sh\n", encoding="utf-8")
@@ -349,6 +379,41 @@ def test_a_non_executable_script_is_not_offered_to_a_host(tmp_path: Path, monkey
     monkeypatch.setenv("PATH", str(empty))
 
     assert hosts.find_server_script() is None
+
+
+def test_executability_is_decided_the_way_this_platform_decides_it(tmp_path: Path):
+    """The one rule the rest of this file leans on, stated directly."""
+    script = tmp_path / hosts.SCRIPT_NAMES[0]
+    script.write_text("#!/bin/sh\n", encoding="utf-8")
+    script.chmod(0o755)
+    assert hosts.is_executable(script)
+
+    plain = tmp_path / "notes.txt"
+    plain.write_text("hello\n", encoding="utf-8")
+    plain.chmod(0o644)
+    assert not hosts.is_executable(plain), "a text file is not a launcher on any platform"
+
+    assert not hosts.is_executable(tmp_path), "a directory is not a launcher"
+    assert not hosts.is_executable(tmp_path / "absent")
+
+
+@WINDOWS_ONLY
+def test_the_launcher_is_found_in_the_scripts_directory_below_the_interpreter(tmp_path: Path, monkeypatch):
+    """A Windows install puts `python.exe` at the root of the prefix and the console
+    scripts in `Scripts` below it, so looking only beside the interpreter finds nothing."""
+    prefix = tmp_path / "prefix"
+    (prefix / "Scripts").mkdir(parents=True)
+    (prefix / "python.exe").write_text("", encoding="utf-8")
+    script = prefix / "Scripts" / "openmind-mcp.exe"
+    script.write_text("", encoding="utf-8")
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.setattr(hosts.sys, "executable", str(prefix / "python.exe"))
+    monkeypatch.setattr(hosts.sys, "argv", [str(prefix / "Scripts" / "openmind")])
+    monkeypatch.setenv("PATH", str(empty))
+
+    assert hosts.find_server_script() == script
 
 
 def test_the_missing_launcher_error_names_where_it_looked(no_install):
@@ -427,7 +492,7 @@ def test_an_entry_reached_by_a_different_but_equivalent_path_is_current(host_dir
     alias = tmp_path / "alias"
     alias.symlink_to(fake_install.parent)
     hosts.claude_desktop_path().write_text(
-        json.dumps({"mcpServers": {"openmind": {"command": str(alias / "openmind-mcp")}}}), encoding="utf-8"
+        json.dumps({"mcpServers": {"openmind": {"command": str(alias / fake_install.name)}}}), encoding="utf-8"
     )
 
     _, out, _ = run(["doctor"], capsys)

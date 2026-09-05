@@ -51,6 +51,44 @@ SCRIPT_NAMES: Final[tuple[str, ...]] = (
     ("openmind-mcp.exe", "openmind-mcp") if os.name == "nt" else ("openmind-mcp",)
 )
 
+#: Where an installer puts console scripts, relative to the interpreter's directory.
+#: A POSIX install drops them next to ``python`` itself; a Windows install puts
+#: ``python.exe`` at the root of the prefix and the scripts one level down in
+#: ``Scripts``, so both have to be looked at.
+SCRIPT_DIRECTORIES: Final[tuple[str, ...]] = ("", "Scripts") if os.name == "nt" else ("",)
+
+#: The extensions Windows will execute when no interpreter is named.
+DEFAULT_PATHEXT: Final[str] = ".COM;.EXE;.BAT;.CMD"
+
+
+def is_executable(path: Path) -> bool:
+    """Return whether the operating system would run this file if asked to.
+
+    ``os.access(path, os.X_OK)`` answers the question on POSIX and lies on Windows,
+    where it is true for every readable file — including a text file that no host
+    could ever launch. Windows decides by extension instead, so this asks ``PATHEXT``.
+    """
+    if not path.is_file():
+        return False
+    if os.name != "nt":
+        return os.access(path, os.X_OK)
+    suffix = path.suffix.lower()
+    extensions = os.environ.get("PATHEXT") or DEFAULT_PATHEXT  # always ";"-separated, on Windows only
+    return suffix in {ext.strip().lower() for ext in extensions.split(";") if ext.strip()}
+
+
+def _same_path(left: Path, right: Path) -> bool:
+    """Return whether two paths name the same file once resolved.
+
+    Case is not significant on Windows or on a default macOS volume, so the comparison
+    is made through ``os.path.normcase`` — otherwise ``C:\\Users`` and ``c:\\users``
+    read as two different installs.
+    """
+    try:
+        return os.path.normcase(left.resolve()) == os.path.normcase(right.resolve())
+    except OSError:  # pragma: no cover - unresolvable path in a config
+        return False
+
 
 def searched_directories() -> list[Path]:
     """Return the directories checked for this install's ``openmind-mcp``, in order.
@@ -58,9 +96,11 @@ def searched_directories() -> list[Path]:
     ``sys.executable`` is deliberately **not** resolved. In a virtualenv it is a symlink
     to a base interpreter that usually has no ``openmind`` installed at all; following it
     is how the old code ended up writing a launch command that could not import the
-    server.
+    server. On Windows the launcher is not beside the interpreter at all — it is in
+    the ``Scripts`` directory below it — so that is searched too.
     """
-    directories: list[Path] = [Path(sys.executable).parent]
+    interpreter = Path(sys.executable).parent
+    directories: list[Path] = [interpreter / part if part else interpreter for part in SCRIPT_DIRECTORIES]
     if sys.argv and sys.argv[0]:
         with contextlib.suppress(OSError):  # an unresolvable argv[0] is not worth failing over
             directories.append(Path(sys.argv[0]).resolve().parent)
@@ -82,7 +122,7 @@ def find_server_script() -> Path | None:
     for directory in searched_directories():
         for name in SCRIPT_NAMES:
             candidate = directory / name
-            if candidate.is_file() and os.access(candidate, os.X_OK):
+            if is_executable(candidate):
                 return candidate
     for name in SCRIPT_NAMES:
         found = shutil.which(name)
@@ -125,16 +165,15 @@ def command_line() -> str:
 def same_script(command: str) -> bool:
     """Return whether a host entry's command is this install's launcher.
 
-    Both sides are resolved before comparing, so a symlinked bin directory or a
+    ``command`` is the entry's command as the host stored it: a path, which on Windows
+    routinely contains a space (``C:\\Program Files\\...``) and so must not be split on
+    one. Both sides are resolved before comparing, so a symlinked bin directory or a
     ``/private`` prefix on macOS does not read as a different install.
     """
     script = find_server_script()
     if script is None or not command:
         return False
-    try:
-        return Path(command.split(" ")[0]).resolve() == script.resolve()
-    except OSError:  # pragma: no cover - unresolvable path in a config
-        return False
+    return _same_path(Path(command), script)
 
 
 def _override_dir() -> Path | None:
@@ -322,8 +361,8 @@ def status(host: Host) -> Status | None:
         if isinstance(found, dict):
             configured = True
             command = " ".join([str(found.get("command") or ""), *(str(a) for a in found.get("args") or [])]).strip()
-            executable = Path(str(found.get("command") or ""))
-            runnable = executable.exists() and os.access(executable, os.X_OK)
-            current = same_script(command)
+            executable = str(found.get("command") or "")
+            runnable = bool(executable) and is_executable(Path(executable))
+            current = same_script(executable)
 
     return Status(host, exists=exists, configured=configured, command=command, runnable=runnable, current=current)
