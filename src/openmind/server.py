@@ -625,6 +625,12 @@ def main() -> int:
         stream=sys.stderr,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    # httpx logs every request at INFO, which turns the daily catalog check's expected
+    # 404 into noise on a host's server log. OpenMind's own loggers stay at INFO so a
+    # student reporting a problem still gets something useful.
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+    logger.setLevel(logging.INFO)
     mcp.run()
     return 0
 

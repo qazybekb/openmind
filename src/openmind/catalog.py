@@ -714,7 +714,11 @@ def fit_previews(payload: dict[str, Any], budget: int, *, floor: int = MIN_PREVI
     if not isinstance(courses, list) or not courses:
         return payload
 
-    while len(json.dumps(payload, default=str)) > budget:
+    def size() -> int:
+        """Measure the payload the way the tool serialises it, not with default spacing."""
+        return len(json.dumps(payload, default=str, separators=(",", ":")))
+
+    while size() > budget:
         longest = max(courses, key=lambda c: len(str(c.get("description") or "")))
         text = str(longest.get("description") or "")
         if len(text) <= floor:

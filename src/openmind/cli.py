@@ -14,6 +14,7 @@ import logging
 import os
 import shutil
 import sys
+from datetime import date
 from getpass import getpass
 from pathlib import Path
 from typing import Any, Final
@@ -25,6 +26,9 @@ from openmind.config import CANVAS_URL, Config, ConfigError, config_path, home_d
 logger = logging.getLogger(__name__)
 
 MIN_PYTHON: Final[tuple[int, int]] = (3, 11)
+# Berkeley publishes a new catalog each academic year; four months without an update
+# means the update path is broken, not that nothing changed.
+STALE_CATALOG_DAYS: Final[int] = 120
 MAX_NICKNAME_LENGTH: Final[int] = 40
 TOKEN_HELP: Final[str] = (
     "Create one in bCourses: Account -> Settings -> Approved Integrations -> + New Access Token."
@@ -426,10 +430,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             info = catalog.meta(conn)
             count = conn.execute("SELECT COUNT(*) FROM catalog_courses").fetchone()[0]
             offerings = conn.execute("SELECT COUNT(*) FROM term_offerings").fetchone()[0]
-        out(f"Catalog: {count} courses, snapshot {info.get('catalog_as_of', 'unknown')}")
+        as_of = info.get("catalog_as_of", "unknown")
+        out(f"Catalog: {count} courses, snapshot {as_of}")
         out(f"Offerings: {offerings} course-terms, snapshot {info.get('offerings_as_of', 'none')}")
         terms = json.loads(info.get("terms_known") or "[]")
         out(f"  terms known: {', '.join(terms) or 'none'}")
+        problems += _report_snapshot_age(as_of)
+        problems += _report_stale_subjects()
     except Exception as exc:
         err(f"Catalog: not built ({exc}). Run `openmind update-data`.")
         problems += 1
@@ -446,6 +453,32 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 # -- index / data / clear / config ---------------------------------------------
+
+
+def _report_snapshot_age(as_of: str) -> int:
+    """Warn when the catalog snapshot is old enough to be misleading. Returns problems found."""
+    try:
+        captured = date.fromisoformat(as_of)
+    except ValueError:
+        err("  the snapshot has no usable date; run `openmind update-data --rebuild`")
+        return 1
+    age = (date.today() - captured).days
+    if age > STALE_CATALOG_DAYS:
+        err(f"  that snapshot is {age} days old; course data has moved on. Run `openmind update-data`.")
+        return 1
+    out(f"  {age} day(s) old")
+    return 0
+
+
+def _report_stale_subjects() -> int:
+    """Name the departments whose offerings were carried forward from an older crawl."""
+    stale = catalog.load_meta_file().get("stale_subjects") or []
+    if not stale:
+        return 0
+    err(f"  {len(stale)} subject(s) have carried-forward offerings: {', '.join(str(s) for s in stale[:6])}"
+        + (" and others" if len(stale) > 6 else ""))
+    err("  their course lists may be a day or more behind; check the class schedule for those.")
+    return 1
 
 
 def cmd_index(args: argparse.Namespace) -> int:

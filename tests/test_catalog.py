@@ -313,6 +313,7 @@ def test_ranking_patterns_cannot_inject_operators_or_wildcards(query: str, packa
 
 def test_a_full_page_of_results_fits_the_tool_budget(packaged: Path):
     """Ten results used to be trimmed to six by `shrink`, silently losing the tail."""
+    from openmind import service
     from openmind.service import BUDGETS
 
     envelope = {
@@ -332,7 +333,8 @@ def test_a_full_page_of_results_fits_the_tool_budget(packaged: Path):
             # A query with fewer than ten distinct courses returns fewer; what must not
             # happen is the budget silently dropping any of the ones it found.
             assert len(payload["courses"]) == min(10, payload["total"]), query
-            size = len(json.dumps(payload, default=str))
+            # Measured the way the tool serialises it, which is what the budget describes.
+            size = service.encoded_size(payload)
             assert size <= BUDGETS["search_catalog"], f"{query!r} produced {size} bytes"
 
 

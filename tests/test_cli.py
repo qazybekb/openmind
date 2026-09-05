@@ -359,3 +359,57 @@ def test_a_second_update_data_run_does_not_rebuild(config, sample_catalog, capsy
     assert code == 0
     assert "Built the catalog" not in out
     assert "turned off in your config" in out
+
+
+# -- catalog freshness reporting ---------------------------------------------------
+
+
+def test_doctor_reports_the_snapshot_dates_and_terms(config, canvas, stored_token, sample_catalog, capsys):
+    code, out, _ = run(["doctor"], capsys)
+
+    assert code == 0
+    assert "snapshot 2026-09-05" in out
+    assert "terms known: Fall 2026" in out
+    assert "day(s) old" in out
+
+
+def test_doctor_warns_about_a_stale_catalog_snapshot(config, canvas, stored_token, sample_catalog, capsys):
+    """Advice from a year-old catalog looks identical to advice from a fresh one."""
+    from openmind import catalog
+
+    with catalog.connect() as conn:
+        conn.execute("UPDATE meta SET value = '2024-01-01' WHERE key = 'catalog_as_of'")
+        conn.commit()
+
+    code, _, err = run(["doctor"], capsys)
+
+    assert code == 1
+    assert "days old" in err
+    assert "openmind update-data" in err
+
+
+def test_doctor_names_subjects_whose_offerings_were_carried_forward(config, canvas, stored_token,
+                                                                    sample_catalog, monkeypatch, capsys):
+    from openmind import catalog
+
+    monkeypatch.setattr(catalog, "load_meta_file",
+                        lambda: {"stale_subjects": ["STAT (Fall 2026)", "COMPSCI (Fall 2026)"]})
+
+    code, _, err = run(["doctor"], capsys)
+
+    assert code == 1
+    assert "carried-forward offerings" in err
+    assert "STAT (Fall 2026)" in err
+
+
+def test_a_snapshot_with_an_unusable_date_is_reported(config, canvas, stored_token, sample_catalog, capsys):
+    from openmind import catalog
+
+    with catalog.connect() as conn:
+        conn.execute("UPDATE meta SET value = 'sometime' WHERE key = 'catalog_as_of'")
+        conn.commit()
+
+    code, _, err = run(["doctor"], capsys)
+
+    assert code == 1
+    assert "no usable date" in err

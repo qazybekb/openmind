@@ -68,6 +68,16 @@ class ServiceError(Exception):
     """An operation could not be completed and the student should be told why."""
 
 
+def encoded_size(payload: Any) -> int:
+    """Measure a payload the way the tools serialise it.
+
+    `server._json` emits compact separators, so measuring with Python's spacier default
+    made every budget stop several hundred bytes early — a page short of results for no
+    reason a student could see.
+    """
+    return len(json.dumps(payload, default=str, separators=(",", ":")))
+
+
 def shrink(payload: dict[str, Any], budget: int) -> dict[str, Any]:
     """Trim a payload to a byte budget by dropping list items from the end.
 
@@ -75,7 +85,7 @@ def shrink(payload: dict[str, Any], budget: int) -> dict[str, Any]:
     list has no way to know it. Dropping whole entries and adding a ``truncated`` note
     keeps the JSON valid and the omission visible.
     """
-    if len(json.dumps(payload, default=str)) <= budget:
+    if encoded_size(payload) <= budget:
         return payload
 
     trimmed = dict(payload)
@@ -86,7 +96,7 @@ def shrink(payload: dict[str, Any], budget: int) -> dict[str, Any]:
         preview = dict(trimmed)
         preview["truncated"] = True
         preview["warnings"] = [*(trimmed.get("warnings") or []), _omission_note(dropped or 1)]
-        return len(json.dumps(preview, default=str))
+        return encoded_size(preview)
 
     for key in _LIST_KEYS:
         values = trimmed.get(key)
@@ -118,7 +128,7 @@ def fit_prose(payload: dict[str, Any], field: str, text: str, offset: int, reque
     """
     payload[field] = ""
     payload.pop(cursor_field, None)
-    fixed = len(json.dumps(payload, default=str))
+    fixed = encoded_size(payload)
     room = max(0, budget - fixed - _JSON_STRING_OVERHEAD)
     take = min(requested, room)
 
@@ -146,7 +156,7 @@ def fit_page(payload: dict[str, Any], records: Sequence[tuple[str, Any]], budget
     emitted = 0
     for key, record in records:
         payload[key].append(record)
-        if len(json.dumps(payload, default=str)) > budget and emitted:
+        if encoded_size(payload) > budget and emitted:
             payload[key].pop()
             break
         emitted += 1
@@ -1331,7 +1341,7 @@ def _trim_facts(payload: dict[str, Any], budget: int, *, floor: int = 400) -> No
     if not isinstance(facts, dict):
         return
 
-    while len(json.dumps(payload, default=str)) > budget:
+    while encoded_size(payload) > budget:
         rubric = facts.get("rubric")
         description = str(facts.get("description") or "")
         if isinstance(rubric, list) and len(rubric) > 3:

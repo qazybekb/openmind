@@ -8,6 +8,7 @@ complete, a host check that let the scheme through.
 from __future__ import annotations
 
 import io
+import json
 import zipfile
 from pathlib import Path
 
@@ -235,3 +236,33 @@ def test_an_off_api_link_is_not_followed():
 
 def test_the_page_limit_constant_is_still_what_callers_get(home: Path):
     assert canvas_module.MAX_PAGES == 20
+
+
+# -- C2/C3: logging and measurement -------------------------------------------------
+
+
+def test_the_server_quiets_the_http_client_loggers(monkeypatch: pytest.MonkeyPatch):
+    """httpx logs every request at INFO, turning the daily 404 check into stderr noise."""
+    import logging
+
+    from openmind import server
+
+    for name in ("httpx", "httpcore", "openmind"):
+        logging.getLogger(name).setLevel(logging.NOTSET)
+    monkeypatch.setattr(server.mcp, "run", lambda *a, **k: None)
+
+    server.main()
+
+    assert logging.getLogger("httpx").level == logging.WARNING
+    assert logging.getLogger("httpcore").level == logging.WARNING
+    assert logging.getLogger("openmind").level == logging.INFO
+
+
+def test_budgets_are_measured_the_way_the_tools_serialise():
+    """Measuring with Python's default spacing stopped every page hundreds of bytes early."""
+    from openmind import server
+    from openmind.service import encoded_size
+
+    payload = {"courses": [{"subject": "STAT", "number": "156", "title": "Causal Inference"}] * 5}
+    assert encoded_size(payload) == len(server._json(payload))
+    assert encoded_size(payload) < len(json.dumps(payload, default=str))

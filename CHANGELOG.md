@@ -52,6 +52,36 @@ model; nothing about its setup carries over. Your old `~/.openmind` files are le
 - Privacy copy that implied on-device AI. The docs and the website now say plainly that
   the host model's provider receives your course data.
 
+### Fixed before release, found by driving the server over stdio
+- Catalog search buried the obvious answer: searching "causal inference" never returned
+  STAT 156, the course actually called Causal Inference.
+- A page of ten catalog results was silently cut to six by the response size limit.
+- The Berkeley catalog could not be built without a bCourses token, even though it is
+  public data that ships in the package.
+- Tutoring prompts failed with a generic error instead of saying "run `openmind setup`"
+  when no token was stored.
+- `pytest` and `python -m pytest` disagreed about whether the test suite could load.
+
+### Fixed before release, found by an implementation review
+- `get_deadlines` promised a next page it had not delivered, so 19 of 30 assignments
+  were unreachable, and overdue work had no continuation at all.
+- Every page of a non-indexed course's materials returned the first page again.
+- A slide longer than the response limit returned "nothing left to read" and could never
+  be read at all.
+- The data refresh job published an empty offerings table when the class schedule was
+  down, which would have told every student their courses were not offered.
+- Document extraction limits were declared but not enforced: a 624-byte slide deck
+  expanded to 400,100 characters and reported itself complete.
+- A course list that hit the page limit was cached as if it were the whole list.
+- A pagination link could downgrade the connection to plain HTTP and carry the bCourses
+  token with it.
+- A document that failed to extract once was never retried, and the failure count reset
+  to zero while it was still broken.
+- A page deleted from bCourses kept being quoted from the local index with no warning.
+- Long assignment descriptions and syllabi could push a response past its size limit.
+- Cross-listed courses appeared once per code, so three of ten course suggestions could
+  be the same class.
+
 ## 1.0.0 — 2026-03-01
 
 Initial release: a terminal Canvas study assistant for UC Berkeley.
