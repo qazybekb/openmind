@@ -1249,16 +1249,22 @@ class Session:
         with catalog.connect() as conn:
             course = catalog.details(conn, subject, number)
             known = catalog.terms_known(conn)
+            snapshot_note = catalog.offerings_note(conn)
         if course is None:
             raise ServiceError(
                 f"{subject.upper()} {number} is not in the catalog snapshot. Check the subject code with "
                 "search_catalog, or try check_offering for live section data."
             )
         payload = {"course": course, "terms_known": known, **self.stamp()}
+        # One note, not two: why this course has no sections listed and why the snapshot
+        # they would have come from is older than the catalog are the same question.
+        notes: list[str] = []
         if "offered_terms" not in course:
-            payload["offerings_note"] = (
-                "No scheduled sections are known for this course in the terms covered by the snapshot."
-            )
+            notes.append("No scheduled sections are known for this course in the terms covered by the snapshot.")
+        if snapshot_note:
+            notes.append(snapshot_note)
+        if notes:
+            payload["offerings_note"] = " ".join(notes)
         return shrink(payload, BUDGETS["get_catalog_course"])
 
     def _schedule_terms(self) -> list[schedule.Facet]:

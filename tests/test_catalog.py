@@ -272,6 +272,28 @@ def test_meta_json_is_read_from_the_data_snapshot(sample_catalog):
     assert json.loads(info["terms_known"]) == ["Fall 2026"]
 
 
+NOT_REFRESHED = "offerings not refreshed: classes.berkeley.edu returned HTTP 403; previous snapshot kept"
+
+
+def test_a_snapshot_that_kept_its_previous_offerings_says_so(sample_catalog: Path):
+    """An offerings date older than the catalog date, read alone, looks like "not offered"."""
+    path = sample_catalog / "catalog_meta.json"
+    meta = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps({**meta, "offerings_note": NOT_REFRESHED}), encoding="utf-8")
+    catalog.build(source_dir=sample_catalog)
+
+    with catalog.connect() as conn:
+        assert catalog.offerings_note(conn) == NOT_REFRESHED
+        assert catalog.search(conn, query="causal inference")["offerings_note"] == NOT_REFRESHED
+
+
+def test_a_snapshot_with_freshly_crawled_offerings_carries_no_note(sample_catalog):
+    """The note is the exception; a normal snapshot must not add a line saying nothing."""
+    with catalog.connect() as conn:
+        assert catalog.offerings_note(conn) == ""
+        assert "offerings_note" not in catalog.search(conn, query="causal inference")
+
+
 # -- ranking and budget --------------------------------------------------------
 
 

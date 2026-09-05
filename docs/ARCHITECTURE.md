@@ -86,8 +86,15 @@ the university's calendar. A scheduled job re-exports them, publishes a hashed a
 and clients pick it up within a day after verifying the SHA-256. A student gets current
 course data without upgrading anything, and the job needs only the repository token.
 
+`classes.berkeley.edu` refuses GitHub-hosted runners with HTTP 403, so that job refreshes
+the catalogs and carries the previous offerings forward untouched rather than failing;
+the offerings themselves are refreshed from a machine the site answers
+([docs/DISTRIBUTION.md](DISTRIBUTION.md)).
+
 Both carry the date they were captured, and every catalog payload says so — advice from
-a stale snapshot should look stale. CI fails if the shipped snapshot is over a year old.
+a stale snapshot should look stale, and a snapshot whose offerings were not refreshed
+says why in one line that `openmind doctor` and the catalog payloads repeat. CI fails if
+the shipped snapshot is over a year old.
 
 ## Storage
 

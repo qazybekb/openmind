@@ -528,7 +528,12 @@ def course_planner(interests: str, constraints: str = "", term: str = "") -> str
             f"{course.get('level', '')}). Offered: {when}.\n  {course.get('description', '')}"
         )
 
-    warnings = "\n".join(f"- {note}" for note in matches.get("warnings", []))
+    # The snapshot's note about its own offerings belongs with the warnings here: this
+    # prompt's whole job is telling a student what they can actually enrol in.
+    notes = list(matches.get("warnings", []))
+    if matches.get("offerings_note"):
+        notes.append(matches["offerings_note"])
+    warnings = "\n".join(f"- {note}" for note in notes)
     return f"""\
 # Course planning for next semester
 The student's current bCourses courses: {enrolled}

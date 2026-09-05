@@ -304,6 +304,9 @@ def build(path: Path | None = None, *, source_dir: Path | None = None) -> dict[s
         for key, value in {
             "catalog_as_of": meta.get("catalog_as_of") or date.today().isoformat(),
             "offerings_as_of": meta.get("offerings_as_of") or ("" if not offerings else date.today().isoformat()),
+            # Why the offerings are older than the catalog, when they are. Carried out of
+            # the manifest so a student is told once rather than left to compare dates.
+            "offerings_note": meta.get("offerings_note") or "",
             "terms_known": json.dumps(meta.get("terms_known") or terms),
             "data_sha256": meta.get("data_sha256") or "",
             "max_group_size": largest_group,
@@ -406,6 +409,16 @@ def _schema_current(target: Path) -> bool:
 def meta(conn: sqlite3.Connection) -> dict[str, str]:
     """Return the catalog's provenance fields."""
     return {str(row["key"]): str(row["value"]) for row in conn.execute("SELECT key, value FROM meta")}
+
+
+def offerings_note(conn: sqlite3.Connection) -> str:
+    """Return the snapshot's own note about its offerings, or "" when there is none.
+
+    A refresh that could not reach the class schedule keeps the previous offerings and
+    records why. Repeating that line wherever ``offerings_as_of`` is reported is what
+    stops a stale date from being read as "this course is not offered".
+    """
+    return meta(conn).get("offerings_note", "").strip()
 
 
 def terms_known(conn: sqlite3.Connection) -> list[str]:
@@ -565,13 +578,17 @@ def _result(conn: sqlite3.Connection, rows: list[sqlite3.Row], total: int, limit
             subject: str | None) -> dict[str, Any]:
     """Render ranked rows as one entry per course, whatever it is cross-listed as."""
     info = meta(conn)
-    return {
+    result: dict[str, Any] = {
         "courses": collapse_cross_listings(conn, rows, limit, subject),
         "total": total,
         "catalog_as_of": info.get("catalog_as_of", "unknown"),
         "offerings_as_of": info.get("offerings_as_of", "unknown"),
         "terms_known": terms_known(conn),
     }
+    note = info.get("offerings_note", "").strip()
+    if note:
+        result["offerings_note"] = note
+    return result
 
 
 def collapse_cross_listings(conn: sqlite3.Connection, rows: list[sqlite3.Row], limit: int,

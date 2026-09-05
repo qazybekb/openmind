@@ -43,6 +43,17 @@ jobs:
       - name: Verify the schedule parser against saved fixtures
         run: python -m pytest tests/test_schedule.py tests/test_catalog.py -q
 
+      # As of 2026-09-05, classes.berkeley.edu answers GitHub-hosted runner IP ranges with
+      # HTTP 403 — the same URLs return 200 from a laptop with the identical user agent,
+      # so it is an origin block, not a bug. This job therefore keeps the catalogs current
+      # and carries the previous offerings forward, saying so in the manifest. To refresh
+      # the offerings themselves, run
+      #
+      #     python3 scripts/refresh_catalog.py --out src/openmind/data
+      #
+      # from a machine that can reach the site (the maintainer's, or a self-hosted runner)
+      # and commit the result; the steps below are what this job would have done with it.
+      #
       # pipefail matters here: without it the exit status is tee's, so a script that
       # refused to publish an incomplete snapshot would look like a success and the job
       # would carry on to commit and release it.

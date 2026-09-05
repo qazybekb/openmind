@@ -344,6 +344,22 @@ def test_catalog_detail_returns_the_full_description(session: Session, sample_ca
     assert "offerings_note" in payload
 
 
+def test_a_snapshot_that_could_not_refresh_its_offerings_says_so_in_one_note(session: Session, sample_catalog):
+    """"No sections known" and "nobody could read the schedule" are the same question."""
+    from openmind import catalog
+
+    reason = "offerings not refreshed: classes.berkeley.edu returned HTTP 403; previous snapshot kept"
+    with catalog.connect() as conn:
+        conn.execute("UPDATE meta SET value = ? WHERE key = 'offerings_note'", (reason,))
+        conn.commit()
+
+    payload = session.catalog_course("COMPSCI", "189")
+
+    assert payload["offerings_note"].endswith(reason)
+    assert payload["offerings_note"].startswith("No scheduled sections are known")
+    assert "offerings_note" not in payload["course"], "one note, not two"
+
+
 def test_an_unknown_catalog_course_points_at_the_other_tools(session: Session, sample_catalog):
     with pytest.raises(ServiceError, match="check_offering"):
         session.catalog_course("STAT", "99999")

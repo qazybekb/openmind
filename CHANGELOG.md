@@ -23,8 +23,11 @@ model; nothing about its setup carries over. Your old `~/.openmind` files are le
   Nothing is stored until you ask for a course by name.
 - Socratic tutoring shipped as data — rules, a hint ladder, cited excerpts, and your
   course's own AI policy quoted from its syllabus — with no model inside the server.
-- Berkeley catalog search with a per-term offerings table, both refreshed by a scheduled
-  job rather than by a release, and both stamped with the date they were captured.
+- Berkeley catalog search with a per-term offerings table, refreshed by a scheduled job
+  rather than by a release, and both stamped with the date they were captured. The class
+  schedule blocks GitHub-hosted runners, so the offerings half is refreshed from a machine
+  it will answer; the job keeps the catalogs current and says so in the manifest
+  (`docs/DISTRIBUTION.md`).
 - `check_offering` for live sections from classes.berkeley.edu.
 - `openmind doctor`, `openmind clear`, and `openmind config` for setup, diagnosis, and
   deletion.

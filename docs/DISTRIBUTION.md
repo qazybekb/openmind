@@ -58,14 +58,46 @@ Before tagging, run through [docs/ACCEPTANCE.md](ACCEPTANCE.md) — the manual c
 ## Data releases are separate from code releases
 
 Course data changes on the university's calendar. `.github/workflows/refresh-data.yml`
-runs `scripts/refresh_catalog.py` daily, and when the data actually changed it commits
-the CSVs and publishes a `data-<date>` release with a `catalog-<date>.tar.gz` asset.
+runs `scripts/refresh_catalog.py` daily, and when the data actually changed it:
+
+1. tars the four data files — `undergraduate_courses.csv`, `graduate_courses.csv`,
+   `term_offerings.csv`, `catalog_meta.json` — into `catalog-<catalog_as_of>.tar.gz`;
+2. takes the SHA-256 of that archive and writes it into the manifest as `data_sha256`,
+   so the manifest a client fetches names the hash of the file it will download;
+3. commits `src/openmind/data` to the default branch, which is where clients read the
+   manifest from;
+4. publishes a GitHub release tagged `data-<catalog_as_of>` with the archive attached,
+   clobbering the asset if the tag already exists.
 
 Installed clients check that manifest at most once a day, verify the SHA-256, and
 rebuild their local catalog. Students get current course data without upgrading the
 package, and the job keeps working with only the repository token.
 
 Turn the check off entirely with `openmind config --set data_updates=false`.
+
+### The offerings half has to be refreshed by hand
+
+As of 2026-09-05, `classes.berkeley.edu` answers GitHub-hosted runner IP ranges with
+HTTP 403. The same URLs return 200 from a laptop with the identical user agent, so it is
+an origin block rather than a bug or an outage.
+
+The scheduled job therefore degrades instead of failing: the Coursedog catalogs still
+refresh, `term_offerings.csv` is kept exactly as it is, and the manifest describes the
+snapshot that actually ships — the previous `offerings_as_of`, `terms_known` and
+`offering_count`, plus an `offerings_note` saying why. `openmind doctor` and the catalog
+tool payloads repeat that note, so a stale offerings date is never read as "this course
+is not offered".
+
+To refresh the offerings, run this from a machine that can reach the site — the
+maintainer's, or a self-hosted runner:
+
+```bash
+python3 scripts/refresh_catalog.py --out src/openmind/data
+```
+
+It prints `changed` or `unchanged` on stdout and its progress on stderr. On `changed`,
+commit `src/openmind/data` and do steps 1, 2 and 4 above, which is what the workflow
+would have done. The crawl takes roughly an hour at the polite one-second delay.
 
 ## Acceptance
 

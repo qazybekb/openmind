@@ -457,6 +457,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         out(f"Offerings: {offerings} course-terms, snapshot {info.get('offerings_as_of', 'none')}")
         terms = json.loads(info.get("terms_known") or "[]")
         out(f"  terms known: {', '.join(terms) or 'none'}")
+        # Provenance, not a fault: the snapshot is doing the honest thing by saying its
+        # offerings are older than its catalog, so this reports without failing doctor.
+        if note := info.get("offerings_note", "").strip():
+            out(f"  {note}")
         problems += _report_snapshot_age(as_of)
         problems += _report_stale_subjects()
     except Exception as exc:

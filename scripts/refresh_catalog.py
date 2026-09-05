@@ -17,7 +17,12 @@ Three things happen here:
    filters (STAT 156 is one) is pulled from an unfiltered export and flagged
    ``In Printed Catalog = 0``. Being offered matters more than being printed.
 
-Nothing is written unless the content hash changed, so an unchanged run produces no
+When the class schedule refuses to answer at all — it returns HTTP 403 to GitHub-hosted
+runner IP ranges — the catalogs are still refreshed, the previous offerings snapshot is
+kept untouched, and the manifest says so. A catalog one day old beats a job that fails
+every day and refreshes nothing.
+
+Nothing is written unless the data actually changed, so an unchanged run produces no
 commit.
 
     python3 scripts/refresh_catalog.py --out src/openmind/data
@@ -50,6 +55,7 @@ CATALOG_PAGES = {
     "graduate": "https://graduate.catalog.berkeley.edu/courses",
 }
 UA = "openmind-berkeley catalog refresh (+https://github.com/qazybekb/openmind)"
+SCHEDULE_HOST = "classes.berkeley.edu"
 
 # Each catalog site applies its own default department exclusions; these are the ones
 # read from the sites' own payloads.
@@ -200,6 +206,52 @@ def read_previous_offerings(out: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def read_previous_manifest(out: Path) -> dict[str, Any]:
+    """Read the manifest already on disk, if there is a readable one."""
+    path = out / "catalog_meta.json"
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def unreachable_note(exc: Exception) -> str:
+    """Say why the offerings were not refreshed, naming the status when there is one.
+
+    GitHub-hosted runners get HTTP 403 from the class schedule, so for the scheduled job
+    this is the ordinary state rather than a rare failure. It has to read as a fact about
+    the data a student is holding, not as a stack trace.
+    """
+    status = re.search(r"HTTP (\d{3})", str(exc))
+    if status:
+        reason = f"{SCHEDULE_HOST} returned HTTP {status.group(1)}"
+    else:
+        reason = f"{SCHEDULE_HOST} could not be reached ({str(exc).strip().rstrip('.') or type(exc).__name__})"
+    return f"offerings not refreshed: {reason}; previous snapshot kept"
+
+
+def carried_offerings(manifest: dict[str, Any], rows: list[dict[str, str]]) -> dict[str, Any]:
+    """Describe the offerings snapshot being kept, from the manifest that shipped it.
+
+    A run that does not crawl still packages the previous ``term_offerings.csv`` into the
+    release asset. Writing today's date and zero counts would tell every client the
+    snapshot has no offerings at all — the one thing the file on disk proves is false.
+    """
+    terms = manifest.get("terms_known") or sorted({row["term"] for row in rows if row.get("term")})
+    carried: dict[str, Any] = {
+        "offerings_as_of": str(manifest.get("offerings_as_of") or ""),
+        "terms_known": [str(term) for term in terms],
+        "offering_count": int(manifest.get("offering_count") or len(rows)),
+    }
+    stale = manifest.get("stale_subjects")
+    if stale:
+        carried["stale_subjects"] = [str(subject) for subject in stale]
+    return carried
+
+
 def carry_forward(rows: list[dict[str, str]], previous: list[dict[str, str]],
                   failures: list[tuple[str, str, str]]) -> tuple[list[dict[str, str]], list[str]]:
     """Reuse the last good rows for subjects whose crawl failed this time.
@@ -256,13 +308,28 @@ def coverage_problems(rows: list[dict[str, str]], previous: list[dict[str, str]]
 # -- writing -------------------------------------------------------------------
 
 
-def write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
-    """Write rows as UTF-8 CSV with stable ordering."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
+OFFERING_FIELDS = ["subject", "number", "term", "section_count", "instruction_modes", "instructors"]
+
+
+def render_csv(rows: list[dict[str, str]], fieldnames: list[str]) -> str:
+    """Render rows as CSV text with stable ordering."""
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    return buffer.getvalue()
+
+
+def already_on_disk(pending: dict[Path, str]) -> bool:
+    """Return whether every file this run would write already holds exactly that text."""
+    return all(path.exists() and path.read_bytes() == text.encode("utf-8") for path, text in pending.items())
+
+
+def write_all(pending: dict[Path, str]) -> None:
+    """Write the rendered files as UTF-8, leaving their line endings exactly as rendered."""
+    for path, text in pending.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8", newline="")
 
 
 def content_hash(paths: list[Path]) -> str:
@@ -287,7 +354,8 @@ def main() -> int:
     args = parser.parse_args()
 
     out = Path(args.out)
-    previous = content_hash([*out.glob("*.csv"), *out.glob("catalog_meta.json")]) if out.exists() else ""
+    previous_meta = read_previous_manifest(out)
+    previous_offerings = read_previous_offerings(out)
 
     log("== catalogs ==")
     ids = discover_catalog_ids()
@@ -307,36 +375,52 @@ def main() -> int:
     terms: list[schedule.Facet] = []
     failures: list[tuple[str, str, str]] = []
     stale_subjects: list[str] = []
-    if not args.skip_offerings:
+    note = ""
+    if args.skip_offerings:
+        note = "offerings not refreshed: --skip-offerings was requested; previous snapshot kept"
+    else:
         log("== offerings ==")
-        terms = current_and_future_terms(schedule.list_terms(), date.today(), args.terms)
-        if not terms:
-            raise SystemExit("the class schedule listed no current or upcoming terms. Refusing to ship.")
-        previous = read_previous_offerings(out)
-        offerings, failures = crawl_offerings(subjects, terms, args.delay, args.subject_limit)
-        log(f"{len(offerings)} course-term offerings across {len(terms)} term(s)")
-        if failures:
-            log(f"{len(failures)} subject crawl(s) failed: {[f'{t} {s}' for t, s, _ in failures[:5]]}")
-            offerings, stale_subjects = carry_forward(offerings, previous, failures)
-            if stale_subjects:
-                log(f"carried forward the previous rows for {len(stale_subjects)} subject(s)")
+        try:
+            # `schedule.fetch` funnels every transport failure into ScheduleError, so this
+            # covers a refused connection as well as an HTTP status.
+            terms = current_and_future_terms(schedule.list_terms(), date.today(), args.terms)
+            if not terms:
+                raise SystemExit("the class schedule listed no current or upcoming terms. Refusing to ship.")
+            offerings, failures = crawl_offerings(subjects, terms, args.delay, args.subject_limit)
+        except schedule.ScheduleError as exc:
+            # Not a coverage refusal. Nothing was learned about the offerings, so the
+            # snapshot on disk is still the best available and is left exactly as it is
+            # while the catalogs — which come from a different site — still refresh.
+            log(f"the class schedule could not be read: {exc}")
+            note = unreachable_note(exc)
+            log(note)
+            terms, offerings, failures = [], [], []
+        else:
+            log(f"{len(offerings)} course-term offerings across {len(terms)} term(s)")
+            if failures:
+                log(f"{len(failures)} subject crawl(s) failed: {[f'{t} {s}' for t, s, _ in failures[:5]]}")
+                offerings, stale_subjects = carry_forward(offerings, previous_offerings, failures)
+                if stale_subjects:
+                    log(f"carried forward the previous rows for {len(stale_subjects)} subject(s)")
 
-        crawled = subjects[: args.subject_limit] if args.subject_limit else subjects
-        blocking = coverage_problems(offerings, previous, terms, failures, len(crawled))
-        if blocking and args.allow_coverage_loss:
-            for problem in blocking:
-                log(f"coverage warning (overridden by --allow-coverage-loss): {problem}")
-            blocking = []
-        if blocking:
-            for problem in blocking:
-                log(f"REFUSING TO PUBLISH: {problem}")
-            log("Nothing was written. The existing snapshot is still the best available.")
-            log("If this is a real change rather than an outage, re-run with --allow-coverage-loss.")
-            return 1
+            crawled = subjects[: args.subject_limit] if args.subject_limit else subjects
+            blocking = coverage_problems(offerings, previous_offerings, terms, failures, len(crawled))
+            if blocking and args.allow_coverage_loss:
+                for problem in blocking:
+                    log(f"coverage warning (overridden by --allow-coverage-loss): {problem}")
+                blocking = []
+            if blocking:
+                for problem in blocking:
+                    log(f"REFUSING TO PUBLISH: {problem}")
+                log("Nothing was written. The existing snapshot is still the best available.")
+                log("If this is a real change rather than an outage, re-run with --allow-coverage-loss.")
+                return 1
 
     # A course that is scheduled but hidden by the catalog's default filters still
-    # matters — it is one a student can actually enrol in.
-    scheduled = {(row["subject"], row["number"]) for row in offerings}
+    # matters — it is one a student can actually enrol in. When the offerings were not
+    # refreshed, the rows on disk are the ones that will ship, so they decide the union:
+    # dropping STAT 156 from the catalogs because nobody crawled today would be a loss.
+    scheduled = {(row["subject"], row["number"]) for row in (previous_offerings if note else offerings)}
     known = {(row.get("Subject", ""), row.get("Course Number", "")) for rows in catalogs.values() for row in rows}
     missing = scheduled - known
     if missing:
@@ -355,7 +439,7 @@ def main() -> int:
         log(f"recovered {recovered} course(s); {len(missing)} still unmatched")
 
     log("== writing ==")
-    written: list[Path] = []
+    pending: dict[Path, str] = {}
     for level, rows in catalogs.items():
         for row in rows:
             row.setdefault("In Printed Catalog", "1")
@@ -363,16 +447,25 @@ def main() -> int:
         if "In Printed Catalog" not in fieldnames:
             fieldnames.append("In Printed Catalog")
         path = out / f"{level}_courses.csv"
-        write_csv(path, rows, fieldnames)
-        written.append(path)
+        pending[path] = render_csv(rows, fieldnames)
         log(f"{path}: {len(rows)} rows")
 
-    if not args.skip_offerings:
+    if not note:
         path = out / "term_offerings.csv"
-        write_csv(path, sorted(offerings, key=lambda r: (r["term"], r["subject"], r["number"])),
-                  ["subject", "number", "term", "section_count", "instruction_modes", "instructors"])
-        written.append(path)
+        pending[path] = render_csv(
+            sorted(offerings, key=lambda r: (r["term"], r["subject"], r["number"])), OFFERING_FIELDS
+        )
         log(f"{path}: {len(offerings)} rows")
+
+    # "Changed" is a claim about the data this run rebuilt. A run that deliberately left
+    # the offerings alone must not be called changed because of a file it never touched,
+    # and an unchanged run must not rewrite anything at all — including the manifest,
+    # whose date would otherwise be the only thing that ever differed.
+    manifest_path = out / "catalog_meta.json"
+    if manifest_path.exists() and already_on_disk(pending):
+        log("no change since the last run; nothing to publish")
+        print("unchanged")
+        return 0
 
     today = date.today().isoformat()
     manifest: dict[str, Any] = {
@@ -387,20 +480,19 @@ def main() -> int:
         ),
         "data_sha256": "",
     }
-    if stale_subjects:
+    if note:
+        # The manifest ships with the offerings file, so it must describe the snapshot
+        # that is actually in the asset rather than the crawl that did not happen.
+        manifest.update(carried_offerings(previous_meta, previous_offerings))
+        manifest["offerings_note"] = note
+    elif stale_subjects:
         # Named rather than hidden: a reader can tell which departments are a day old.
         manifest["stale_subjects"] = stale_subjects
-    manifest_path = out / "catalog_meta.json"
+
+    write_all(pending)
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    written.append(manifest_path)
 
-    digest = content_hash(written)
-    if digest == previous:
-        log("no change since the last run; nothing to publish")
-        print("unchanged")
-        return 0
-
-    log(f"content hash {digest}")
+    log(f"content hash {content_hash([*pending, manifest_path])}")
     print("changed")
     return 0
 

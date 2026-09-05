@@ -402,6 +402,22 @@ def test_doctor_names_subjects_whose_offerings_were_carried_forward(config, canv
     assert "STAT (Fall 2026)" in err
 
 
+def test_doctor_repeats_the_snapshots_note_about_its_own_offerings(config, canvas, stored_token,
+                                                                   sample_catalog, capsys):
+    """Two dates and no explanation reads as a bug; the snapshot already knows the reason."""
+    from openmind import catalog
+
+    note = "offerings not refreshed: classes.berkeley.edu returned HTTP 403; previous snapshot kept"
+    with catalog.connect() as conn:
+        conn.execute("UPDATE meta SET value = ? WHERE key = 'offerings_note'", (note,))
+        conn.commit()
+
+    code, out, _ = run(["doctor"], capsys)
+
+    assert note in out
+    assert code == 0, "keeping the previous offerings is honest provenance, not a fault"
+
+
 def test_a_snapshot_with_an_unusable_date_is_reported(config, canvas, stored_token, sample_catalog, capsys):
     from openmind import catalog
 
