@@ -2,13 +2,7 @@
 
 from __future__ import annotations
 
-from openmind.cli import app
-
-
-def main() -> None:
-    """Run the CLI application."""
-    app()
-
+from openmind.cli import main
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
