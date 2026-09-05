@@ -23,9 +23,22 @@ jobs:
         with:
           python-version: "3.11"
 
+      # A tag on a broken tree must not reach PyPI. Publishing is irreversible for a
+      # version number, so the suite runs before anything is built.
+      - name: Install the package and dev tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check src tests scripts
+
+      - name: Test
+        run: python -m pytest -q
+
       - name: Build distribution artifacts
         run: |
-          python -m pip install --upgrade pip build twine
+          python -m pip install --upgrade build twine
           python -m build
           python -m twine check dist/*
 

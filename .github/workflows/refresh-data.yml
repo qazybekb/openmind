@@ -95,7 +95,9 @@ jobs:
 
           Catalog and per-term offerings re-exported by scripts/refresh_catalog.py.
           Asset SHA-256: ${{ steps.asset.outputs.sha }}"
-          git push
+          # Named explicitly: the manifest the client fetches is served from the default
+          # branch, so committing anywhere else would publish an asset nobody finds.
+          git push origin HEAD:${{ github.event.repository.default_branch }}
 
       # Two runs on the same day would both want the data-<date> tag, so create the
       # release only when it is absent and overwrite the asset otherwise. The manifest

@@ -1,5 +1,9 @@
 # OpenMind
 
+[![CI](https://github.com/qazybekb/openmind/actions/workflows/ci.yml/badge.svg)](https://github.com/qazybekb/openmind/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/openmind-berkeley)](https://pypi.org/project/openmind-berkeley/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 **Your bCourses, in Claude.** A read-only Canvas connector for UC Berkeley students that
 runs on your own laptop.
 
@@ -28,7 +32,8 @@ Claude:  Two things, and one is overdue.
 ## What it is
 
 OpenMind is an [MCP](https://modelcontextprotocol.io) server: a small program you run
-that gives an AI app a set of tools. It has twelve, and all of them read.
+that gives an AI app a set of tools. It has twelve tools and five prompts, and every
+tool reads.
 
 The division of labour is deliberate. **The model talks; the code computes.** Deadlines,
 grade weights, hour estimates, and start-by dates are worked out in Python and handed
@@ -83,8 +88,17 @@ pretend otherwise. If a course is sensitive, don't enable it.
 Your deadlines and grades are never written to disk. Course documents are stored only
 for courses you explicitly index, and `openmind clear` deletes everything.
 
-Full detail — including all four network destinations — in
-[docs/PRIVACY.md](docs/PRIVACY.md).
+OpenMind connects to exactly four places, and there is no general web-fetch tool, so
+there is no fifth:
+
+| Destination | When |
+|---|---|
+| `bcourses.berkeley.edu` | Every tool call that reads your courses, with your token |
+| The file host bCourses redirects to | Only when reading a course document — the token is dropped first |
+| `github.com` | A public catalog file, once a day. Turn it off with `openmind config --set data_updates=false` |
+| `classes.berkeley.edu` | Only when you ask whether a course is offered |
+
+Full detail in [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ## Commands
 
@@ -108,6 +122,9 @@ servers. macOS, Windows, and Linux.
 OpenMind is an independent student project. "UC Berkeley", "bCourses", and "Berkeley
 Academic Guide" are referred to only to describe what this connects to. It is not
 endorsed by or affiliated with the University of California.
+
+Source: [github.com/qazybekb/openmind](https://github.com/qazybekb/openmind) —
+`git clone https://github.com/qazybekb/openmind.git`
 
 MIT licensed. Built by a Berkeley student who was tired of finding out about deadlines
 too late.

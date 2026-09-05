@@ -268,3 +268,124 @@ def test_the_catalog_tools_work_without_a_canvas_account(home, sample_catalog):
     assert not detail_result.is_error, detail_result.content[0].text
     assert canvas_result.is_error, "Canvas tools must still require setup"
     assert "openmind setup" in canvas_result.content[0].text
+
+
+# -- pre-push consistency ---------------------------------------------------------
+#
+# The repository is about to become public, and the data pipeline, the package metadata,
+# and the docs all name it. These assertions keep them naming the same thing.
+
+
+REPO_SLUG = "qazybekb/openmind"
+
+
+def read(*parts: str) -> str:
+    return (REPO_ROOT.joinpath(*parts)).read_text(encoding="utf-8")
+
+
+def project() -> dict:
+    return tomllib.loads(read("pyproject.toml"))["project"]
+
+
+def test_one_version_in_the_package_the_metadata_and_the_changelog():
+    from openmind import __version__
+
+    heading = re.search(r"^## (\S+)", read("CHANGELOG.md"), flags=re.MULTILINE)
+    assert heading is not None, "CHANGELOG.md has no version heading"
+    assert project()["version"] == __version__ == heading.group(1)
+
+
+def test_the_data_urls_and_the_package_metadata_name_the_same_repository():
+    """The daily update fetches a file from this repo; a mismatch breaks it silently."""
+    from openmind import catalog
+
+    assert REPO_SLUG in catalog.MANIFEST_URL
+    assert REPO_SLUG in catalog.ASSET_URL_TEMPLATE
+    for url in project()["urls"].values():
+        assert REPO_SLUG in url, url
+
+
+def test_the_readme_and_the_website_point_at_the_same_repository():
+    slugs = set()
+    for text in [read("README.md"), *(p.read_text(encoding="utf-8")
+                                     for p in (REPO_ROOT / "website" / "src").rglob("*.astro"))]:
+        slugs.update(
+            match.removesuffix(".git")
+            for match in re.findall(r"github\.com/([\w.-]+/[\w.-]+)", text)
+        )
+    assert slugs == {REPO_SLUG}, slugs
+
+
+def test_the_install_commands_agree_across_the_docs():
+    for name in ("README.md", "docs/SETUP.md", "docs/DISTRIBUTION.md"):
+        text = read(*name.split("/"))
+        assert "uv tool install openmind-berkeley" in text, name
+        assert "pip install git+" not in text, f"{name} still recommends a git install"
+        assert "install openmind-mcp" not in text, f"{name} treats the launcher as a package"
+
+    website = read("website", "src", "components", "Install.astro")
+    assert "uv tool install openmind-berkeley" in website
+    assert "pip install git+" not in website
+
+
+def test_pipx_is_offered_as_the_alternative_not_the_default():
+    for name in ("README.md", "docs/SETUP.md", "docs/DISTRIBUTION.md"):
+        text = read(*name.split("/"))
+        assert "pipx install openmind-berkeley" in text, name
+        assert text.index("uv tool install") < text.index("pipx install"), name
+
+
+def test_every_network_destination_is_named_wherever_they_are_listed():
+    """Four destinations. A doc that lists three is a doc that hides one."""
+    hosts_named = ("bcourses.berkeley.edu", "classes.berkeley.edu", "github")
+    for name in (("docs", "PRIVACY.md"), ("README.md",),
+                 ("website", "src", "components", "Privacy.astro")):
+        text = read(*name).lower()
+        for host in hosts_named:
+            assert host in text, f"{'/'.join(name)} does not mention {host}"
+        assert "file host" in text, f"{'/'.join(name)} does not mention the file host"
+        assert "data_updates" in text, f"{'/'.join(name)} does not say how to turn the update check off"
+
+
+def test_the_readme_states_the_same_counts_the_server_registers(described):
+    tools, prompts = described
+    readme = read("README.md")
+    assert f"{_words(len(tools.tools))} tools" in readme, readme[:0] or "README tool count"
+    assert f"{_words(len(prompts.prompts))} prompts" in readme
+
+
+def _words(number: int) -> str:
+    return {5: "five", 12: "twelve"}[number]
+
+
+def test_the_publish_workflow_runs_the_suite_before_it_builds():
+    """Publishing a version number is irreversible; a tag on a broken tree must not."""
+    workflow = read(".github", "workflows", "publish.yml")
+    assert "pytest" in workflow
+    assert workflow.index("pytest") < workflow.index("python -m build")
+    assert "ruff check" in workflow
+
+
+def test_the_refresh_workflow_needs_nothing_but_the_repository_token():
+    workflow = read(".github", "workflows", "refresh-data.yml")
+    assert "secrets." not in workflow.replace("${{ github.token }}", ""), "an external secret crept in"
+    assert "github.token" in workflow
+
+
+def test_the_refresh_workflow_commits_the_file_the_client_fetches():
+    """A manifest committed anywhere else is a manifest nobody downloads."""
+    from openmind import catalog
+
+    workflow = read(".github", "workflows", "refresh-data.yml")
+    committed = re.search(r"git add (\S+)", workflow)
+    assert committed is not None
+    directory = committed.group(1)
+
+    manifest_path = catalog.MANIFEST_URL.split("/main/", 1)[1]
+    assert manifest_path == f"{directory}/catalog_meta.json"
+    assert manifest_path in workflow
+
+
+def test_the_refresh_workflow_pushes_to_the_default_branch():
+    workflow = read(".github", "workflows", "refresh-data.yml")
+    assert "default_branch" in workflow, "the push target must be explicit, not whatever is checked out"
