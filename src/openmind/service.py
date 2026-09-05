@@ -316,6 +316,13 @@ class Session:
 
         window_items = upcoming[offset : offset + limit]
         notes: list[str] = []
+        if overdue:
+            notes.append(
+                f"overdue[] covers the last {agenda.OVERDUE_LOOKBACK_DAYS} days regardless of the range asked for, "
+                "because work that was never submitted does not stop mattering when the window moves."
+            )
+        if status == "missing":
+            notes.append("Missing work is in overdue[], not items[].")
         if skipped:
             notes.append(f"{skipped} calendar events, pages, or notes were skipped; they are not graded work.")
         if any(w.basis == "unknown" for w in weights.values()):

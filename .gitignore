@@ -2,7 +2,6 @@
 .openmind/
 config.json
 .env
-.gmail-mcp/
 
 # Python
 __pycache__/
@@ -13,6 +12,10 @@ __pycache__/
 dist/
 build/
 .eggs/
+
+# Local development environment
+.venv/
+venv/
 
 # Testing & linting
 .pytest_cache/
@@ -36,8 +39,5 @@ website/dist/
 website/node_modules/
 website/.astro/
 
-# Runtime
-*.pdf
-sessions/
-memory/
-obsidian/
+# Data refresh scratch
+catalog-*.tar.gz

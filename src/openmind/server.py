@@ -102,14 +102,19 @@ class AppContext:
         self.cache.invalidate()
 
 
+# One per process. Tools reach it through the lifespan context and prompts reach it
+# directly — prompts are rendered outside a tool call and so have no request context —
+# but both must see the same cache and the same Canvas connection.
+_app = AppContext()
+
+
 @asynccontextmanager
 async def lifespan(server: MCPServer) -> AsyncIterator[AppContext]:
     """Hold the shared cache and Canvas client for the life of the process."""
-    context = AppContext()
     try:
-        yield context
+        yield _app
     finally:
-        context.close()
+        _app.close()
 
 
 mcp: MCPServer = MCPServer(
@@ -510,15 +515,9 @@ Terms with offerings data: {', '.join(matches.get('terms_known', [])) or 'none'}
 
 # -- prompt helpers ------------------------------------------------------------
 
-_app = AppContext()
-
 
 def _prompt_session() -> Session:
-    """Return a session for a prompt.
-
-    Prompts are rendered outside a tool call, so they do not get a request context and
-    cannot reach the lifespan state; this module-level context serves them instead.
-    """
+    """Return a session for a prompt, from the same process-wide context tools use."""
     try:
         return _app.session()
     except (ConfigError, CanvasError) as exc:
