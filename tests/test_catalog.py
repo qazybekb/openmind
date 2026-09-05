@@ -531,3 +531,76 @@ def test_an_index_built_by_an_older_version_is_rebuilt(home: Path, sample_catalo
 
     with catalog.connect() as conn:
         assert catalog.meta(conn)["schema_version"] == catalog.SCHEMA_VERSION
+
+
+# -- sizing the overfetch from the data -------------------------------------------
+
+
+def test_the_largest_group_in_the_data_is_recorded(packaged: Path):
+    with catalog.connect(packaged) as conn:
+        recorded = int(catalog.meta(conn)["max_group_size"])
+        actual = conn.execute(
+            "SELECT MAX(n) FROM (SELECT COUNT(*) AS n FROM catalog_courses GROUP BY group_key)"
+        ).fetchone()[0]
+
+    assert recorded == actual
+    assert recorded >= 8, "the packaged catalog contains groups of eight codes"
+
+
+def test_the_overfetch_never_drops_below_its_floor(packaged: Path):
+    with catalog.connect(packaged) as conn:
+        assert catalog.overfetch(conn) == max(int(catalog.meta(conn)["max_group_size"]), catalog._MIN_OVERFETCH)
+        conn.execute("UPDATE meta SET value = '2' WHERE key = 'max_group_size'")
+        conn.commit()
+        assert catalog.overfetch(conn) == catalog._MIN_OVERFETCH
+
+
+def test_an_index_with_no_recorded_group_size_still_works(packaged: Path):
+    with catalog.connect(packaged) as conn:
+        conn.execute("DELETE FROM meta WHERE key = 'max_group_size'")
+        conn.commit()
+        assert catalog.overfetch(conn) == catalog._MIN_OVERFETCH
+
+
+def test_a_page_is_not_cut_short_by_one_very_large_cross_listing_group(home: Path, tmp_path: Path):
+    """Nine codes for one course used to eat the whole over-fetch window."""
+    import csv
+
+    source = tmp_path / "big-group"
+    source.mkdir()
+    codes = [f"SUBJ{n}" for n in range(9)]
+    fields = ["Subject", "Course Number", "Department(s)", "Course Title",
+              "Credits - Units - Minimum Units", "Credits - Units - Maximum Units", "Terms Offered",
+              "Course Description", "Cross-Listed Course(s)", "Repeat Rules",
+              "Repeat Rule: Special Circumstances", "Offering Information", "Additional Offering Information"]
+
+    def row(subject: str, number: str, title: str, cross: str) -> dict[str, str]:
+        return {**dict.fromkeys(fields, "-"), "Subject": subject, "Course Number": number,
+                "Course Title": title, "Course Description": "Shared seminar on research methods.",
+                "Credits - Units - Minimum Units": "4", "Credits - Units - Maximum Units": "4",
+                "Cross-Listed Course(s)": cross, "Department(s)": "Somewhere"}
+
+    rows = [
+        row(code, "C196", "Shared Seminar",
+            ", ".join(f"{other}C196 SHARED SEMINAR" for other in codes if other != code))
+        for code in codes
+    ]
+    # Ten unrelated courses that also match, so a full page is available.
+    rows += [row(f"OTHER{n}", "101", f"Research Methods {n}", "-") for n in range(10)]
+
+    for name in ("undergraduate_courses.csv", "graduate_courses.csv"):
+        with (source / name).open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(rows if name.startswith("under") else [])
+
+    catalog.build(source_dir=source)
+
+    with catalog.connect() as conn:
+        assert int(catalog.meta(conn)["max_group_size"]) == 9
+        result = catalog.search(conn, query="research methods seminar", limit=10)
+
+    assert result["total"] == 11, "nine codes plus ten others collapse to eleven courses"
+    assert len(result["courses"]) == 10, "a page of ten was available and must be returned"
+    keys = [(c["subject"], c["number"]) for c in result["courses"]]
+    assert len(keys) == len(set(keys))

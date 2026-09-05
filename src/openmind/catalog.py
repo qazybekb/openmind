@@ -22,6 +22,7 @@ import logging
 import re
 import sqlite3
 import tarfile
+from collections import Counter
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, date, datetime
@@ -55,9 +56,11 @@ MIN_SUBJECTS: Final[int] = 200
 # Bumped when the built shape changes, so an index from an older version is rebuilt
 # rather than queried with columns it does not have.
 SCHEMA_VERSION: Final[str] = "2"
-# A cross-listing set rarely exceeds three or four codes, so over-fetching this multiple
-# of the page size is enough to fill a page after collapsing duplicates.
-_GROUP_OVERFETCH: Final[int] = 6
+# How many rows to read per requested result before collapsing cross-listings. The
+# floor is a guess; the real bound is the largest group in the data, recorded at build
+# time — the packaged catalog has groups of 8, and a constant of 6 would leave a page
+# short whenever such a group ranks consecutively.
+_MIN_OVERFETCH: Final[int] = 6
 
 _CSV_FILES: Final[dict[str, str]] = {
     "undergraduate_courses.csv": "undergraduate",
@@ -278,6 +281,7 @@ def build(path: Path | None = None, *, source_dir: Path | None = None) -> dict[s
 
     groups = build_groups(rows)
     rows = [(*row, groups[(row[0], row[1])]) for row in rows]
+    largest_group = max(Counter(groups.values()).values(), default=1)
     offerings = _read_offerings(source_dir)
 
     with connect(target, create=True) as conn:
@@ -302,6 +306,7 @@ def build(path: Path | None = None, *, source_dir: Path | None = None) -> dict[s
             "offerings_as_of": meta.get("offerings_as_of") or ("" if not offerings else date.today().isoformat()),
             "terms_known": json.dumps(meta.get("terms_known") or terms),
             "data_sha256": meta.get("data_sha256") or "",
+            "max_group_size": largest_group,
             "schema_version": SCHEMA_VERSION,
             "built_at": datetime.now(UTC).isoformat(),
         }.items():
@@ -425,6 +430,19 @@ def _title_rank_patterns(query: str) -> tuple[str, str]:
     return wanted, f"%{escaped}%"
 
 
+def overfetch(conn: sqlite3.Connection) -> int:
+    """Return how many rows to read per requested result before collapsing.
+
+    Sized from the largest cross-listing group the data actually contains, so a page
+    cannot come up short because eight codes for one course happened to rank together.
+    """
+    try:
+        recorded = int(meta(conn).get("max_group_size") or 0)
+    except (ValueError, TypeError):  # pragma: no cover - a hand-edited meta table
+        recorded = 0
+    return max(recorded, _MIN_OVERFETCH)
+
+
 def _match_expression(query: str, join: str = "AND") -> str:
     """Quote every token so catalog text can never inject FTS operators."""
     tokens = [token.replace('"', "") for token in _TOKEN.findall(query or "")]
@@ -492,7 +510,7 @@ def search(conn: sqlite3.Connection, *, query: str = "", subject: str | None = N
             exact, phrase = _title_rank_patterns(query)
             try:
                 rows = conn.execute(
-                    sql, [exact, phrase, expression, *params, limit * _GROUP_OVERFETCH]
+                    sql, [exact, phrase, expression, *params, limit * overfetch(conn)]
                 ).fetchall()
                 total = int(conn.execute(
                     "SELECT COUNT(DISTINCT c.group_key) FROM catalog_fts "
@@ -509,7 +527,7 @@ def search(conn: sqlite3.Connection, *, query: str = "", subject: str | None = N
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
         rows = conn.execute(
             f"SELECT c.* FROM catalog_courses c{where} ORDER BY c.subject, c.number LIMIT ?",
-            [*params, limit * _GROUP_OVERFETCH],
+            [*params, limit * overfetch(conn)],
         ).fetchall()
         total = int(conn.execute(
             f"SELECT COUNT(DISTINCT c.group_key) FROM catalog_courses c{where}", params
@@ -535,7 +553,7 @@ def _like_search(conn: sqlite3.Connection, query: str, clauses: list[str], param
         "ORDER BY CASE WHEN lower(c.title) = ? THEN 0 "
         "              WHEN lower(c.title) LIKE ? ESCAPE '\\' THEN 1 "
         "              ELSE 2 END, c.subject, c.number LIMIT ?",
-        [*values, *params, exact, phrase, limit * _GROUP_OVERFETCH],
+        [*values, *params, exact, phrase, limit * overfetch(conn)],
     ).fetchall()
     total = int(conn.execute(
         f"SELECT COUNT(DISTINCT c.group_key) FROM catalog_courses c WHERE {full}", [*values, *params]
