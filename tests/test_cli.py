@@ -337,3 +337,25 @@ def test_a_stream_that_cannot_be_reconfigured_is_not_fatal(monkeypatch):
     monkeypatch.setattr(cli.sys, "stdout", Stubborn())
     monkeypatch.setattr(cli.sys, "stderr", object())
     cli._use_utf8()  # must not raise
+
+
+# -- lazy catalog build ---------------------------------------------------------
+
+
+def test_update_data_builds_the_catalog_on_a_fresh_home(config, capsys):
+    """It used to report "already up to date" and build nothing, leaving no catalog at all."""
+    from openmind.config import catalog_db_path
+
+    assert not catalog_db_path().exists()
+    code, out, _ = run(["update-data"], capsys)
+
+    assert code == 0
+    assert "Built the catalog from packaged data" in out
+    assert catalog_db_path().exists()
+
+
+def test_a_second_update_data_run_does_not_rebuild(config, sample_catalog, capsys):
+    code, out, _ = run(["update-data"], capsys)
+    assert code == 0
+    assert "Built the catalog" not in out
+    assert "turned off in your config" in out

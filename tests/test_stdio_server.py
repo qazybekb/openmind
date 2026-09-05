@@ -24,7 +24,7 @@ STARTUP_BUDGET_S = 5.0
 
 
 @pytest.fixture
-def server(home: Path, sample_catalog: Path) -> StdioServerParameters:
+def server(home: Path) -> StdioServerParameters:
     """Launch parameters pointing at this checkout with an isolated home."""
     return StdioServerParameters(
         command=sys.executable,
@@ -102,3 +102,63 @@ def test_the_server_advertises_its_ground_rules_to_the_host(server: StdioServerP
     assert "due_human" in lowered
     assert "read-only" in lowered
     assert server_info.name == "openmind"
+
+
+# -- prompts without a bCourses account -----------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("prompt", "args"),
+    [
+        ("tutor", {"course": "INFO 205", "topic": "contextual integrity"}),
+        ("practice", {"course": "INFO 205", "topic": "contextual integrity"}),
+        ("weekly_plan", {}),
+        ("explain_assignment", {"course": "INFO 205", "assignment": "Lab 1"}),
+    ],
+)
+def test_a_canvas_prompt_without_a_token_explains_itself_instead_of_failing(
+    server: StdioServerParameters, prompt: str, args: dict
+):
+    """MCP prompts have no error channel: raising gives the host "Error rendering prompt X"."""
+    async def work(client):
+        return await client.get_prompt(prompt, args)
+
+    result = drive(server, work)  # must not raise
+    text = result.messages[0].content.text
+    assert "openmind setup" in text
+    assert "restart your AI app" in text
+
+
+def test_the_course_planner_works_without_a_bcourses_account(server: StdioServerParameters):
+    """Catalog planning is public data; it should not need a credential."""
+    async def work(client):
+        return await client.get_prompt("course_planner", {"interests": "causal inference"})
+
+    text = drive(server, work).messages[0].content.text
+    assert "STAT 156" in text
+    assert "check with your advisor" in text
+    assert "bCourses is not connected" in text
+
+
+def test_a_prompt_needing_setup_logs_no_traceback(server: StdioServerParameters, capfd):
+    """A student who has not run setup is an ordinary state, not a fault to report."""
+    async def work(client):
+        return await client.get_prompt("tutor", {"course": "X", "topic": "y"})
+
+    drive(server, work)
+    stderr = capfd.readouterr().err
+    assert "Traceback" not in stderr
+    assert "Error rendering prompt" not in stderr
+
+
+def test_the_catalog_builds_itself_over_stdio_without_setup(server: StdioServerParameters, home: Path):
+    """First catalog question on a fresh machine: no token, no setup, no rebuild flag."""
+    async def work(client):
+        return await client.call_tool("search_catalog", {"query": "causal inference", "limit": 10})
+
+    result = drive(server, work)
+    assert not result.is_error, result.content[0].text
+    payload = json.loads(result.content[0].text)
+    assert len(payload["courses"]) == 10
+    assert ("STAT", "156") in [(c["subject"], c["number"]) for c in payload["courses"][:3]]
+    assert (home / "catalog.db").exists()

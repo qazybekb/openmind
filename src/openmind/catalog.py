@@ -43,6 +43,11 @@ MAX_ASSET_BYTES: Final[int] = 32 * 1024 * 1024
 
 MAX_LIMIT: Final[int] = 30
 DEFAULT_LIMIT: Final[int] = 10
+# Search results carry a gist; `get_catalog_course` returns the whole text. The gist
+# is shortened further, down to MIN_PREVIEW, when a page of results would otherwise
+# exceed the tool's byte budget — see `fit_previews`.
+SEARCH_PREVIEW: Final[int] = 200
+MIN_PREVIEW: Final[int] = 80
 DESCRIPTION_PREVIEW: Final[int] = 300
 
 MIN_COURSES: Final[int] = 10_000
@@ -289,11 +294,21 @@ def _load_source_meta(source_dir: Path | None) -> dict[str, Any]:
     return load_meta_file()
 
 
-def ensure_built(path: Path | None = None) -> None:
-    """Build the catalog index if it does not exist yet."""
+def ensure_built(path: Path | None = None) -> dict[str, int] | None:
+    """Build the catalog index from the packaged CSVs if it does not exist yet.
+
+    The catalog is public data that ships in the wheel, so there is no reason to make a
+    student run setup — or hand over a Canvas token — before they can search it. The
+    first catalog question builds it; every later one finds it already there.
+
+    Returns the row counts when it built something, or ``None`` when it was already
+    there.
+    """
     target = path or catalog_db_path()
-    if not target.exists():
-        build(target)
+    if target.exists():
+        return None
+    logger.info("Building the Berkeley catalog index from packaged data (first run).")
+    return build(target)
 
 
 # -- reads --------------------------------------------------------------------
@@ -317,6 +332,13 @@ def terms_known(conn: sqlite3.Connection) -> list[str]:
 
 
 _TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9&'-]*")
+
+
+def _title_rank_patterns(query: str) -> tuple[str, str]:
+    """Return the (exact, contains) lower-cased patterns used to rank titles."""
+    wanted = " ".join((query or "").lower().split())
+    escaped = wanted.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+    return wanted, f"%{escaped}%"
 
 
 def _match_expression(query: str, join: str = "AND") -> str:
@@ -373,13 +395,22 @@ def search(conn: sqlite3.Connection, *, query: str = "", subject: str | None = N
             if not expression:
                 break
             where = " AND ".join(["catalog_fts MATCH ?", *clauses])
+            # bm25 alone buries the obvious answer: a course *called* "Causal
+            # Inference" scores below one whose description happens to repeat the
+            # words. Title equality comes first, then the phrase appearing in a title,
+            # then relevance. The MATCH expression is still the quoted-token one, so
+            # nothing here reopens operator injection.
             sql = (
                 "SELECT c.*, bm25(catalog_fts, 4.0, 4.0, 8.0, 1.0) AS rank FROM catalog_fts "
                 "JOIN catalog_courses c ON c.rowid = catalog_fts.rowid "
-                f"WHERE {where} ORDER BY rank LIMIT ?"
+                f"WHERE {where} "
+                "ORDER BY CASE WHEN lower(c.title) = ? THEN 0 "
+                "              WHEN lower(c.title) LIKE ? ESCAPE '\\' THEN 1 "
+                "              ELSE 2 END, rank LIMIT ?"
             )
+            exact, phrase = _title_rank_patterns(query)
             try:
-                rows = conn.execute(sql, [expression, *params, limit]).fetchall()
+                rows = conn.execute(sql, [expression, *params, exact, phrase, limit]).fetchall()
                 total = int(conn.execute(
                     f"SELECT COUNT(*) FROM catalog_fts JOIN catalog_courses c ON c.rowid = catalog_fts.rowid WHERE {where}",
                     [expression, *params],
@@ -418,9 +449,13 @@ def _like_search(conn: sqlite3.Connection, query: str, clauses: list[str], param
         where = ["((c.subject LIKE ? ESCAPE '\\' AND c.number = ?) OR " + where[0][1:-1] + ")"]
         values = [code.group(1).strip().upper() + "%", code.group(2).upper(), needle, needle, needle]
     full = " AND ".join([*where, *clauses])
+    exact, phrase = _title_rank_patterns(query)
     rows = conn.execute(
-        f"SELECT c.* FROM catalog_courses c WHERE {full} ORDER BY c.subject, c.number LIMIT ?",
-        [*values, *params, limit],
+        f"SELECT c.* FROM catalog_courses c WHERE {full} "
+        "ORDER BY CASE WHEN lower(c.title) = ? THEN 0 "
+        "              WHEN lower(c.title) LIKE ? ESCAPE '\\' THEN 1 "
+        "              ELSE 2 END, c.subject, c.number LIMIT ?",
+        [*values, *params, exact, phrase, limit],
     ).fetchall()
     total = int(conn.execute(f"SELECT COUNT(*) FROM catalog_courses c WHERE {full}", [*values, *params]).fetchone()[0])
     return rows, total
@@ -474,12 +509,13 @@ def format_course(conn: sqlite3.Connection, row: sqlite3.Row, *, preview: bool) 
 
     description = str(row["description"] or "")
     if description:
-        course["description"] = description[: DESCRIPTION_PREVIEW - 3] + "..." if (
-            preview and len(description) > DESCRIPTION_PREVIEW
-        ) else description
-    if row["cross_listed"]:
-        course["cross_listed"] = str(row["cross_listed"])
+        limit = SEARCH_PREVIEW if preview else DESCRIPTION_PREVIEW
+        course["description"] = (
+            _trim(description, limit) if preview and len(description) > limit else description
+        )
     if not preview:
+        if row["cross_listed"]:
+            course["cross_listed"] = str(row["cross_listed"])
         if row["repeat_rules"]:
             course["repeat_rules"] = str(row["repeat_rules"])
         if row["offering_details"]:
@@ -487,12 +523,18 @@ def format_course(conn: sqlite3.Connection, row: sqlite3.Row, *, preview: bool) 
     if not row["in_printed_catalog"]:
         course["in_printed_catalog"] = False
 
+    # In a list of ten suggestions the actionable fact is "offered, this many sections".
+    # Who teaches it and how matters when choosing between sections, which is what
+    # `check_offering` and `get_catalog_course` are for — and carrying it here costs
+    # about 60 bytes a course, which is the difference between ten results and eight.
     offerings = [
         {
             "term": str(entry["term"]),
             "sections": int(entry["section_count"] or 0),
-            **({"instructors": str(entry["instructors"])} if entry["instructors"] else {}),
-            **({"modes": str(entry["instruction_modes"])} if entry["instruction_modes"] else {}),
+            **({} if preview else {
+                **({"instructors": str(entry["instructors"])} if entry["instructors"] else {}),
+                **({"modes": str(entry["instruction_modes"])} if entry["instruction_modes"] else {}),
+            }),
         }
         for entry in conn.execute(
             "SELECT * FROM term_offerings WHERE subject = ? AND number = ? ORDER BY term",
@@ -510,6 +552,43 @@ def format_course(conn: sqlite3.Connection, row: sqlite3.Row, *, preview: bool) 
 COURSE_CODE = re.compile(
     r"^\s*([A-Za-z]+(?:[ &/-]+[A-Za-z]+){0,2}?)\s*[- ]?\s*([A-Za-z]{0,2}[0-9][0-9A-Za-z]*)\s*$"
 )
+
+
+def fit_previews(payload: dict[str, Any], budget: int, *, floor: int = MIN_PREVIEW) -> dict[str, Any]:
+    """Shrink descriptions until a page of search results fits its byte budget.
+
+    A list tool degrades better in fidelity than in completeness: losing twenty
+    characters of every gist is a smaller loss than losing the tenth course entirely,
+    which is what the generic `shrink` backstop would otherwise do. The longest
+    descriptions are cut first, so short entries keep their whole text.
+    """
+    courses = payload.get("courses")
+    if not isinstance(courses, list) or not courses:
+        return payload
+
+    while len(json.dumps(payload, default=str)) > budget:
+        longest = max(courses, key=lambda c: len(str(c.get("description") or "")))
+        text = str(longest.get("description") or "")
+        if len(text) <= floor:
+            break  # nothing left to give; `shrink` drops whole entries from here
+        longest["description"] = _trim(text, max(floor, int(len(text) * 0.85)))
+    return payload
+
+
+ELLIPSIS: Final[str] = "..."
+
+
+def _trim(text: str, limit: int) -> str:
+    """Cut a description to *limit* characters total, ending on a word where possible.
+
+    The limit includes the ellipsis, so a caller measuring the result against its budget
+    gets the number it asked for.
+    """
+    if len(text) <= limit:
+        return text
+    window = text[: max(1, limit - len(ELLIPSIS))]
+    cut = window.rfind(" ")
+    return (window[:cut] if cut > limit // 2 else window).rstrip(" ,;:") + ELLIPSIS
 
 
 def parse_course_code(code: str) -> tuple[str, str] | None:
@@ -565,8 +644,11 @@ def maybe_update(*, enabled: bool, force: bool = False, path: Path | None = None
         response = httpx.get(MANIFEST_URL, timeout=UPDATE_TIMEOUT_S, follow_redirects=True)
         response.raise_for_status()
         manifest = response.json()
-    except Exception as exc:
-        logger.info("Could not check for newer catalog data: %s", type(exc).__name__)
+    except Exception:
+        # Being offline, or the data file not being published yet, is an ordinary state:
+        # the packaged snapshot still works. The check marker is already recorded above,
+        # so a failure does not turn into a retry on every call.
+        logger.debug("No newer catalog data available right now; keeping the current snapshot.")
         return None
 
     if not isinstance(manifest, dict):

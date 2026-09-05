@@ -20,7 +20,7 @@ OpenMind means "nothing is due", never "the request failed".
 | `read_material` | `material_id`, `page`, `cursor` | An indexed document as Markdown with `--- p. N ---` markers. Scanned or unsupported files return one line saying so. |
 | `index_course` | `course_id`, `enable` | Builds (or deletes) a local searchable index of one course's materials. Runs in 20-second passes; call again while `pending` is above zero. |
 | `prepare_study_session` | `course_id`, `topic`, `mode` (`tutor`/`practice`/`explain_assignment`/`weekly_plan`), `assignment_id` | Tutoring rules, a hint ladder, up to four cited excerpts, your course's AI policy, and an opening move. |
-| `search_catalog` | `query`, `subject`, `level`, `units`, `offered_term`, `limit` | Berkeley catalog matches with units, department, description, and the terms each course is known to be offered. |
+| `search_catalog` | `query`, `subject`, `level`, `units`, `offered_term`, `limit` | Berkeley catalog matches with units, department, a description gist, and the terms each course is known to be offered. Courses titled after the query rank first. Use `get_catalog_course` for the full text and cross-listings. |
 | `get_catalog_course` | `subject`, `number` | One course in full: description, units range, repeat rules, cross-listings, known offerings. |
 | `check_offering` | `course_code`, `term` | Live sections from classes.berkeley.edu: times, instructors, seats, instruction mode. One request, cached for a day. |
 

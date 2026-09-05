@@ -86,7 +86,7 @@ def test_the_offered_term_filter_keeps_only_scheduled_courses(sample_catalog):
     with catalog.connect() as conn:
         result = catalog.search(conn, offered_term="Fall 2026", limit=30)
     assert [(c["subject"], c["number"]) for c in result["courses"]] == [("STAT", "156")]
-    assert result["courses"][0]["offered_terms"][0]["instructors"] == "Peng Ding"
+    assert result["courses"][0]["offered_terms"][0] == {"term": "Fall 2026", "sections": 1}
 
 
 def test_a_course_missing_from_the_printed_catalog_is_flagged(sample_catalog):
@@ -104,7 +104,7 @@ def test_descriptions_are_previewed_in_search_and_full_in_detail(sample_catalog)
         conn.commit()
         preview = catalog.search(conn, subject="COMPSCI")["courses"][0]["description"]
         full = catalog.details(conn, "COMPSCI", "189")["description"]
-    assert len(preview) == catalog.DESCRIPTION_PREVIEW
+    assert len(preview) <= catalog.SEARCH_PREVIEW
     assert preview.endswith("...")
     assert len(full) == 600
 
@@ -270,3 +270,120 @@ def test_meta_json_is_read_from_the_data_snapshot(sample_catalog):
         info = catalog.meta(conn)
     assert info["catalog_as_of"] == "2026-09-05"
     assert json.loads(info["terms_known"]) == ["Fall 2026"]
+
+
+# -- ranking and budget --------------------------------------------------------
+
+
+def test_a_course_titled_after_the_query_outranks_one_that_merely_mentions_it(packaged: Path):
+    """bm25 alone buried STAT 156 "Causal Inference" below courses whose descriptions repeat the words."""
+    with catalog.connect(packaged) as conn:
+        result = catalog.search(conn, query="causal inference", limit=10)
+
+    top_three = [(c["subject"], c["number"]) for c in result["courses"][:3]]
+    assert ("STAT", "156") in top_three, top_three
+    assert ("STAT", "256") in top_three, top_three
+    assert result["total"] > 10, "the query still matches many courses"
+
+
+def test_titles_containing_the_phrase_come_before_descriptions_that_mention_it(packaged: Path):
+    """No Berkeley course is titled exactly "Machine Learning", so the phrase tier decides."""
+    with catalog.connect(packaged) as conn:
+        titles = [c["title"].lower() for c in catalog.search(conn, query="machine learning", limit=10)["courses"]]
+    assert all("machine learning" in title for title in titles[:4]), titles[:4]
+
+
+def test_the_offering_and_catalog_flags_survive_the_new_ranking(packaged: Path):
+    with catalog.connect(packaged) as conn:
+        result = catalog.search(conn, query="causal inference", limit=10)
+    stat156 = next(c for c in result["courses"] if (c["subject"], c["number"]) == ("STAT", "156"))
+    assert stat156["in_printed_catalog"] is False
+    assert stat156["offered_terms"][0]["term"] == "Fall 2026"
+
+
+@pytest.mark.parametrize("query", ['NEAR("a" "b")', "machine*", 'x" OR "y', "100% pure", "a_b"])
+def test_ranking_patterns_cannot_inject_operators_or_wildcards(query: str, packaged: Path):
+    """The title ranking uses LIKE, so % and _ in a query must be escaped, not matched."""
+    with catalog.connect(packaged) as conn:
+        catalog.search(conn, query=query, limit=5)  # must not raise
+    exact, phrase = catalog._title_rank_patterns("100% a_b")
+    assert exact == "100% a_b"
+    assert phrase == r"%100\% a\_b%"
+
+
+def test_a_full_page_of_results_fits_the_tool_budget(packaged: Path):
+    """Ten results used to be trimmed to six by `shrink`, silently losing the tail."""
+    from openmind.service import BUDGETS
+
+    envelope = {
+        "as_of": "2026-09-05T10:00:00-07:00", "tz": "America/Los_Angeles",
+        "partial": False, "warnings": [],
+        "advice_note": "These are fit-based matches from a catalog snapshot, not official advising. "
+                       "Prefer courses with known offerings, and check requirements with your advisor.",
+    }
+    queries = ["causal inference", "machine learning", "data science ethics", "public health policy",
+               "research methods", "comparative literature", ""]
+
+    with catalog.connect(packaged) as conn:
+        for query in queries:
+            payload = catalog.fit_previews(
+                {**catalog.search(conn, query=query, limit=10), **envelope}, BUDGETS["search_catalog"]
+            )
+            assert len(payload["courses"]) == 10, query
+            size = len(json.dumps(payload, default=str))
+            assert size <= BUDGETS["search_catalog"], f"{query!r} produced {size} bytes"
+
+
+def test_gists_are_shortened_before_whole_courses_are_dropped(packaged: Path):
+    """Losing twenty characters of every description beats losing the tenth course."""
+    with catalog.connect(packaged) as conn:
+        full = catalog.search(conn, query="data science ethics", limit=10)
+    before = [len(str(c.get("description") or "")) for c in full["courses"]]
+
+    fitted = catalog.fit_previews(json.loads(json.dumps(full)), 2_500)
+    after = [len(str(c.get("description") or "")) for c in fitted["courses"]]
+
+    assert len(fitted["courses"]) == 10, "no course was dropped"
+    assert sum(after) < sum(before), "descriptions were shortened"
+    # The floor is approximate — `_trim` backs up to a word boundary — but no gist is
+    # cut down to something useless.
+    assert all(length >= 40 for length in after if length), after
+
+
+def test_fit_previews_gives_up_rather_than_looping_on_an_impossible_budget(packaged: Path):
+    with catalog.connect(packaged) as conn:
+        payload = catalog.search(conn, query="statistics", limit=10)
+    fitted = catalog.fit_previews(payload, 10)  # unreachable; must terminate
+    assert len(fitted["courses"]) == 10
+
+
+def test_search_previews_leave_the_detail_fields_to_the_detail_tool(packaged: Path):
+    """Cross-listings and instructor names are lookup detail, not scanning detail."""
+    with catalog.connect(packaged) as conn:
+        listed = catalog.search(conn, query="causal inference", limit=10)["courses"]
+        detail = catalog.details(conn, "STAT", "156")
+
+    assert all("cross_listed" not in course for course in listed)
+    assert all("instructors" not in term for c in listed for term in c.get("offered_terms", []))
+    assert detail["offered_terms"][0]["instructors"] == "Peng Ding"
+
+
+# -- lazy build ----------------------------------------------------------------
+
+
+def test_the_catalog_builds_itself_on_first_use_without_any_setup(home: Path):
+    """Searching public data must not require a Canvas token, or setup, or a rebuild flag."""
+    from openmind.config import catalog_db_path
+
+    assert not catalog_db_path().exists()
+    built = catalog.ensure_built()
+    assert built is not None and built["courses"] >= catalog.MIN_COURSES
+    assert catalog_db_path().exists()
+
+    with catalog.connect() as conn:
+        assert catalog.search(conn, query="causal inference")["courses"]
+
+
+def test_a_second_call_does_not_rebuild(home: Path):
+    assert catalog.ensure_built() is not None
+    assert catalog.ensure_built() is None

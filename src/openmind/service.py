@@ -1058,6 +1058,7 @@ class Session:
                        units: str | None = None, offered_term: str | None = None,
                        limit: int = 10) -> dict[str, Any]:
         """Search the Berkeley catalog, optionally restricted to a term's offerings."""
+        catalog.ensure_built()
         message = catalog.maybe_update(enabled=self.cfg.data_updates)
         with catalog.connect() as conn:
             result = catalog.search(
@@ -1074,10 +1075,15 @@ class Session:
             "These are fit-based matches from a catalog snapshot, not official advising. "
             "Prefer courses with known offerings, and check requirements with your advisor."
         )
+        # Shorten the gists before letting `shrink` drop whole courses: a student
+        # scanning for something to take is worse served by nine results than by ten
+        # slightly terser ones.
+        result = catalog.fit_previews(result, BUDGETS["search_catalog"])
         return shrink(result, BUDGETS["search_catalog"])
 
     def catalog_course(self, subject: str, number: str) -> dict[str, Any]:
         """Return one catalog course in full."""
+        catalog.ensure_built()
         catalog.maybe_update(enabled=self.cfg.data_updates)
         with catalog.connect() as conn:
             course = catalog.details(conn, subject, number)

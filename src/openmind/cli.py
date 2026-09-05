@@ -403,6 +403,11 @@ def cmd_update_data(args: argparse.Namespace) -> int:
         counts = catalog.build()
         out(f"Rebuilt the catalog from packaged data: {counts['courses']} courses, {counts['offerings']} offerings.")
         return 0
+
+    built = catalog.ensure_built()
+    if built is not None:
+        out(f"Built the catalog from packaged data: {built['courses']} courses, {built['offerings']} offerings.")
+
     message = catalog.maybe_update(enabled=cfg.data_updates or args.force, force=True)
     if message:
         out(message)
@@ -410,7 +415,8 @@ def cmd_update_data(args: argparse.Namespace) -> int:
     if not cfg.data_updates and not args.force:
         out("Public data updates are turned off in your config. Use --force to check once anyway.")
         return 0
-    out("The Berkeley catalog is already up to date.")
+    if built is None:
+        out("The Berkeley catalog is already up to date.")
     return 0
 
 

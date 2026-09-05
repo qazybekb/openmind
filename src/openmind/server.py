@@ -12,13 +12,14 @@ with the Canvas connection made lazily on the first tool call.
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import sys
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, ParamSpec, TypeVar
 
 from mcp.server.mcpserver import AssistantMessage, Context, MCPServer, UserMessage
 from mcp.server.mcpserver.exceptions import ToolError
@@ -37,6 +38,9 @@ from openmind.secrets import get_token
 from openmind.service import ServiceError, Session
 
 logger = logging.getLogger("openmind")
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 INSTRUCTIONS = """\
 OpenMind reads one UC Berkeley student's own bCourses (Canvas) account, read-only, from their laptop.
@@ -161,6 +165,31 @@ def _guard(operation: str, call: Any) -> str:
     except Exception as exc:  # pragma: no cover - defensive
         logger.exception("%s failed unexpectedly", operation)
         raise ToolError(f"{operation} failed unexpectedly: {type(exc).__name__}.") from exc
+
+
+def needs_bcourses(render: Callable[_P, _R]) -> Callable[_P, _R | str]:
+    """Render an explanation instead of raising when bCourses is not set up yet.
+
+    A prompt has no error channel in MCP: raising turns into a generic "Error rendering
+    prompt X" plus a logged traceback, and the student is told nothing useful. Setup not
+    being done yet is an ordinary state, not a fault, so it renders as text.
+    """
+
+    @functools.wraps(render)
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R | str:
+        try:
+            return render(*args, **kwargs)
+        except (ConfigError, CanvasError) as exc:
+            logger.debug("Prompt %s needs setup: %s", render.__name__, exc)
+            return (
+                f"# OpenMind is not connected to bCourses yet\n\n{exc}\n\n"
+                "Run `openmind setup` in a terminal, then restart your AI app.\n\n"
+                "Tell the student that, and do not attempt to answer from memory: without bCourses "
+                "there are no real deadlines, grades, or course materials to work from. "
+                "Berkeley course catalog questions do work without setup."
+            )
+
+    return wrapper
 
 
 # -- Canvas facts --------------------------------------------------------------
@@ -395,6 +424,7 @@ def check_offering(
 
 
 @mcp.prompt(title="Tutor me on a topic")
+@needs_bcourses
 def tutor(course: str, topic: str, level: str = "") -> list[UserMessage | AssistantMessage]:
     """Socratic tutoring on a topic, using the student's own course materials."""
     session = _prompt_session()
@@ -409,6 +439,7 @@ def tutor(course: str, topic: str, level: str = "") -> list[UserMessage | Assist
 
 
 @mcp.prompt(title="Practice questions")
+@needs_bcourses
 def practice(course: str, topic: str, count: str = "3") -> list[UserMessage | AssistantMessage]:
     """Retrieval practice on a topic, one question at a time, with confidence ratings."""
     session = _prompt_session()
@@ -422,6 +453,7 @@ def practice(course: str, topic: str, count: str = "3") -> list[UserMessage | As
 
 
 @mcp.prompt(title="Plan my week")
+@needs_bcourses
 def weekly_plan(days: str = "7", course: str = "") -> str:
     """A study plan for the coming days, built from real deadlines."""
     session = _prompt_session()
@@ -460,6 +492,7 @@ def weekly_plan(days: str = "7", course: str = "") -> str:
 
 
 @mcp.prompt(title="Explain an assignment")
+@needs_bcourses
 def explain_assignment(course: str, assignment: str) -> str:
     """Break down an assignment: what it asks, what the rubric rewards, and a time plan."""
     session = _prompt_session()
@@ -479,7 +512,11 @@ def course_planner(interests: str, constraints: str = "", term: str = "") -> str
             f"{c.get('code') or c.get('nickname')}" for c in current.get("courses", [])
         ) or "none on record"
     except (ServiceError, CanvasError, ConfigError) as exc:
-        enrolled = f"could not be read ({exc})"
+        # Catalog planning is public data, so this prompt still works — it just cannot
+        # see what the student is already taking. Say so plainly rather than quoting an
+        # error at them mid-sentence.
+        logger.debug("course_planner has no bCourses access: %s", exc)
+        enrolled = "unknown (bCourses is not connected; ask the student what they are taking now)"
 
     matches = session.search_catalog(query=interests, offered_term=term.strip() or None, limit=12)
     lines = []
@@ -521,10 +558,7 @@ Terms with offerings data: {', '.join(matches.get('terms_known', [])) or 'none'}
 
 def _prompt_session() -> Session:
     """Return a session for a prompt, from the same process-wide context tools use."""
-    try:
-        return _app.session()
-    except (ConfigError, CanvasError) as exc:
-        raise ToolError(str(exc)) from exc
+    return _app.session()
 
 
 def _public_prompt_session() -> Session:

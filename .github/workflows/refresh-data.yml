@@ -93,17 +93,29 @@ jobs:
           Asset SHA-256: ${{ steps.asset.outputs.sha }}"
           git push
 
+      # Two runs on the same day would both want the data-<date> tag, so create the
+      # release only when it is absent and overwrite the asset otherwise. The manifest
+      # names the hash of whatever is published last, so the two stay in step.
       - name: Publish the data asset
         if: steps.refresh.outputs.status == 'changed'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: data-${{ steps.asset.outputs.date }}
+          FILE: ${{ steps.asset.outputs.file }}
+          SHA: ${{ steps.asset.outputs.sha }}
         run: |
-          gh release create "data-${{ steps.asset.outputs.date }}" \
-            "${{ steps.asset.outputs.file }}" \
-            --title "Berkeley course data ${{ steps.asset.outputs.date }}" \
-            --notes "Public UC Berkeley catalog and class-schedule snapshot.
+          NOTES="Public UC Berkeley catalog and class-schedule snapshot.
 
-          SHA-256: \`${{ steps.asset.outputs.sha }}\`
+          SHA-256: \`${SHA}\`
 
           Clients with \`data_updates\` enabled pick this up automatically within a day,
           verifying the hash before rebuilding. \`openmind update-data\` pulls it now."
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$FILE" --clobber
+            gh release edit "$TAG" --notes "$NOTES"
+          else
+            gh release create "$TAG" "$FILE" \
+              --title "Berkeley course data ${{ steps.asset.outputs.date }}" \
+              --notes "$NOTES"
+          fi

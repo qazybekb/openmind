@@ -72,7 +72,10 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+# "." puts the repo root on sys.path so `from tests.conftest import ...` resolves under
+# the bare `pytest` console script, which does not add the working directory the way
+# `python -m pytest` does.
+pythonpath = [".", "src"]
 addopts = "-q"
 
 [tool.ruff]
