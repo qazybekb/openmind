@@ -11,6 +11,18 @@ where to find it.
   run a local server — this has to be a program on your computer.
 - **A bCourses account.** That's it. No OpenMind account exists.
 
+## Who can use this
+
+OpenMind is for a UC Berkeley student running their own copy on their own machine with
+their own bCourses access token. That is what personal access tokens are for. Your token
+is never shared, collected, pooled, or sent anywhere except bCourses; there is no
+OpenMind server to send it to, and no OpenMind account exists. If you want a friend to
+use it, they install it themselves and generate their own token — never hand yours over,
+and never run one instance on someone else's behalf. Canvas asks applications that
+operate *on behalf of other people* to use OAuth; this one operates only on behalf of
+the person who installed it. The maintainer has raised the token policy with Berkeley
+Research, Teaching, and Learning and will follow whatever guidance comes back.
+
 ## 1. Install
 
 ```bash
