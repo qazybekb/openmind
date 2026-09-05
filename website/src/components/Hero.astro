@@ -1,4 +1,5 @@
 ---
+const install = 'uv tool install openmind-berkeley';
 ---
 <section class="pt-28 pb-20 md:pt-36 md:pb-28 relative">
   <!-- Subtle radial glow -->
@@ -18,8 +19,8 @@
 
     <!-- Tagline -->
     <p class="text-lg md:text-xl text-text-body max-w-2xl mx-auto mb-6 leading-relaxed">
-      Know what's due. Plan your week. Auto-sync deadlines to Calendar + Todoist.<br class="hidden md:block"/>
-      Your personal study buddy and time manager. Free, private, runs on your machine.
+      Your bCourses, in Claude.<br class="hidden md:block"/>
+      A read-only Canvas connector for Berkeley students that runs on your own laptop.
     </p>
 
     <!-- Badge -->
@@ -39,8 +40,8 @@
     </div>
 
     <!-- Install command (secondary) -->
-    <div class="flex items-center justify-center gap-2 mb-20 max-w-full overflow-x-auto px-2">
-      <code id="install-cmd" class="text-xs text-text-muted font-mono whitespace-nowrap">pip install git+https://github.com/qazybekb/openmind.git</code>
+    <div class="flex items-center justify-center gap-2 mb-6 max-w-full overflow-x-auto px-2">
+      <code id="install-cmd" class="text-xs text-text-muted font-mono whitespace-nowrap" data-install={install}>{install}</code>
       <button id="copy-btn" class="text-text-muted hover:text-text-primary transition-colors" title="Copy">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
@@ -48,32 +49,47 @@
       </button>
     </div>
 
-    <!-- Hero terminal -->
+    <!-- Works with -->
+    <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mb-20 text-xs text-text-muted">
+      <span>Works with</span>
+      <span class="text-text-secondary">Claude Desktop</span>
+      <span class="text-text-muted/40">&middot;</span>
+      <span class="text-text-secondary">Claude Code</span>
+      <span class="text-text-muted/40">&middot;</span>
+      <span class="text-text-secondary">Cursor</span>
+      <span class="text-text-muted/40">&middot;</span>
+      <span class="text-text-secondary">ChatGPT desktop</span>
+    </div>
+
+    <!-- Hero conversation -->
     <div class="terminal max-w-3xl mx-auto text-left shadow-2xl shadow-black/40 ring-1 ring-white/[0.03]">
       <div class="terminal-header">
         <div class="terminal-dot bg-[#ff5f57]"></div>
         <div class="terminal-dot bg-[#febc2e]"></div>
         <div class="terminal-dot bg-[#28c840]"></div>
-        <span class="ml-3 text-xs text-text-muted font-sans">openmind</span>
+        <span class="ml-3 text-xs text-text-muted font-sans">Claude &middot; openmind connected</span>
       </div>
       <div class="terminal-body text-text-secondary text-[13px] md:text-sm">
-        <div class="mb-3">
-          <span class="text-text-muted">$</span> <span class="text-text-primary">openmind</span>
-        </div>
-        <div class="mb-5 text-text-secondary">
-          &#x1f43b; Hey Oski! Go Bears! &#x1f499;&#x1f49b;
-        </div>
         <div class="mb-4">
           <span class="text-text-muted">You &rarr;</span> <span class="text-text-primary">What's due this week?</span>
         </div>
-        <div class="space-y-2 mb-5">
-          <div>&#x1f525; <span class="text-text-primary font-medium">HIGH</span> &mdash; NLP midterm report <span class="text-text-muted">(due Fri, 30% of grade)</span></div>
-          <div>&#x1f4cb; <span class="text-text-primary font-medium">MED</span>&ensp; &mdash; Social Issues writing prompt <span class="text-text-muted">(due Mon)</span></div>
-          <div>&#x1f4da; <span class="text-text-primary font-medium">LOW</span>&ensp; &mdash; Finance case reading <span class="text-text-muted">(due next Wed)</span></div>
+        <div class="mb-4 text-text-secondary">Two things, and one is overdue.</div>
+        <div class="space-y-3 mb-5">
+          <div>
+            <div><span class="text-red-400 font-medium">OVERDUE</span> &mdash; <span class="text-text-primary">Causal Inference: Problem Set 4</span></div>
+            <div class="text-text-muted">was due Tue Sep 1, 11:59 PM &middot; still submittable &middot; 20% of your grade</div>
+          </div>
+          <div>
+            <div><span class="text-cal-gold font-medium">HIGH</span> &mdash; <span class="text-text-primary">Causal Inference: Problem Set 3</span></div>
+            <div class="text-text-muted">due tonight 11:59 PM &middot; 20% of grade &middot; ~6h &middot; you should already be on it</div>
+          </div>
+          <div>
+            <div><span class="text-cal-gold font-medium">HIGH</span> &mdash; <span class="text-text-primary">Causal Inference: Midterm 1</span></div>
+            <div class="text-text-muted">due Thu Sep 10 &middot; 30% of grade &middot; ~4h &middot; start by Wednesday</div>
+          </div>
         </div>
         <div class="text-text-muted">
-          I'd start with the NLP report &mdash; that's 30% of your grade and due in 3 days.<br/>
-          You could knock out the outline at a Moffitt table tonight.
+          Nothing else in NLP until the Final Project on Sep 13.
         </div>
       </div>
     </div>
@@ -81,12 +97,12 @@
     <!-- Stats row -->
     <div class="flex flex-wrap items-center justify-center gap-6 md:gap-8 lg:gap-12 mt-16 text-sm text-text-muted">
       <div class="text-center">
-        <div class="text-2xl font-bold text-text-primary">43</div>
-        <div class="text-xs">tools</div>
+        <div class="text-2xl font-bold text-text-primary">12</div>
+        <div class="text-xs">read-only tools</div>
       </div>
       <div class="text-center">
         <div class="text-2xl font-bold text-text-primary">11K</div>
-        <div class="text-xs">courses indexed</div>
+        <div class="text-xs">Berkeley courses</div>
       </div>
       <div class="text-center">
         <div class="text-2xl font-bold text-text-primary">240</div>
@@ -94,7 +110,7 @@
       </div>
       <div class="text-center">
         <div class="text-2xl font-bold text-text-primary">0</div>
-        <div class="text-xs">servers needed</div>
+        <div class="text-xs">accounts to create</div>
       </div>
     </div>
   </div>
@@ -102,7 +118,7 @@
 
 <script>
   document.getElementById('copy-btn')?.addEventListener('click', function() {
-    const text = 'pip install git+https://github.com/qazybekb/openmind.git';
+    const text = document.getElementById('install-cmd')?.dataset.install ?? '';
     const btn = this;
     const original = btn.innerHTML;
 
@@ -114,7 +130,6 @@
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(text).then(showCopied);
     } else {
-      // Fallback for HTTP
       const ta = document.createElement('textarea');
       ta.value = text;
       ta.style.position = 'fixed';

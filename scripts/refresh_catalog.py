@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""Rebuild the public Berkeley course data that ships with OpenMind.
+
+Course data changes on the university's calendar, not on ours. This script runs in CI
+so a student's catalog stays current without waiting for a release — and so the project
+keeps working when nobody is maintaining it.
+
+Three things happen here:
+
+1. **Catalogs.** Both Coursedog catalogs are exported as CSV using the same request the
+   site's own "Download CSV" button makes. No login, no API key. Catalog ids change each
+   academic year and are read from each catalog page's payload.
+2. **Offerings.** The class schedule is crawled for the current and next term, one
+   subject at a time, politely. This is what makes "can I take it this semester"
+   answerable — `Terms Offered` is empty for every row in the catalog export.
+3. **The union rule.** A course that is scheduled but hidden by the catalog's default
+   filters (STAT 156 is one) is pulled from an unfiltered export and flagged
+   ``In Printed Catalog = 0``. Being offered matters more than being printed.
+
+Nothing is written unless the content hash changed, so an unchanged run produces no
+commit.
+
+    python3 scripts/refresh_catalog.py --out src/openmind/data
+    python3 scripts/refresh_catalog.py --out data --skip-offerings   # catalogs only
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import io
+import json
+import re
+import sys
+import urllib.error
+import urllib.request
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from openmind import schedule  # noqa: E402
+
+API = "https://app.coursedog.com/api/v1"
+SCHOOL = "ucberkeley_peoplesoft"
+CATALOG_PAGES = {
+    "undergraduate": "https://undergraduate.catalog.berkeley.edu/courses",
+    "graduate": "https://graduate.catalog.berkeley.edu/courses",
+}
+UA = "openmind-berkeley catalog refresh (+https://github.com/qazybekb/openmind)"
+
+# Each catalog site applies its own default department exclusions; these are the ones
+# read from the sites' own payloads.
+CATALOG_DEFAULTS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "undergraduate": ("Undergraduate", ("LAW", "NONUCB", "UCEAP")),
+    "graduate": ("Graduate", ("GGAGECH", "NONUCB")),
+}
+
+MIN_ROWS = {"undergraduate": 5_000, "graduate": 3_000}
+MIN_SUBJECTS = 200
+
+
+def log(message: str) -> None:
+    """Report progress on stderr so stdout stays machine-readable."""
+    print(message, file=sys.stderr, flush=True)
+
+
+# -- Coursedog export ----------------------------------------------------------
+
+
+def _field(name: str, group: str, kind: str, value: Any, input_type: str = "select") -> dict[str, Any]:
+    """Build one Coursedog filter clause."""
+    return {"id": f"{name}-{group}", "condition": "field", "name": name, "inputType": input_type,
+            "group": group, "type": kind, "value": value, "customField": False}
+
+
+def build_filters(career: str | None, excluded_departments: tuple[str, ...]) -> dict[str, Any]:
+    """The catalog site's own default filters, plus an optional career restriction."""
+    filters = [
+        _field("status", "course", "is", "Active"),
+        *[_field("departments", "course", "doesNotContain", [code]) for code in excluded_departments],
+        _field("catalogPrint", "course", "is", True, input_type="boolean"),
+        _field("courseApproved", "course", "is", "Approved"),
+    ]
+    if career:
+        filters.append(_field("career", "course", "is", career))
+    return {"condition": "and", "filters": filters}
+
+
+def unfiltered_filters() -> dict[str, Any]:
+    """Everything active and approved, including courses kept out of the printed catalog."""
+    return {"condition": "and", "filters": [
+        _field("status", "course", "is", "Active"),
+        _field("departments", "course", "doesNotContain", ["NONUCB"]),
+        _field("courseApproved", "course", "is", "Approved"),
+    ]}
+
+
+def _get(url: str, timeout: int = 120) -> str:
+    """Fetch a URL as text."""
+    request = urllib.request.Request(url, headers={"User-Agent": UA})
+    return urllib.request.urlopen(request, timeout=timeout).read().decode("utf-8", "replace")
+
+
+def discover_catalog_ids() -> dict[str, str]:
+    """Read the active catalog id for each site from its own page payload.
+
+    The ids roll over every academic year. Reading them rather than hard-coding them is
+    what lets this script keep working after the maintainer stops watching it.
+    """
+    ids: dict[str, str] = {}
+    for name, url in CATALOG_PAGES.items():
+        page = _get(url)
+        match = re.search(r'<script[^>]*type="application/json"[^>]*>(.*?)</script>', page, re.S)
+        if not match:
+            raise SystemExit(f"{name}: could not find the catalog payload on {url}")
+        payload = json.loads(match.group(1))
+        for node in payload:
+            if isinstance(node, dict) and "activeCatalog" in node and "catalogDisplayName" in node:
+                ids[name] = payload[node["activeCatalog"]]
+                log(f"{name}: {payload[node['catalogDisplayName']]} -> {ids[name]}")
+                break
+        else:
+            raise SystemExit(f"{name}: no activeCatalog in the payload from {url}")
+    return ids
+
+
+def export_csv(catalog_id: str, filters: dict[str, Any]) -> list[dict[str, str]]:
+    """Run the catalog's own CSV export and parse it."""
+    url = (f"{API}/ca/{SCHOOL}/catalogs/{catalog_id}/courses/csv/$filters"
+           "?orderBy=catalogDisplayName&ignoreEffectiveDating=false")
+    request = urllib.request.Request(
+        url, data=json.dumps(filters).encode(), method="POST",
+        headers={"User-Agent": UA, "Content-Type": "application/json"},
+    )
+    text = urllib.request.urlopen(request, timeout=300).read().decode("utf-8")
+    return list(csv.DictReader(io.StringIO(text)))
+
+
+# -- offerings -----------------------------------------------------------------
+
+
+def current_and_future_terms(terms: list[schedule.Facet], today: date, limit: int) -> list[schedule.Facet]:
+    """Keep the term in progress and anything after it, oldest first.
+
+    Crawling a past term would tell a student a course is "offered Spring 2026" months
+    after enrolment closed. The Registrar posts one term ahead at most, so this is
+    usually one or two terms — and Spring 2027 joins on its own the day it appears.
+    """
+    season = 2 if today.month >= 8 else (1 if today.month >= 6 else 0)
+    floor = (today.year, season)
+    upcoming = [term for term in terms if schedule.term_sort_key(term.name) >= floor]
+    return sorted(upcoming, key=lambda t: schedule.term_sort_key(t.name))[:limit]
+
+
+def crawl_offerings(subjects: list[str], terms: list[schedule.Facet], delay: float,
+                    limit: int | None = None) -> tuple[list[dict[str, str]], list[str]]:
+    """Crawl the class schedule for each subject in each term."""
+    rows: list[dict[str, str]] = []
+    problems: list[str] = []
+    targets = subjects[:limit] if limit else subjects
+
+    for term in terms:
+        log(f"term {term.name} (facet {term.facet_id}, {term.count} sections)")
+        found = 0
+        for position, subject in enumerate(targets, start=1):
+            try:
+                sections = schedule.crawl_subject(subject, term.facet_id, delay=delay)
+            except schedule.ScheduleError as exc:
+                problems.append(f"{term.name} {subject}: {exc}")
+                continue
+            offerings = schedule.collapse(sections, term.name)
+            rows.extend(offering.to_row() for offering in offerings)
+            found += len(offerings)
+            if position % 25 == 0:
+                log(f"  {position}/{len(targets)} subjects, {found} courses so far")
+        log(f"  {term.name}: {found} courses offered")
+    return rows, problems
+
+
+# -- writing -------------------------------------------------------------------
+
+
+def write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
+    """Write rows as UTF-8 CSV with stable ordering."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def content_hash(paths: list[Path]) -> str:
+    """Hash the data files so an unchanged run can stop before committing anything."""
+    digest = hashlib.sha256()
+    for path in sorted(paths, key=lambda p: p.name):
+        digest.update(path.name.encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def main() -> int:
+    """Refresh the packaged Berkeley course data."""
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--out", default="src/openmind/data", help="directory to write the data files into")
+    parser.add_argument("--skip-offerings", action="store_true", help="export catalogs only")
+    parser.add_argument("--terms", type=int, default=2, help="how many upcoming terms to crawl")
+    parser.add_argument("--delay", type=float, default=schedule.POLITE_DELAY_S, help="seconds between page requests")
+    parser.add_argument("--subject-limit", type=int, help="crawl only the first N subjects (for smoke runs)")
+    args = parser.parse_args()
+
+    out = Path(args.out)
+    previous = content_hash([*out.glob("*.csv"), *out.glob("catalog_meta.json")]) if out.exists() else ""
+
+    log("== catalogs ==")
+    ids = discover_catalog_ids()
+    catalogs: dict[str, list[dict[str, str]]] = {}
+    for level, (career, exclusions) in CATALOG_DEFAULTS.items():
+        rows = export_csv(ids[level], build_filters(career, exclusions))
+        if len(rows) < MIN_ROWS[level]:
+            raise SystemExit(f"{level}: only {len(rows)} rows, expected at least {MIN_ROWS[level]}. Refusing to ship.")
+        catalogs[level] = rows
+        log(f"{level}: {len(rows)} rows, {len({r['Subject'] for r in rows})} subjects")
+
+    subjects = sorted({row["Subject"] for rows in catalogs.values() for row in rows if row.get("Subject")})
+    if len(subjects) < MIN_SUBJECTS:
+        raise SystemExit(f"only {len(subjects)} subjects, expected at least {MIN_SUBJECTS}. Refusing to ship.")
+
+    offerings: list[dict[str, str]] = []
+    terms: list[schedule.Facet] = []
+    problems: list[str] = []
+    if not args.skip_offerings:
+        log("== offerings ==")
+        terms = current_and_future_terms(schedule.list_terms(), date.today(), args.terms)
+        if not terms:
+            raise SystemExit("the class schedule listed no current or upcoming terms. Refusing to ship.")
+        offerings, problems = crawl_offerings(subjects, terms, args.delay, args.subject_limit)
+        log(f"{len(offerings)} course-term offerings across {len(terms)} term(s)")
+        if problems:
+            log(f"{len(problems)} subject(s) failed: {problems[:5]}")
+
+    # A course that is scheduled but hidden by the catalog's default filters still
+    # matters — it is one a student can actually enrol in.
+    scheduled = {(row["subject"], row["number"]) for row in offerings}
+    known = {(row.get("Subject", ""), row.get("Course Number", "")) for rows in catalogs.values() for row in rows}
+    missing = scheduled - known
+    if missing:
+        log(f"== union: {len(missing)} scheduled course(s) are not in the filtered catalogs ==")
+        extra = export_csv(ids["undergraduate"], unfiltered_filters())
+        recovered = 0
+        for row in extra:
+            key = (row.get("Subject", ""), row.get("Course Number", ""))
+            if key not in missing:
+                continue
+            row["In Printed Catalog"] = "0"
+            level = "graduate" if str(row.get("Career", "")).lower().startswith("grad") else "undergraduate"
+            catalogs[level].append(row)
+            missing.discard(key)
+            recovered += 1
+        log(f"recovered {recovered} course(s); {len(missing)} still unmatched")
+
+    log("== writing ==")
+    written: list[Path] = []
+    for level, rows in catalogs.items():
+        for row in rows:
+            row.setdefault("In Printed Catalog", "1")
+        fieldnames = list(rows[0].keys())
+        if "In Printed Catalog" not in fieldnames:
+            fieldnames.append("In Printed Catalog")
+        path = out / f"{level}_courses.csv"
+        write_csv(path, rows, fieldnames)
+        written.append(path)
+        log(f"{path}: {len(rows)} rows")
+
+    if not args.skip_offerings:
+        path = out / "term_offerings.csv"
+        write_csv(path, sorted(offerings, key=lambda r: (r["term"], r["subject"], r["number"])),
+                  ["subject", "number", "term", "section_count", "instruction_modes", "instructors"])
+        written.append(path)
+        log(f"{path}: {len(offerings)} rows")
+
+    today = date.today().isoformat()
+    manifest = {
+        "catalog_as_of": today,
+        "offerings_as_of": today if offerings else "",
+        "terms_known": [term.name for term in terms],
+        "course_count": sum(len(rows) for rows in catalogs.values()),
+        "subject_count": len(subjects),
+        "offering_count": len(offerings),
+        "asset_url": (
+            f"https://github.com/qazybekb/openmind/releases/download/data-{today}/catalog-{today}.tar.gz"
+        ),
+        "data_sha256": "",
+    }
+    manifest_path = out / "catalog_meta.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    written.append(manifest_path)
+
+    digest = content_hash(written)
+    if digest == previous:
+        log("no change since the last run; nothing to publish")
+        print("unchanged")
+        return 0
+
+    log(f"content hash {digest}")
+    print("changed")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except urllib.error.URLError as exc:  # pragma: no cover - network failure in CI
+        log(f"network error: {exc}")
+        raise SystemExit(2) from exc

@@ -33,7 +33,9 @@ from openmind.config import catalog_db_path, home_dir
 
 logger = logging.getLogger(__name__)
 
-MANIFEST_URL: Final[str] = "https://raw.githubusercontent.com/qazybekb/openmind/main/data/catalog_meta.json"
+MANIFEST_URL: Final[str] = (
+    "https://raw.githubusercontent.com/qazybekb/openmind/main/src/openmind/data/catalog_meta.json"
+)
 ASSET_URL_TEMPLATE: Final[str] = "https://github.com/qazybekb/openmind/releases/download/data-{date}/catalog-{date}.tar.gz"
 UPDATE_TIMEOUT_S: Final[float] = 20.0
 UPDATE_INTERVAL_S: Final[float] = 24 * 3600

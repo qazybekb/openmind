@@ -2,7 +2,9 @@
 
 ## Supported Versions
 
-OpenMind is currently maintained as a single rolling release. Please report security issues against the latest `main` branch and the most recent tagged release once tags are published.
+OpenMind is maintained as a single rolling release. Report security issues against the latest `main` branch and the most recent tagged release.
+
+OpenMind runs on a student's own machine with their own bCourses token, so the threat model is: what could make it read more than the student allowed, write anything at all, or leak the token.
 
 ## Reporting a Vulnerability
 
@@ -31,10 +33,12 @@ Include:
 Examples of in-scope issues:
 
 - Token leakage in logs, prompts, or error messages
-- SSRF bypasses in web or PDF fetching
-- Path traversal or vault escape in Obsidian tools
+- SSRF bypasses in course-material downloads, including on redirect
+- Path traversal in course-material extraction or in the catalog data asset
 - Canvas URL validation bypasses
-- Prompt-injection paths that allow unintended cross-tool access
+- Prompt-injection paths where course-document text changes tool behaviour or permissions
+- Any path that lets a tool write to bCourses, or read a course the student did not enable
+- Bearer token leakage to a redirect target off bCourses
 - Incorrect privacy claims in shipped docs or CLI output
 
 Out of scope:

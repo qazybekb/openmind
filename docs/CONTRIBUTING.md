@@ -1,182 +1,102 @@
 # Contributing to OpenMind
 
-## Getting Started
+## Getting started
 
 ```bash
 git clone https://github.com/qazybekb/openmind.git
 cd openmind
-pip install -e .
-openmind --help
+uv venv && uv pip install -e ".[dev]"
+pytest -q
 ```
 
-The `-e` flag installs in editable mode — your code changes take effect immediately.
+You do not need a bCourses account to develop against this. Every test runs over
+`httpx.MockTransport` with a synthetic Canvas instance in `tests/conftest.py`, saved
+HTML fixtures from the class schedule, a frozen clock, and a stubbed keyring. If a test
+you write needs the network, it is testing the wrong thing.
 
-## Project Structure
+## Project structure
 
 ```
 src/openmind/
-├── cli.py              # Typer CLI — entry point, routes to setup/REPL/bot
-├── setup_wizard.py     # Interactive onboarding wizard
-├── config.py           # ~/.openmind/config.json management
-├── universities.py     # UC Berkeley config + personality data
-├── personality.py      # System prompt generation
-├── llm.py              # OpenRouter client + tool-calling loop
-├── repl.py             # Terminal REPL (prompt_toolkit + rich)
-├── bot.py              # Telegram bot + heartbeat launcher
-├── heartbeat.py        # Background checks (deadlines, grades, submissions, announcements)
-└── tools/
-    ├── __init__.py     # Tool registry — loads tools based on config
-    ├── canvas.py       # 13 Canvas API tools with pagination
-    ├── berkeley.py     # Campus events, library hours, study rooms
-    ├── courses.py      # Bundled Berkeley catalog search
-    ├── profile.py      # Student profile + resume-derived data
-    ├── pdf.py          # PDF download + text extraction
-    ├── web.py          # Web fetch + DuckDuckGo search + SSRF protection
-    ├── gmail.py        # Gmail search + read (optional)
-    ├── slack.py        # Slack search + channel reads (optional)
-    ├── calendar.py     # Google Calendar events (optional)
-    ├── todoist.py      # Todoist task management (optional)
-    └── obsidian.py     # Obsidian vault read/write/search (optional)
+├── server.py       12 MCP tools and 5 prompts. The only module that imports `mcp`
+├── service.py      Academic operations, usable without MCP
+├── agenda.py       What's due, what it's worth, when to start (pure functions)
+├── canvas.py       Authenticated bCourses access, fixed routes only
+├── catalog.py      Berkeley catalog + offerings, SQLite + FTS5
+├── schedule.py     classes.berkeley.edu parser
+├── index.py        Opt-in full-text index of course materials
+├── materials.py    Bounded document extraction (PDF, PPTX, DOCX, HTML)
+├── pedagogy.py     Tutoring protocol shipped as data
+├── cache.py        In-memory TTL cache
+├── config.py       Non-secret settings
+├── secrets.py      OS credential store
+├── timeutil.py     Local calendar days
+├── cli.py          setup / mcp / doctor / index / update-data / clear / config
+└── data/           Public Berkeley catalog snapshot
+
+scripts/refresh_catalog.py   Re-exports the public course data (runs in CI)
 ```
 
-## Adding a New Tool
+`docs/ARCHITECTURE.md` explains why the layers are separated the way they are. Read it
+before moving code between them.
 
-1. Create a function and tool definition in the appropriate `tools/*.py` file (or a new file)
-2. The tool definition follows the OpenAI function calling schema:
+## Rules that are not negotiable
 
-```python
-MY_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "my_tool_name",
-            "description": "What this tool does — the LLM reads this to decide when to call it.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "param1": {"type": "string", "description": "What this param is"},
-                },
-                "required": ["param1"],
-            },
-        },
-    },
-]
-```
+**Nothing writes to stdout except the protocol.** A host waits for a JSON frame there; a
+stray `print` breaks the handshake. Anything interactive belongs in `cli.py`. Logging
+goes to stderr.
 
-3. Create an executor function:
+**No LLM in the server.** The host model does the explaining. If you find yourself
+wanting to call a model to decide something, that decision belongs in code or in the
+prompt text.
 
-```python
-from typing import Any
+**Read-only.** No tool may submit, upload, post, message, or fetch an arbitrary URL. New
+Canvas routes go in `canvas.py` as named methods, never as a generic request helper.
 
-from openmind.config import ConfigDict
+**Never present a failure as "nothing due".** If a request fails, add a warning and set
+`partial`. An empty list must mean "there is nothing", always.
 
+**Anything a wrong answer would hurt is computed in code.** Dates, weights, estimates,
+and statuses come from `agenda.py`, not from a model's arithmetic.
 
-def execute_my_tool(name: str, args: dict[str, Any], cfg: ConfigDict) -> str:
-    if name != "my_tool_name":
-        return json.dumps({"error": f"Unknown tool: {name}"})
+**Retrieved text is evidence, not instructions.** It goes in the labelled untrusted
+block, after the rules.
 
-    param1 = str(args.get("param1", "")).strip()
-    if not param1:
-        return json.dumps({"error": "Missing required argument: param1."})
+**Secrets never appear in a log line, an error message, or a payload.** There is a test
+for this; keep it passing.
 
-    return json.dumps({"result": "..."})
-```
+## Adding a tool
 
-4. Register in `tools/__init__.py`:
+1. Write the operation in `service.py`, returning a plain dict with `**self.stamp()`.
+2. Give it a byte budget in `service.BUDGETS` and pass the payload through `shrink`.
+3. Add the tool in `server.py` with `structured_output=False`, `ToolAnnotations`, an
+   `Annotated[..., Field(description=...)]` for every parameter, and a docstring that
+   says when to use it *and when not to* — that docstring is how a model routes.
+4. Add a row to `docs/TOOLS.md`. `test_release_contract.py` fails if you forget.
+5. Test the operation in `test_service.py`, not the protocol wrapper.
 
-```python
-from openmind.tools.mymodule import MY_TOOLS, execute_my_tool
+## Style
 
-_TOOL_GROUPS = {
-    ...
-    "mymodule": (MY_TOOLS, execute_my_tool),
-}
-```
+- Docstrings on every public function, in the imperative.
+- Comments explain *why*, not *what*. If a line needs a comment to say what it does,
+  rename something instead.
+- Type annotations everywhere; `from __future__ import annotations` at the top.
+- `ruff check src tests scripts` must be clean.
+- Tests are named after the behaviour they protect, not the function they call.
 
-5. Add to `get_all_tools()` (conditionally if optional):
-
-```python
-if cfg.get("mymodule", {}).get("enabled"):
-    tools.extend(MY_TOOLS)
-```
-
-## Adding Agent Instructions
-
-If your tool needs the LLM to use it in a specific way, add instructions to `personality.py` in the `agent_instructions` string. Follow the existing pattern:
-
-```python
-### "My feature"
-1. Call my_tool_name with the relevant parameter
-2. Process the result
-3. Show to user in this format
-```
-
-## Code Standards
-
-- Python 3.11+
-- No unnecessary dependencies — check if httpx/stdlib can do it first
-- All external HTTP calls need `timeout=` set
-- All tool executors must return JSON strings
-- All tool executors must handle errors gracefully — return `{"error": "..."}`, never raise
-- Canvas API calls use Bearer auth headers, never URL query params
-- Keep the Berkeley personality authentic — reference real places, use real slang
-
-## Security Checklist
-
-Before submitting:
-
-- [ ] No secrets in code (tokens, keys, passwords)
-- [ ] External URL tools check `_is_safe_url()` (blocks localhost, private IPs)
-- [ ] File system tools check `is_relative_to()` (blocks path traversal)
-- [ ] New integrations are read-only by default
-- [ ] Optional dependencies are in `[project.optional-dependencies]`, not `dependencies`
-
-## Testing
-
-Run the Python validation suite:
+## Before opening a pull request
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_*.py' -v
-ruff check src/openmind tests
-python3 -m compileall src/openmind
+ruff check src tests scripts
+pytest -q
+python -m openmind mcp     # must print valid JSON and no secrets
 ```
 
-Verify the CLI:
+If you changed `schedule.py`, re-save the fixtures in `tests/fixtures/schedule/` from
+the live site and say so in the PR — those files are the contract with someone else's
+HTML.
 
-```bash
-PYTHONPATH=src python3 -m openmind --help
-PYTHONPATH=src python3 -c "from openmind.tools import get_all_tools; print(len(get_all_tools({})))"
-PYTHONPATH=src python3 -c "from openmind.tools import get_all_tools; print(len(get_all_tools({'obsidian': {'enabled': True}, 'todoist': {'enabled': True}, 'gmail': {'enabled': True}, 'slack': {'enabled': True}, 'calendar': {'enabled': True}})))"
-```
+## Reporting a security issue
 
-Build the website before changing public-facing copy:
-
-```bash
-cd website
-npm ci
-npm run build
-```
-
-## Berkeley Knowledge Base (Phase 1)
-
-We're planning a bundled knowledge base of Berkeley-specific information (campus, safety, health, transit, student life). See `PLAN.md` for details. If you want to contribute knowledge files, they're simple markdown:
-
-```markdown
-# SafeWalk
-
-SafeWalk provides free walking escorts on campus.
-
-- **Hours**: 8pm - 2am, every night during the semester
-- **Phone**: (510) 642-WALK (9255)
-- **App**: BearWalk
-- **Coverage**: Anywhere on campus + a few blocks off-campus
-```
-
-## Submitting Changes
-
-1. Fork the repo
-2. Create a branch: `git checkout -b my-feature`
-3. Make your changes
-4. Test: unit tests, lint, `python -m openmind --help`, and the website build
-5. Commit with a clear message
-6. Open a PR describing what you changed and why
+See [SECURITY.md](../SECURITY.md). Do not open a public issue for anything involving
+tokens, credential storage, or a way to make the server write.

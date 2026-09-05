@@ -1,0 +1,208 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import '../../styles/global.css';
+---
+
+<Layout
+  title="Connect OpenMind to Claude or ChatGPT — OpenMind"
+  description="Point Claude Desktop, Claude Code, Cursor, or the ChatGPT desktop app at your local OpenMind server."
+>
+  <Nav />
+  <main>
+    <section class="pt-28 pb-20 md:pt-36 md:pb-28">
+      <div class="container max-w-3xl">
+
+        <!-- Header -->
+        <div class="mb-12 fade-in">
+          <a href="/guides/" class="text-xs text-text-muted hover:text-text-primary transition-colors">&larr; All Guides</a>
+          <div class="flex items-center gap-3 mt-4 mb-2">
+            <span class="text-3xl">🖥️</span>
+            <div>
+              <h1 class="text-2xl md:text-4xl font-bold text-text-primary tracking-tight">Connect to Claude or ChatGPT</h1>
+              <div class="flex items-center gap-3 mt-1">
+                <span class="text-[10px] font-semibold text-cal-gold uppercase tracking-widest">Step 2</span>
+                <span class="text-xs text-text-muted">~3 minutes</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-text-body mt-4">
+            OpenMind is an MCP server: a program on your computer that gives an AI app a set of
+            tools. You tell the app once where to find it, and from then on you just ask questions.
+          </p>
+        </div>
+
+        <!-- Prerequisite -->
+        <div class="card mb-8 fade-in border-border/50">
+          <h3 class="text-text-primary font-semibold mb-2">Before you start</h3>
+          <ul class="text-sm text-text-secondary space-y-1">
+            <li>- <a href="/guides/bcourses/" class="underline underline-offset-2 hover:text-text-primary">A bCourses token</a>, and <code class="text-text-secondary">openmind setup</code> already run</li>
+            <li>- A <span class="text-text-primary">desktop</span> AI app. The web and mobile versions cannot run a local server &mdash; this has to be a program on the same machine</li>
+          </ul>
+        </div>
+
+        <!-- Get the config -->
+        <div class="card mb-8 fade-in">
+          <h3 class="text-text-primary font-semibold mb-3">First, get your config</h3>
+          <p class="text-sm text-text-secondary mb-4">
+            This prints the exact block for every supported app, with the absolute path already
+            filled in. Your token does not appear in it &mdash; it stays in your keychain.
+          </p>
+          <div class="terminal">
+            <div class="terminal-header">
+              <div class="terminal-dot bg-[#ff5f57]"></div>
+              <div class="terminal-dot bg-[#febc2e]"></div>
+              <div class="terminal-dot bg-[#28c840]"></div>
+            </div>
+            <div class="terminal-body text-[13px]">
+              <div><span class="text-text-secondary">$</span> <span class="text-text-primary">openmind mcp</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-6">
+
+          <!-- Claude Desktop -->
+          <div class="card fade-in">
+            <div class="flex items-baseline gap-3 mb-3">
+              <span class="text-xs font-semibold text-cal-gold uppercase tracking-widest">Claude Desktop</span>
+            </div>
+            <p class="text-sm text-text-secondary mb-4">
+              Open your Claude config file &mdash; Settings &rarr; Developer &rarr; Edit Config will take you
+              straight there, or find it at:
+            </p>
+            <div class="text-xs text-text-muted space-y-1 mb-4 font-mono">
+              <div>macOS&ensp;&ensp;&ensp;~/Library/Application Support/Claude/claude_desktop_config.json</div>
+              <div>Windows&ensp;%APPDATA%\Claude\claude_desktop_config.json</div>
+            </div>
+            <p class="text-sm text-text-secondary mb-4">Add the <code class="text-text-secondary">openmind</code> entry:</p>
+            <div class="terminal">
+              <div class="terminal-header">
+                <div class="terminal-dot bg-[#ff5f57]"></div>
+                <div class="terminal-dot bg-[#febc2e]"></div>
+                <div class="terminal-dot bg-[#28c840]"></div>
+                <span class="ml-3 text-xs text-text-muted font-sans">claude_desktop_config.json</span>
+              </div>
+              <div class="terminal-body text-[13px] space-y-0.5">
+                <div><span class="text-text-secondary">&#123;</span></div>
+                <div>&ensp;<span class="text-cal-gold">"mcpServers"</span><span class="text-text-secondary">: &#123;</span></div>
+                <div>&ensp;&ensp;<span class="text-cal-gold">"openmind"</span><span class="text-text-secondary">: &#123;</span></div>
+                <div>&ensp;&ensp;&ensp;<span class="text-cal-gold">"command"</span><span class="text-text-secondary">: </span><span class="text-text-primary">"/Users/you/.local/bin/openmind-mcp"</span></div>
+                <div>&ensp;&ensp;<span class="text-text-secondary">&#125;</span></div>
+                <div>&ensp;<span class="text-text-secondary">&#125;</span></div>
+                <div><span class="text-text-secondary">&#125;</span></div>
+              </div>
+            </div>
+            <p class="text-sm text-text-secondary mt-4">
+              Then <span class="text-text-primary">quit Claude completely</span> and reopen it &mdash; closing the
+              window is not enough. The path must be absolute; Claude does not inherit your shell's PATH.
+            </p>
+          </div>
+
+          <!-- Claude Code -->
+          <div class="card fade-in">
+            <div class="flex items-baseline gap-3 mb-3">
+              <span class="text-xs font-semibold text-cal-gold uppercase tracking-widest">Claude Code</span>
+            </div>
+            <p class="text-sm text-text-secondary mb-4">One command, no file editing:</p>
+            <div class="terminal">
+              <div class="terminal-header">
+                <div class="terminal-dot bg-[#ff5f57]"></div>
+                <div class="terminal-dot bg-[#febc2e]"></div>
+                <div class="terminal-dot bg-[#28c840]"></div>
+              </div>
+              <div class="terminal-body text-[13px]">
+                <div><span class="text-text-secondary">$</span> <span class="text-text-primary">claude mcp add --scope user openmind -- /Users/you/.local/bin/openmind-mcp</span></div>
+              </div>
+            </div>
+            <p class="text-sm text-text-secondary mt-4">
+              <code class="text-text-secondary">--scope user</code> makes it available in every project.
+              Check it with <code class="text-text-secondary">claude mcp list</code>.
+            </p>
+          </div>
+
+          <!-- Cursor -->
+          <div class="card fade-in">
+            <div class="flex items-baseline gap-3 mb-3">
+              <span class="text-xs font-semibold text-cal-gold uppercase tracking-widest">Cursor</span>
+            </div>
+            <p class="text-sm text-text-secondary">
+              Add the same JSON block to <code class="text-text-secondary">~/.cursor/mcp.json</code>
+              (create the file if it isn't there), then reload Cursor. Settings &rarr; MCP will show
+              OpenMind connected with its twelve tools.
+            </p>
+          </div>
+
+          <!-- ChatGPT -->
+          <div class="card fade-in">
+            <div class="flex items-baseline gap-3 mb-3">
+              <span class="text-xs font-semibold text-cal-gold uppercase tracking-widest">ChatGPT desktop</span>
+            </div>
+            <p class="text-sm text-text-secondary">
+              In the desktop app's settings, add a local &mdash; sometimes labelled STDIO &mdash; MCP server,
+              and paste the command <code class="text-text-secondary">openmind mcp</code> printed.
+              Local MCP support varies by plan and by app version; if you don't see the option,
+              check what your plan includes.
+            </p>
+          </div>
+
+        </div>
+
+        <!-- Verify -->
+        <div class="card mt-8 fade-in border-l-2 border-l-cal-gold">
+          <h3 class="text-text-primary font-semibold mb-3">Check that it worked</h3>
+          <p class="text-sm text-text-secondary mb-4">Ask your app:</p>
+          <div class="terminal mb-4">
+            <div class="terminal-header">
+              <div class="terminal-dot bg-[#ff5f57]"></div>
+              <div class="terminal-dot bg-[#febc2e]"></div>
+              <div class="terminal-dot bg-[#28c840]"></div>
+            </div>
+            <div class="terminal-body text-[13px]">
+              <div><span class="text-text-muted">You &rarr;</span> <span class="text-text-primary">What's due this week?</span></div>
+            </div>
+          </div>
+          <p class="text-sm text-text-secondary">
+            You should get your real deadlines with priorities. If the app says it has no such tool,
+            restart it &mdash; an AI app only reads its MCP config at launch.
+          </p>
+        </div>
+
+        <!-- Troubleshooting -->
+        <div class="card mt-8 fade-in">
+          <h3 class="text-text-primary font-semibold mb-4">If something is off</h3>
+          <p class="text-sm text-text-secondary mb-4">
+            Run <code class="text-text-secondary">openmind doctor</code> first. It checks your Python
+            version, the keychain, whether the token still works, your time zone, whether each course
+            is reachable, and the catalog &mdash; and names what to fix.
+          </p>
+          <div class="space-y-3 text-sm">
+            <div>
+              <div class="text-text-primary font-medium">The app doesn't see any tools</div>
+              <div class="text-text-secondary">Restart it completely. Check the path in the config is absolute and that the file exists.</div>
+            </div>
+            <div>
+              <div class="text-text-primary font-medium">"Your bCourses token is invalid or expired"</div>
+              <div class="text-text-secondary">Generate a new token in bCourses and run <code class="text-text-secondary">openmind setup</code> again.</div>
+            </div>
+            <div>
+              <div class="text-text-primary font-medium">macOS asks for Keychain access after an upgrade</div>
+              <div class="text-text-secondary">Allow it. Upgrading replaces the Python interpreter, so macOS sees a new program asking for the same secret.</div>
+            </div>
+            <div>
+              <div class="text-text-primary font-medium">"OpenMind is not set up yet"</div>
+              <div class="text-text-secondary">The server is connected but has no config. Run <code class="text-text-secondary">openmind setup</code>, then restart the app.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center mt-12 fade-in">
+          <a href="/guides/" class="btn-secondary">&larr; All Guides</a>
+        </div>
+
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Layout>

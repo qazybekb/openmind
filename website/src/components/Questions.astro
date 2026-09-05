@@ -1,11 +1,14 @@
 ---
 const prompts = [
-  { q: "What's due this week?", a: "NLP midterm report (Fri, 30% of grade) — start with the outline tonight." },
-  { q: "What do I need on the final for an A?", a: "You need 91% on the final. Currently at 87.3%. Doable." },
-  { q: "Teach me contextual integrity", a: "What do you already know? Let's start from your understanding..." },
-  { q: "Make me a study guide for the midterm", a: "Reading your course materials... generating 15-page PDF now." },
-  { q: "What skills am I missing for AI PM?", a: "Strong: Python, NLP. Gap: UX design — take INFO 214." },
-  { q: "Plan my week", a: "Sat 10am: Lab 2 (1.5h) → Sun 1pm: NLP report (4h). Want me to block these on your calendar?" },
+  { q: "What's due this week?", a: "Ranked by urgency, with weights, hour estimates, and start-by dates. Overdue work listed first." },
+  { q: "Is my Tuesday deadline actually Tuesday?", a: "Your time zone, read off your Canvas profile — not UTC, not your laptop's clock." },
+  { q: "What's my grade in STAT 156?", a: "What bCourses shows, broken down by assignment group. Ungraded work isn't counted as zeros." },
+  { q: "Explain problem set 3 using the week 3 slides", a: "The assignment, what the rubric rewards, and cited excerpts from your own materials." },
+  { q: "Tutor me on confounding", a: "Questions before answers, one concept at a time, taught from your course's readings." },
+  { q: "Quiz me on this week's reading", a: "One question at a time, confidence rating before the reveal, feedback with a citation." },
+  { q: "Plan my week", a: "A schedule built from real deadlines, respecting start-by dates and how much you can actually do in a day." },
+  { q: "What should I take next semester if I'm into NLP?", a: "Catalog matches filtered to what's actually offered, with prerequisites flagged and the advisor caveat." },
+  { q: "Is STAT 156 offered this fall?", a: "Live sections, times, instructors, and open seats from the public class schedule." },
 ];
 ---
 <section class="section-sm">
@@ -19,7 +22,7 @@ const prompts = [
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
       {prompts.map((p, i) => (
-        <div class={`card fade-in`} style={`transition-delay: ${0.08 * (i + 1)}s`}>
+        <div class="card fade-in" style={`transition-delay: ${0.08 * (i + 1)}s`}>
           <p class="text-text-primary font-medium text-sm mb-2">"{p.q}"</p>
           <p class="text-text-muted text-xs leading-relaxed">{p.a}</p>
         </div>
@@ -28,7 +31,7 @@ const prompts = [
 
     <p class="text-center mt-8 fade-in">
       <a href="/use-cases/" class="text-text-secondary text-sm underline underline-offset-2 hover:text-text-primary transition-colors">
-        See 80+ example prompts &rarr;
+        See more example prompts &rarr;
       </a>
     </p>
   </div>

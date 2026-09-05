@@ -7,69 +7,79 @@ on:
   pull_request:
 
 jobs:
-  python-checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  python:
+    name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.13"]
+        exclude:
+          - os: windows-latest
+            python-version: "3.11"
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
-      - name: Install project and lint tool
+      - name: Install the package and dev tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install . ruff
+          python -m pip install -e ".[dev]"
 
-      - name: Compile package
-        run: python -m compileall src/openmind
+      - name: Lint
+        run: ruff check src tests scripts
 
-      - name: Verify tool counts
+      - name: Test
+        run: python -m pytest -q
+
+      # A host spawns the server and waits for a protocol frame on stdout. Anything
+      # else there — a banner, a warning, a stray print — breaks the handshake.
+      - name: Verify the server starts silently and describes itself
+        run: python -m pytest tests/test_release_contract.py -q
+
+      - name: Verify the CLI
         run: |
-          PYTHONPATH=src python -c "from openmind.tools import get_all_tools; assert len(get_all_tools({})) == 30"
-          PYTHONPATH=src python -c "from openmind.tools import get_all_tools; assert len(get_all_tools({'obsidian':{'enabled':True},'todoist':{'enabled':True},'gmail':{'enabled':True},'slack':{'enabled':True},'calendar':{'enabled':True}})) == 43"
+          python -m openmind --help
+          python -m openmind --version
+          python -m openmind mcp
 
-      - name: Verify CLI help
-        run: |
-          PYTHONPATH=src python -m openmind --help > /tmp/openmind-help.txt
-          grep -q "setup" /tmp/openmind-help.txt
-          grep -q "config" /tmp/openmind-help.txt
-          grep -q "chat" /tmp/openmind-help.txt
-          grep -q "profile" /tmp/openmind-help.txt
-          grep -q "privacy" /tmp/openmind-help.txt
-
-      - name: Verify package import
-        run: PYTHONPATH=src python -c "import openmind; print(openmind.__version__)"
-
-      - name: Run test suite
-        run: PYTHONPATH=src python -m unittest discover -s tests -p 'test_*.py' -v
-
-      - name: Run Ruff
-        run: ruff check src/openmind tests
-
-  website-build:
+  build:
+    name: Build the distribution
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build and check
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          python -m twine check dist/*
+      - name: Verify the catalog data ships in the wheel
+        run: |
+          python -m zipfile -l dist/*.whl | grep -q "openmind/data/undergraduate_courses.csv"
+          python -m zipfile -l dist/*.whl | grep -q "openmind/data/graduate_courses.csv"
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
+  website:
+    name: Build the website
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22.12.0"
           cache: npm
           cache-dependency-path: website/package-lock.json
-
-      - name: Install website dependencies
-        working-directory: website
+      - working-directory: website
         run: npm ci
-
-      - name: Build website
-        working-directory: website
+      - working-directory: website
         run: npm run build

@@ -6,182 +6,104 @@ import '../styles/global.css';
 
 const categories = [
   {
-    name: "Deadlines & Assignments",
-    icon: "📚",
-    about: "OpenMind fetches all your upcoming assignments from bCourses and sorts them by what actually matters — a 30% midterm due Friday outranks a 1% attendance quiz due tomorrow. It checks submission status too, so you never miss a deadline without knowing.",
-    setup: "Works out of the box — just needs your bCourses connection.",
+    name: "Deadlines",
+    icon: "\u23F0",
+    about: "OpenMind reads your bCourses planner, converts every due date into your own time zone, works out what each item is worth from your course's assignment-group weights, estimates how long it will take, and computes the last day you can start. Anything past due and unsubmitted is listed first, separately, so it can't get buried.",
+    setup: "Works as soon as setup is done.",
     templates: [
-      { q: "What's due this week?", desc: "Priority-sorted deadlines across all courses" },
-      { q: "What's due for NLP?", desc: "Assignments for a specific course" },
-      { q: "Am I missing anything?", desc: "Check for unsubmitted past-due assignments" },
-      { q: "What's the most important thing I should work on right now?", desc: "Priority scoring by urgency × grade weight" },
-      { q: "What assignments are worth the most in Finance?", desc: "Grade weight breakdown" },
-      { q: "Do I have anything due tomorrow?", desc: "Urgent deadline check" },
-      { q: "Show me everything due in the next 2 weeks", desc: "Extended deadline view" },
-      { q: "What did I submit this week?", desc: "Submission status review" },
+      { q: "What's due this week?", desc: "Ranked by urgency, with weights and start-by dates" },
+      { q: "What's due for NLP?", desc: "One course at a time" },
+      { q: "Am I missing anything?", desc: "Past-due work that was never submitted" },
+      { q: "What should I work on right now?", desc: "The top of the ranked list, and why it's there" },
+      { q: "Do I have anything due tomorrow?", desc: "Calendar days in your zone, not 24-hour blocks" },
+      { q: "Show me everything due in the next two weeks", desc: "A wider window" },
+      { q: "Is my Tuesday deadline actually Tuesday?", desc: "An 11:59 PM deadline is not the next day" },
+      { q: "What have I already submitted this week?", desc: "Submission status straight from bCourses" },
+      { q: "What's due that has no deadline set?", desc: "Undated work, which the planner hides" },
     ]
   },
   {
-    name: "Grades & GPA",
-    icon: "📊",
-    about: "See your current grades across all courses, calculate exactly what you need on the final to hit your target, and identify which classes need the most attention. OpenMind pulls real-time grade data from bCourses and does the math for you using actual assignment weights.",
-    setup: "Works out of the box — just needs your bCourses connection.",
+    name: "Grades",
+    icon: "\u{1F4CA}",
+    about: "Your own scores, exactly as bCourses reports them, broken down by assignment group. Ungraded work is never counted as a zero, and a course with no posted score says so rather than showing a misleading number. OpenMind reads grades for yourself only \u2014 there is no code path to anyone else's.",
+    setup: "Works as soon as setup is done.",
     templates: [
-      { q: "What are my grades?", desc: "Current grade for every course" },
-      { q: "What do I need on the final to get an A in Finance?", desc: "Grade calculation with assignment weights" },
-      { q: "What's my worst grade right now?", desc: "Identify courses that need attention" },
-      { q: "If I skip the writing prompt, what happens to my grade?", desc: "What-if scenario" },
-      { q: "What assignments can I afford to do poorly on?", desc: "Low-impact assignment identification" },
-      { q: "Which class needs the most attention right now?", desc: "Compare current grades and workload" },
-      { q: "Which course is dragging down my average?", desc: "Spot the weakest current grade" },
+      { q: "What are my grades?", desc: "Every enabled course, with the letter grade bCourses shows" },
+      { q: "Break down my grade in STAT 156", desc: "Assignment groups, their weights, and recent graded work" },
+      { q: "What's my worst grade right now?", desc: "Where attention is most useful" },
+      { q: "How much is problem set 3 worth?", desc: "Computed from group weights, not guessed" },
+      { q: "What's still ungraded in NLP?", desc: "Submitted work waiting on a GSI" },
+      { q: "Which assignments are worth the most this semester?", desc: "Weight across all your courses" },
     ]
   },
   {
-    name: "Readings & PDFs",
-    icon: "📖",
-    about: "OpenMind fetches your course module pages from bCourses, finds the readings, and actually reads them — downloading PDFs, extracting text from lecture slides, and fetching web articles. It summarizes each reading so you know the key arguments before class.",
-    setup: "Works out of the box. PDF extraction uses pymupdf (bundled).",
+    name: "Assignments",
+    icon: "\u270D\uFE0F",
+    about: "The full assignment description and rubric from bCourses, plus the facts around it: your due date (so an extension shows up), what it's worth, how long it should take, and when to start. Ask for help and you get the task explained and a plan \u2014 not text written for you to submit.",
+    setup: "Works as soon as setup is done. Better once the course is indexed.",
     templates: [
-      { q: "What readings for Info Law this week?", desc: "Fetch and summarize weekly readings" },
-      { q: "Summarize the NLP lecture 7 slides", desc: "Download PDF, extract text, summarize" },
-      { q: "Summarize this article: [URL]", desc: "Fetch and summarize any web article" },
-      { q: "What are the key arguments in the Barocas paper?", desc: "Deep reading summary" },
-      { q: "Compare this week's readings across my courses", desc: "Cross-course reading overview" },
-      { q: "Summarize this week's NLP readings", desc: "Module and reading summary" },
-      { q: "Make a one-page summary of all readings for the midterm", desc: "Consolidated study material" },
+      { q: "Explain problem set 3", desc: "What it asks, what the rubric rewards, and a time plan" },
+      { q: "Explain the midterm report using the week 3 slides", desc: "The same, with cited excerpts from your materials" },
+      { q: "What does the rubric actually want here?", desc: "Criterion by criterion, with the points attached" },
+      { q: "How should I structure this essay?", desc: "An outline, from the rubric" },
+      { q: "Did I already submit this?", desc: "Submission state, attempts, and whether it was late" },
+      { q: "When do I need to start the final project?", desc: "A start-by date from the hour estimate" },
     ]
   },
   {
-    name: "Assignment Help",
-    icon: "✍️",
-    about: "OpenMind reads the full assignment description and rubric from bCourses, then gives you specific guidance — what the professor is looking for, how to structure your response, and which rubric points to focus on. If you have a profile, it connects the assignment to your experience.",
-    setup: "Works out of the box. Even better with a profile (openmind setup profile).",
+    name: "Tutoring",
+    icon: "\u{1F9E0}",
+    about: "Ask a factual question and you get a direct answer. Ask to learn something and the mode changes: diagnose what you already know, teach one building block, check with a scenario question, and climb a hint ladder rather than handing over the answer. It teaches from your own course materials once the course is indexed, and quotes what your syllabus says about AI so it works inside your instructor's rules.",
+    setup: "Run openmind index --course <id> so it can quote your slides and readings.",
     templates: [
-      { q: "Help me with the NLP midterm report", desc: "Reads the prompt + rubric, gives specific guidance" },
-      { q: "What does the rubric say for the Big Data paper?", desc: "Rubric breakdown" },
-      { q: "Draft an outline for the Info Law lab", desc: "Rubric-based outline generation" },
-      { q: "What format does the professor want for this essay?", desc: "Format requirements extraction" },
-      { q: "What's the word count for the Social Issues prompt?", desc: "Assignment requirements" },
-      { q: "Check if my outline covers all rubric points", desc: "Rubric alignment check" },
-      { q: "What are the most common mistakes on this type of assignment?", desc: "Proactive guidance" },
+      { q: "Tutor me on confounding", desc: "Socratic tutoring from your course's own materials" },
+      { q: "I don't understand backpropagation", desc: "Starts by finding where it actually breaks down" },
+      { q: "/answer", desc: "Ends the Socratic mode and gives the answer, no lecture" },
+      { q: "Quiz me on this week's reading", desc: "One question at a time, confidence before the reveal" },
+      { q: "Explain this like I've never seen it before", desc: "A concrete analogy, then a worked example" },
+      { q: "Am I allowed to use AI for this course?", desc: "Quotes what your syllabus says, rather than guessing" },
     ]
   },
   {
-    name: "Teach Me",
-    icon: "🎓",
-    about: "Interactive learning from your actual course materials — not generic knowledge. OpenMind finds the relevant lecture slides or readings, explains one concept at a time with analogies, asks you real scenario questions, and adjusts based on your answers. It connects everything back to your assignments.",
-    setup: "Works out of the box. Uses your course materials from bCourses.",
+    name: "Course materials",
+    icon: "\u{1F4D6}",
+    about: "By default OpenMind can see the names of your files and modules. Index a course and it extracts the text of its PDFs, slide decks, pages, and syllabus into a private file on your machine \u2014 so it can search inside them and quote a specific page. Scanned PDFs and unsupported formats are reported as such, never silently skipped.",
+    setup: "openmind index --course <id>. openmind clear deletes it.",
     templates: [
-      { q: "Teach me about attention mechanisms from NLP", desc: "Step-by-step interactive teaching" },
-      { q: "Explain algorithmic fairness like I'm five", desc: "Simplified concept explanation" },
-      { q: "I don't understand transformers", desc: "Start from basics, build up" },
-      { q: "Quiz me on NLP lectures 6-9", desc: "Practice questions from course content" },
-      { q: "Continue where we left off", desc: "Resume previous study session" },
-      { q: "Explain this concept using a real-world analogy", desc: "Analogy-based learning" },
-      { q: "What's the difference between supervised and unsupervised learning?", desc: "Comparison-based teaching" },
-      { q: "Give me 5 practice problems on regression", desc: "Practice problem generation" },
+      { q: "Where do the slides cover instrumental variables?", desc: "Page-cited hits from inside your decks" },
+      { q: "What did the professor say about the midterm format?", desc: "Searches announcements and the syllabus" },
+      { q: "Show me week 3's materials", desc: "Everything in that module, in order" },
+      { q: "Read me page 12 of the week 4 reading", desc: "The document as text, with page markers" },
+      { q: "What's the late policy?", desc: "Quoted from the syllabus, with the citation" },
+      { q: "Index my causal inference course", desc: "Makes that course's materials searchable" },
     ]
   },
   {
-    name: "Flashcards & Study",
-    icon: "🃏",
-    about: "Generate flashcards from your actual lecture slides and readings — not generic study material. OpenMind reads the PDF, extracts the key concepts, and creates Q&A pairs. If Obsidian is connected, it saves them to your vault.",
-    setup: "Works out of the box. Obsidian integration optional for saving.",
+    name: "Planning your week",
+    icon: "\u{1F5D3}\uFE0F",
+    about: "A study plan built from real deadlines rather than a guess: overdue work first, each item scheduled to start no later than its start-by date, in blocks you could actually sit through, with a buffer before anything heavy. OpenMind cannot write to your calendar \u2014 it produces a plan you follow, not a claim that it scheduled something.",
+    setup: "Works as soon as setup is done.",
     templates: [
-      { q: "Make flashcards for NLP lecture 7", desc: "Q&A pairs from lecture content" },
-      { q: "Make flashcards for algorithmic fairness", desc: "Concept-based flashcards" },
-      { q: "Quiz me on these flashcards", desc: "Interactive flashcard review" },
-      { q: "Prepare me for the Social Issues midterm", desc: "Study guide from course materials" },
-      { q: "What topics will be on the final?", desc: "Syllabus-based topic extraction" },
-      { q: "Create a cheat sheet for the NLP midterm", desc: "Key formulas and definitions" },
+      { q: "Plan my week", desc: "A schedule from your real deadlines and hour estimates" },
+      { q: "I only have 6 hours this weekend \u2014 what matters most?", desc: "Triage by weight and urgency" },
+      { q: "What should I do first today?", desc: "One thing, with the reason" },
+      { q: "I'm behind. Where do I start?", desc: "Overdue work first, still-submittable first" },
+      { q: "How many hours of work do I have this week?", desc: "The total across everything open" },
     ]
   },
   {
-    name: "Career & Skills",
-    icon: "🚀",
-    about: "OpenMind compares what you have (your skills, experience, projects from your profile) against what you need (based on your career goals and target companies). It identifies specific gaps and recommends Berkeley courses, projects, or resources to fill them. This is the most powerful feature when your profile is set up.",
-    setup: "Requires a profile: openmind setup profile. Much better with resume data.",
+    name: "Choosing courses",
+    icon: "\u{1F393}",
+    about: "The whole Berkeley catalog \u2014 11,000 undergraduate and graduate courses across 240 departments \u2014 plus the part that actually decides your semester: which of them have sections this term. Every result carries the date the snapshot was taken, and course advice always ends with the reminder to check requirements with your advisor.",
+    setup: "Works as soon as setup is done. No bCourses data needed.",
     templates: [
-      { q: "What skills am I missing for AI PM roles?", desc: "Skill gap analysis from profile" },
-      { q: "What CS courses should I take for AI?", desc: "Course recommendations based on goals" },
-      { q: "Based on my profile, what should I focus on for AI PM roles?", desc: "Profile-based career guidance" },
-      { q: "What should I focus on to get into Google?", desc: "Company-specific career advice" },
-      { q: "What classes would help me get into a PhD program?", desc: "Academic career planning" },
-      { q: "Which Berkeley classes fit my interests and career goals best?", desc: "Profile-based course matching" },
-      { q: "What electives complement my major?", desc: "Cross-disciplinary course suggestions" },
-      { q: "What projects should I build for my portfolio?", desc: "Project recommendations based on skills" },
-      { q: "How does my coursework compare to typical AI PM job requirements?", desc: "Career-course alignment" },
-    ]
-  },
-  {
-    name: "Course Catalog",
-    icon: "📘",
-    about: "Search across 11,169 Berkeley courses (6,771 undergraduate + 4,398 graduate) from 240 departments. The catalog is bundled with OpenMind — no network request needed. Filter by subject, level, or keyword. See course descriptions, units, prerequisites, and terms offered.",
-    setup: "Works out of the box. Catalog is bundled with the package.",
-    templates: [
-      { q: "Search for machine learning courses", desc: "Keyword search across 11K courses" },
-      { q: "What INFO courses are available?", desc: "Department-specific listing" },
-      { q: "Show me graduate-level data science courses", desc: "Level-filtered search" },
-      { q: "What are the prerequisites for CS 189?", desc: "Course detail lookup" },
-      { q: "What departments offer AI-related courses?", desc: "Cross-department search" },
-      { q: "List all subjects available at Berkeley", desc: "Full department listing (240)" },
-      { q: "What 3-unit courses are in the iSchool?", desc: "Filtered course search" },
-    ]
-  },
-  {
-    name: "Campus Life",
-    icon: "🏛️",
-    about: "Live campus data from Berkeley's official sources. Events come from events.berkeley.edu's JSON API (lectures, concerts, career fairs, sports). Library hours are scraped from lib.berkeley.edu. Study room links go directly to LibCal for booking.",
-    setup: "Works out of the box. All data is fetched live from Berkeley's public sources.",
-    templates: [
-      { q: "What's happening on campus this week?", desc: "Live events from events.berkeley.edu" },
-      { q: "Any featured events today?", desc: "Highlighted campus events" },
-      { q: "Is Doe Library open right now?", desc: "Library hours lookup" },
-      { q: "I need a study room in Main Stacks", desc: "LibCal booking link" },
-      { q: "What lectures are happening this week?", desc: "Academic events filter" },
-      { q: "Any concerts or performances coming up?", desc: "Arts events" },
-      { q: "What sports events are this weekend?", desc: "Athletic events" },
-    ]
-  },
-  {
-    name: "Email & Slack",
-    icon: "💬",
-    about: "Search and read your Gmail and Slack messages without leaving the terminal. Useful for checking professor emails, TA announcements in course Slack channels, or assignment feedback. Both are strictly read-only — OpenMind can never send, post, or delete anything.",
-    setup: "Requires setup: openmind setup gmail and/or openmind setup slack",
-    templates: [
-      { q: "Check my email for anything from professors", desc: "Gmail search by sender" },
-      { q: "Did my NLP professor reply?", desc: "Professor email check" },
-      { q: "Summarize my unread emails", desc: "Email summary" },
-      { q: "Any updates in the NLP Slack?", desc: "Slack channel reader" },
-      { q: "What did the TA say about the midterm in Slack?", desc: "Slack message search" },
-      { q: "Search Slack for 'office hours'", desc: "Keyword search across channels" },
-    ]
-  },
-  {
-    name: "Calendar & Tasks",
-    icon: "📆",
-    about: "Add assignment deadlines to your Google Calendar with one command, or create individual study blocks. Todoist integration syncs your Canvas assignments as tasks with due dates. Calendar is the one integration that can write — it creates events when you ask.",
-    setup: "Requires setup: openmind setup calendar and/or openmind setup todoist",
-    templates: [
-      { q: "Add my deadlines to Google Calendar", desc: "Bulk-sync Canvas assignments" },
-      { q: "Block 2 hours tomorrow for the midterm", desc: "Create study time event" },
-      { q: "What's on my calendar this week?", desc: "Calendar overview" },
-      { q: "Add my assignments to Todoist", desc: "Task sync with due dates" },
-      { q: "What's in my Todoist?", desc: "Active task list" },
-      { q: "Add task: review NLP slides by Friday", desc: "Manual task creation" },
-    ]
-  },
-  {
-    name: "Obsidian Notes",
-    icon: "📓",
-    about: "Save reading summaries, assignment outlines, and flashcards directly to your Obsidian vault. OpenMind writes structured markdown files with wiki-style [[links]] between notes. Search your vault by filename or content to find past summaries.",
-    setup: "Requires setup: openmind setup obsidian (provide your vault path)",
-    templates: [
-      { q: "Save this reading summary to Obsidian", desc: "Write to Readings/ folder" },
-      { q: "Search my notes for 'fairness'", desc: "Vault search by content" },
-      { q: "Create an assignment outline in Obsidian", desc: "Structured note generation" },
-      { q: "Save these flashcards to my vault", desc: "Flashcard export" },
-      { q: "What notes do I have on transformers?", desc: "Topic-based note search" },
+      { q: "What should I take next semester if I'm into NLP?", desc: "Matches filtered to what's offered, with reasons" },
+      { q: "Is STAT 156 offered this fall?", desc: "Live sections, times, instructors, and seats" },
+      { q: "What are the 4-unit graduate courses in the I School?", desc: "Filter by level, units, and department" },
+      { q: "Tell me about COMPSCI 189", desc: "Full description, units, repeat rules, cross-listings" },
+      { q: "What causal inference courses does Berkeley have?", desc: "Keyword search across the whole catalog" },
+      { q: "Who teaches INFO 259 this term?", desc: "Straight from the public class schedule" },
+      { q: "Is that course offered in the spring?", desc: "Says plainly when the Registrar hasn't posted it yet" },
     ]
   },
 ];
@@ -189,7 +111,7 @@ const categories = [
 const totalTemplates = categories.reduce((sum, cat) => sum + cat.templates.length, 0);
 ---
 
-<Layout title="Use Cases — OpenMind" description="80+ ways to use OpenMind. Ready-to-use prompts for deadlines, grades, career advice, and more.">
+<Layout title="Use Cases — OpenMind" description="Ways to use OpenMind: prompts for deadlines, grades, tutoring from your own course materials, and choosing courses.">
   <Nav />
   <main>
     <section class="pt-32 pb-16 md:pt-40 md:pb-20">
@@ -202,10 +124,10 @@ const totalTemplates = categories.reduce((sum, cat) => sum + cat.templates.lengt
           What can you ask<br/><span class="text-cal-gold">OpenMind?</span>
         </h1>
         <p class="text-lg text-text-secondary max-w-xl mx-auto mb-4">
-          Copy any prompt and paste it into OpenMind. Or just use them as inspiration.
+          Copy any prompt into Claude, Cursor, or ChatGPT once OpenMind is connected.
         </p>
         <p class="text-sm text-text-secondary max-w-md mx-auto">
-          Each category explains what it does, what powers it, and what setup is needed.
+          Each section explains what OpenMind computes for you, and what setup it needs.
         </p>
       </div>
     </section>

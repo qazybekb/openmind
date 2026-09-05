@@ -1,0 +1,82 @@
+---
+---
+<section id="how" class="section-sm">
+  <div class="container">
+    <div class="text-center mb-16 fade-in">
+      <div class="badge mb-5">How it works</div>
+      <h2 class="text-3xl md:text-5xl font-bold text-text-primary tracking-tight mb-5">
+        A connector, <span class="text-cal-gold">not a chatbot.</span>
+      </h2>
+      <p class="text-text-body text-lg max-w-2xl mx-auto">
+        OpenMind is a small program on your laptop that gives an AI app a set of tools.
+        It doesn't have a voice, a personality, or a model of its own &mdash; the app you already
+        use provides all three.
+      </p>
+    </div>
+
+    <!-- The flow -->
+    <div class="max-w-4xl mx-auto mb-16">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div class="card fade-in fade-in-delay-1">
+          <div class="text-xs text-text-muted uppercase tracking-widest mb-3">1 &mdash; You ask</div>
+          <p class="text-sm text-text-secondary leading-relaxed">
+            You type a question in Claude, Cursor, or ChatGPT. The app decides OpenMind can help
+            and calls one of its twelve tools.
+          </p>
+        </div>
+        <div class="card fade-in fade-in-delay-2">
+          <div class="text-xs text-text-muted uppercase tracking-widest mb-3">2 &mdash; OpenMind reads</div>
+          <p class="text-sm text-text-secondary leading-relaxed">
+            It reads bCourses with your token, computes the dates, weights, and priorities in
+            Python, and returns labelled facts. No model is involved in this step.
+          </p>
+        </div>
+        <div class="card fade-in fade-in-delay-3">
+          <div class="text-xs text-text-muted uppercase tracking-widest mb-3">3 &mdash; The app answers</div>
+          <p class="text-sm text-text-secondary leading-relaxed">
+            Your AI app turns those facts into an answer &mdash; which means your course data goes to
+            that provider. That's the trade, and it's stated plainly below.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Why it's built this way -->
+    <div class="max-w-3xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div class="card fade-in fade-in-delay-1">
+        <h3 class="text-text-primary font-semibold mb-2">Why the code does the arithmetic</h3>
+        <p class="text-sm text-text-secondary leading-relaxed">
+          Language models are good at explaining and bad at being sure. A deadline shifted by a day,
+          or a confident "that's 5% of your grade" when it's 30%, does real damage. So every number
+          you can act on &mdash; due dates in your zone, grade weight, hours, start-by &mdash; is computed
+          in Python and pinned by tests, and the app is instructed to show it as given.
+        </p>
+      </div>
+      <div class="card fade-in fade-in-delay-2">
+        <h3 class="text-text-primary font-semibold mb-2">Why it only reads</h3>
+        <p class="text-sm text-text-secondary leading-relaxed">
+          An assistant that could submit your work would need to be right every time. This one
+          can't submit, post, message, or upload anything &mdash; not as a policy, but because those
+          routes don't exist in the code. That's what makes it safe to leave connected.
+        </p>
+      </div>
+      <div class="card fade-in fade-in-delay-3">
+        <h3 class="text-text-primary font-semibold mb-2">Why it tutors instead of answering</h3>
+        <p class="text-sm text-text-secondary leading-relaxed">
+          Ask a factual question &mdash; when's the midterm, what's my grade &mdash; and you get a direct
+          answer. Ask to <em>learn</em> something and it switches: diagnose first, one concept at a
+          time, hints before answers. Type <code>/answer</code> and it gives you the answer, with no
+          lecture about why you should have worked harder.
+        </p>
+      </div>
+      <div class="card fade-in fade-in-delay-4">
+        <h3 class="text-text-primary font-semibold mb-2">Why your syllabus gets quoted</h3>
+        <p class="text-sm text-text-secondary leading-relaxed">
+          Course AI policies range from "encouraged" to "academic integrity violation". Every study
+          session includes what <em>your</em> syllabus actually says, so the tutor works inside your
+          instructor's rules rather than guessing at them.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>

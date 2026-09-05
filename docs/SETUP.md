@@ -1,174 +1,175 @@
-# OpenMind — Setup Guide
+# Setup
 
-## Prerequisites
+Five minutes, three steps: install, connect your bCourses account, tell your AI app
+where to find it.
 
-- Python 3.11 or later
-- pip (comes with Python)
-- A UC Berkeley bCourses account
-- An OpenRouter account (free to start)
+## Before you start
 
-## Step 1: Install
+- **Python 3.11 or newer.** `python3 --version` to check.
+- **A desktop AI app that supports local MCP servers**: Claude Desktop, Claude Code,
+  Cursor, or the ChatGPT desktop app. The web and mobile versions of these apps cannot
+  run a local server — this has to be a program on your computer.
+- **A bCourses account.** That's it. No OpenMind account exists.
 
-### From source (developers)
-
-```bash
-git clone https://github.com/qazybekb/openmind.git
-cd openmind
-pip install .
-```
-
-### From GitHub (users)
+## 1. Install
 
 ```bash
-pip install git+https://github.com/qazybekb/openmind.git
+uv tool install openmind-berkeley
 ```
 
-All integrations (Telegram, Gmail, Calendar, Slack, Todoist, Obsidian) are included by default.
-
-## Step 2: Run the setup wizard
+Or with pipx:
 
 ```bash
-openmind
+pipx install openmind-berkeley
 ```
 
-On first run, the wizard asks for three things:
-
-### Step 1: bCourses API Token
-
-1. Go to [bCourses](https://bcourses.berkeley.edu)
-2. Click your profile picture (top-left) > **Settings**
-3. Scroll to **Approved Integrations**
-4. Click **+ New Access Token**
-5. Give it a name like "OpenMind" and click **Generate Token**
-6. Copy the token and paste it into the wizard
-
-The wizard validates your token immediately, greets you by name, and discovers your active courses.
-
-### Step 2: Choose your LLM model
-
-Pick the AI model that powers OpenMind:
-
-1. **xiaomi/mimo-v2-pro** — reliable + affordable, $1/$3 per 1M tokens (default)
-2. **anthropic/claude-sonnet-4-6** — best reasoning, $3/$15 per 1M tokens
-3. **openai/gpt-5.4** — GPT ecosystem, $2.50/$15 per 1M tokens
-
-Or type any OpenRouter model ID. You can change this later with `/setup model`.
-
-### Step 3: OpenRouter API Key
-
-1. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
-2. Create an account (free credits available for new users)
-3. Generate an API key
-4. Paste it into the wizard
-
-That's it — you're chatting. OpenMind defaults to `google/gemini-2.5-pro`. Change it anytime with `openmind setup model`.
-
-### Adding integrations later
-
-Every integration has its own setup command. Run these whenever you're ready:
+Or run it without installing anything permanently:
 
 ```bash
-openmind setup telegram     # Telegram bot + background alerts
-openmind setup gmail        # Gmail search + read
-openmind setup calendar     # Google Calendar sync
-openmind setup slack        # Slack channel reader
-openmind setup todoist      # Todoist task sync
-openmind setup obsidian     # Obsidian vault integration
-openmind setup profile      # Academic profile + career goals
-openmind setup model        # Change your LLM model
+uvx --from openmind-berkeley openmind setup
 ```
 
-### Integration details
-
-**Telegram:** Message @BotFather → /newbot → copy token. Message @userinfobot → get user ID. Validated during setup — invalid tokens are rejected.
-
-**Gmail / Calendar:** Requires Google OAuth credentials (Desktop app) from Google Cloud Console. Both share the same credentials directory. Auth completes on first use via browser sign-in.
-
-**Slack:** Requires a Slack user token (xoxp-...) from api.slack.com/apps. Read-only access to course channels.
-
-**Todoist:** API token from Todoist Settings > Integrations > Developer.
-
-**Obsidian:** Provide the path to your vault directory.
-
-### Optional: Obsidian
-
-Enables saving reading summaries, assignment outlines, and flashcards to your Obsidian vault.
-
-1. Provide the path to your Obsidian vault (e.g., `~/Documents/Obsidian`)
-2. OpenMind creates subdirectories as needed (Readings/, Assignments/, Flashcards/)
-
-## Step 3: Use it
+## 2. Connect your bCourses account
 
 ```bash
-openmind          # Start Telegram bot (if configured) or terminal REPL
-openmind chat     # Force terminal REPL
-openmind config   # Show current configuration
-openmind setup    # Re-run setup wizard to change settings
+openmind setup
 ```
 
-## Where config lives
+You will be asked for a bCourses **access token**. Create one at:
 
-All configuration is stored in `~/.openmind/`:
+> bCourses → Account → Settings → Approved Integrations → **+ New Access Token**
 
+Give it a purpose ("OpenMind") and leave the expiry blank, or set one — OpenMind will
+tell you clearly when a token expires. Copy the token immediately; bCourses shows it
+once.
+
+Paste it when asked. Nothing is echoed to the screen, and the token goes straight into
+your operating system's credential store — macOS Keychain, Windows Credential Manager,
+or the Secret Service on Linux. It is never written into a config file.
+
+Setup then:
+
+- confirms who you are and reads your time zone from your Canvas profile, so deadlines
+  come out on the right day;
+- lists your active courses and asks which ones to share. **Courses you leave out are
+  invisible to every tool**, so leave out anything you would rather your AI app not see;
+- builds a local index of the public Berkeley course catalog, for course planning.
+
+Course *materials* — slides, readings, pages — are **not** stored unless you ask. See
+step 4.
+
+### If your machine has no credential store
+
+Some minimal Linux setups have no Secret Service. Run:
+
+```bash
+openmind setup --allow-file-secrets
 ```
-~/.openmind/
-├── config.json       # All settings, tokens, courses
-├── repl_history      # Terminal REPL command history
-├── state/            # Heartbeat state (deadlines, grades, submissions, announcements)
-│   ├── deadlines.json
-│   ├── grades.json
-│   ├── submissions.json
-│   └── announcements.json
-└── gmail/            # Gmail OAuth tokens (if enabled)
-    ├── credentials.json
-    └── token.json
+
+which stores the token in a `0600` file instead, and says so loudly.
+
+## 3. Tell your AI app about it
+
+```bash
+openmind mcp
 ```
 
-## Changing your courses
+This prints copy-paste configuration for each supported app, with the absolute path of
+the server. Nothing secret appears in it — the token stays in your credential store.
 
-If you add/drop a course mid-semester, edit `~/.openmind/config.json` and update the `"courses"` section:
+### Claude Desktop
+
+Open `claude_desktop_config.json`:
+
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+Add the block `openmind mcp` printed:
 
 ```json
 {
-  "courses": {
-    "1552198": "Big Data",
-    "1550426": "Ethical AI"
+  "mcpServers": {
+    "openmind": {
+      "command": "/absolute/path/to/openmind-mcp"
+    }
   }
 }
 ```
 
-Or re-run `openmind setup` to auto-discover courses fresh from bCourses.
+Restart Claude Desktop completely (quit, don't just close the window).
 
-## Changing your model
+### Claude Code
 
-Edit `~/.openmind/config.json` and change the `"model"` field:
-
-```json
-{
-  "model": "anthropic/claude-sonnet-4"
-}
+```bash
+claude mcp add --scope user openmind -- /absolute/path/to/openmind-mcp
 ```
 
-Browse all available models at [openrouter.ai/models](https://openrouter.ai/models).
+### Cursor
 
-## Troubleshooting
+Add the same JSON block to `~/.cursor/mcp.json`, then reload Cursor.
 
-| Problem | Fix |
-|---------|-----|
-| `openmind: command not found` | Make sure pip's bin directory is in your PATH. Try `python -m openmind` |
-| Setup wizard keeps looping | Check your bCourses token hasn't expired. Generate a new one. |
-| "Canvas token is invalid or expired" | Generate a new token in bCourses Settings |
-| "Canvas rate limit hit" | Wait 1-2 minutes and try again |
-| Telegram bot not responding | Check bot token and user ID. Run `openmind setup` to reconfigure |
-| Gmail "not ready" error | Run `openmind chat` (needs terminal for browser auth), or delete `~/.openmind/gmail/token.json` and re-auth |
-| No courses found during setup | Some courses may not be "active" yet. Add course IDs manually to config.json |
-| pymupdf errors | Run `pip install pymupdf` to reinstall |
+### ChatGPT desktop
 
-## Privacy
+In settings, add a local (STDIO) MCP server with the command `openmind mcp` printed.
+Local MCP support varies by plan — if you don't see the option, check your plan's
+documentation.
 
-- OpenMind runs on your machine, but chat data goes to OpenRouter for LLM responses
-- API tokens are stored in `~/.openmind/config.json` and sent only to the service they authenticate with
-- Canvas, Gmail, and Slack access are read-only — OpenMind cannot submit, post, send, or modify them
-- Google Calendar is the one write integration: it can create calendar events when you ask
-- No analytics, no tracking, no telemetry
-- Delete everything: `rm -rf ~/.openmind`
+## 4. Ask a question
+
+```
+what's due this week?
+```
+
+You should get real deadlines with priorities. If the app says it has no such tool,
+restart it — a host only reads its MCP config at launch.
+
+## 5. Optional: make your course materials searchable
+
+By default OpenMind can see the *names* of your files and modules, but not what is
+inside them. To search inside slides and readings:
+
+```bash
+openmind index --course 1234
+```
+
+(`openmind config` lists your course ids, or ask your AI app to call `list_courses`.)
+
+This extracts text from the course's PDFs, slides, pages, and syllabus into a private
+`0600` SQLite file on your machine. Nothing is uploaded anywhere by OpenMind. Once a
+course is indexed, tutoring and `find_materials` can quote it with page citations.
+
+Undo it at any time:
+
+```bash
+openmind index --course 1234 --delete
+```
+
+## If something is wrong
+
+```bash
+openmind doctor
+```
+
+`doctor` checks your Python version, the credential store, whether the token still
+works, your time zone, whether each enabled course is reachable, the index size, the
+catalog snapshot date, and whether the server starts cleanly. It names what is broken
+and what to run.
+
+Common cases:
+
+| Symptom | Fix |
+|---|---|
+| "Your bCourses token is invalid or expired" | Make a new token in bCourses and run `openmind setup` again |
+| The AI app doesn't see the tools | Restart the app completely; check the path in its config is absolute |
+| macOS asks for Keychain access after an upgrade | Allow it — `uv tool upgrade` replaces the interpreter, so macOS sees a new program |
+| "This course does not share its file list" | The instructor disabled the Files tab; pages and the syllabus are still indexed |
+| A PDF says "scanned document, no text layer" | It is an image scan; there is no text to extract. Open it in bCourses |
+
+## Removing it
+
+```bash
+openmind clear --all           # delete the index, catalog, config, and stored token
+uv tool uninstall openmind-berkeley
+```
+
+Then delete the access token in bCourses → Account → Settings → Approved Integrations.

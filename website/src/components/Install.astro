@@ -8,72 +8,104 @@
         5 minutes to<br/><span class="text-cal-gold">your first question.</span>
       </h2>
       <p class="text-text-secondary text-lg max-w-xl mx-auto">
-        No Docker. No server. No signup. Three steps: bCourses token, pick a model, OpenRouter key. Done.
+        No Docker, no server, no signup. Install it, paste a bCourses token, tell your AI app
+        where it is.
       </p>
     </div>
 
     <div class="max-w-3xl mx-auto">
 
-      <!-- Install command -->
+      <!-- Steps 1 and 2 -->
       <div class="fade-in mb-12">
         <div class="terminal">
           <div class="terminal-header">
             <div class="terminal-dot bg-[#ff5f57]"></div>
             <div class="terminal-dot bg-[#febc2e]"></div>
             <div class="terminal-dot bg-[#28c840]"></div>
+            <span class="ml-3 text-xs text-text-muted font-sans">Terminal</span>
           </div>
           <div class="terminal-body text-[13px] md:text-sm space-y-1.5">
-            <div><span class="text-text-secondary">$</span> <span class="text-text-primary">pip install git+https://github.com/qazybekb/openmind.git</span></div>
-            <div><span class="text-text-secondary">$</span> <span class="text-text-primary">openmind</span></div>
-            <div class="mt-3">
-              &#x1f43b; Welcome to OpenMind! Go Bears! &#x1f499;&#x1f49b;
-            </div>
-            <div class="mt-2"><span class="text-text-primary">Step 1 of 3</span> &mdash; Connect to bCourses</div>
+            <div><span class="text-text-secondary">$</span> <span class="text-text-primary">uv tool install openmind-berkeley</span></div>
+            <div><span class="text-text-secondary">$</span> <span class="text-text-primary">openmind setup</span></div>
+            <div class="mt-3 text-text-secondary">Paste your bCourses access token.</div>
+            <div class="text-text-muted">It is stored in your operating system's credential store, not in a file.</div>
             <div>&ensp;<span class="text-text-secondary">bCourses token:</span> ********</div>
-            <div>&ensp;<span class="text-text-muted">Key: 1072~****4T2r</span></div>
-            <div>&ensp;<span class="text-green-500">Connected!</span> Hey Oski &#x1f43b;</div>
-            <div>&ensp;<span class="text-green-500">6 courses</span> found</div>
-            <div class="mt-2"><span class="text-text-primary">Step 2 of 3</span> &mdash; Choose your LLM</div>
-            <div>&ensp;<span class="text-text-secondary">Enter 1, 2, 3, or a model ID (1):</span> <span class="text-text-primary">1</span></div>
-            <div class="mt-2"><span class="text-text-primary">Step 3 of 3</span> &mdash; Connect OpenRouter</div>
-            <div>&ensp;<span class="text-text-secondary">OpenRouter key:</span> ********</div>
-            <div>&ensp;<span class="text-green-500">OK</span></div>
-            <div class="mt-2">&#x1f389; <span class="text-text-primary">You're all set, Oski!</span> Go Bears!</div>
-            <div class="mt-3">
-              <span class="text-text-secondary">You &rarr;</span> <span class="text-text-primary">What's due this week?</span>
-            </div>
+            <div>&ensp;<span class="text-text-muted">Token: 1072~****4T2r</span></div>
+            <div>&ensp;<span class="text-green-500">Connected as Oski Bear (America/Los_Angeles).</span></div>
+            <div class="mt-2 text-text-secondary">Your active courses:</div>
+            <div>&ensp;<span class="text-text-muted">1. Causal Inference&ensp;(id 1001)</span></div>
+            <div>&ensp;<span class="text-text-muted">2. Natural Language Processing&ensp;(id 1002)</span></div>
+            <div>&ensp;<span class="text-text-muted">3. Social Issues of Information&ensp;(id 1003)</span></div>
+            <div class="mt-1 text-text-secondary">OpenMind shares only the courses you choose here with your AI app.</div>
+            <div>&ensp;<span class="text-text-secondary">Numbers to share, or Enter for all:</span> <span class="text-text-primary">1,2</span></div>
+            <div class="mt-2"><span class="text-green-500">Saved 2 courses.</span> <span class="text-text-muted">11,156 courses across 240 subjects indexed.</span></div>
+            <div class="mt-2 text-text-muted">Course materials are NOT stored locally unless you ask for it.</div>
           </div>
         </div>
       </div>
 
+      <!-- Step 3: connect the host -->
+      <div class="fade-in fade-in-delay-1 mb-12">
+        <h3 class="text-sm font-semibold text-text-primary mb-2">Then connect your AI app</h3>
+        <p class="text-text-secondary text-xs mb-5">
+          <code class="text-text-secondary">openmind mcp</code> prints the exact config for each app,
+          with the absolute path filled in. Nothing secret appears in it.
+        </p>
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot bg-[#ff5f57]"></div>
+            <div class="terminal-dot bg-[#febc2e]"></div>
+            <div class="terminal-dot bg-[#28c840]"></div>
+            <span class="ml-3 text-xs text-text-muted font-sans">claude_desktop_config.json</span>
+          </div>
+          <div class="terminal-body text-[13px] space-y-0.5">
+            <div><span class="text-text-secondary">&#123;</span></div>
+            <div>&ensp;<span class="text-cal-gold">"mcpServers"</span><span class="text-text-secondary">: &#123;</span></div>
+            <div>&ensp;&ensp;<span class="text-cal-gold">"openmind"</span><span class="text-text-secondary">: &#123; </span><span class="text-cal-gold">"command"</span><span class="text-text-secondary">: </span><span class="text-text-primary">"/Users/you/.local/bin/openmind-mcp"</span><span class="text-text-secondary"> &#125;</span></div>
+            <div>&ensp;<span class="text-text-secondary">&#125;</span></div>
+            <div><span class="text-text-secondary">&#125;</span></div>
+          </div>
+        </div>
+        <p class="text-text-muted text-xs mt-3">
+          Claude Code: <code class="text-text-secondary">claude mcp add --scope user openmind -- /path/to/openmind-mcp</code><br/>
+          Cursor: the same JSON block in <code class="text-text-secondary">~/.cursor/mcp.json</code>.
+          ChatGPT desktop: add a local (STDIO) server with that command.
+        </p>
+      </div>
+
       <!-- What you need -->
-      <div class="fade-in mb-12">
+      <div class="fade-in fade-in-delay-2 mb-12">
         <h3 class="text-sm font-semibold text-text-primary mb-5">What you need</h3>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <a href="/guides/bcourses/" class="card group">
             <div class="text-lg mb-2">&#x1f4d8;</div>
-            <h4 class="text-text-primary font-medium text-sm mb-1 group-hover:text-cal-gold transition-colors">bCourses token</h4>
-            <p class="text-text-secondary text-xs">Profile &rarr; Settings &rarr; New Access Token</p>
+            <h4 class="text-text-primary font-medium text-sm mb-1 group-hover:text-cal-gold transition-colors">A bCourses token</h4>
+            <p class="text-text-secondary text-xs">Account &rarr; Settings &rarr; New Access Token</p>
           </a>
-          <a href="/guides/openrouter/" class="card group">
-            <div class="text-lg mb-2">&#x1f916;</div>
-            <h4 class="text-text-primary font-medium text-sm mb-1 group-hover:text-cal-gold transition-colors">LLM model</h4>
-            <p class="text-text-secondary text-xs">Gemini, MiMo, or Claude &mdash; your choice</p>
+          <a href="/guides/connect/" class="card group">
+            <div class="text-lg mb-2">&#x1f5a5;</div>
+            <h4 class="text-text-primary font-medium text-sm mb-1 group-hover:text-cal-gold transition-colors">A desktop AI app</h4>
+            <p class="text-text-secondary text-xs">Claude, Cursor, or ChatGPT &mdash; the desktop version</p>
           </a>
-          <a href="/guides/openrouter/" class="card group">
-            <div class="text-lg mb-2">&#x1f511;</div>
-            <h4 class="text-text-primary font-medium text-sm mb-1 group-hover:text-cal-gold transition-colors">OpenRouter key</h4>
-            <p class="text-text-secondary text-xs">openrouter.ai/keys &mdash; free credits available</p>
+          <a href="https://github.com/qazybekb/openmind/blob/main/docs/SETUP.md" target="_blank" class="card group">
+            <div class="text-lg mb-2">&#x1f40d;</div>
+            <h4 class="text-text-primary font-medium text-sm mb-1 group-hover:text-cal-gold transition-colors">Python 3.11+</h4>
+            <p class="text-text-secondary text-xs">macOS, Windows, or Linux</p>
           </a>
         </div>
         <p class="text-center text-text-muted text-xs mt-4">
-          <a href="/guides/" class="underline underline-offset-2 hover:text-text-secondary">Step-by-step guides for each &rarr;</a>
+          <a href="/guides/" class="underline underline-offset-2 hover:text-text-secondary">Step-by-step guides &rarr;</a>
         </p>
       </div>
 
-      <!-- Add more later -->
-      <div class="fade-in fade-in-delay-1 mb-12">
-        <h3 class="text-sm font-semibold text-text-primary mb-5">Add more later</h3>
+      <!-- Optional extras -->
+      <div class="fade-in fade-in-delay-3 mb-12">
+        <h3 class="text-sm font-semibold text-text-primary mb-2">Optional, later</h3>
+        <p class="text-text-secondary text-xs mb-5">
+          By default OpenMind sees the <em>names</em> of your files, not what's inside them.
+          Indexing a course extracts its text into a private file on your machine so tutoring can
+          quote it with page citations.
+        </p>
         <div class="terminal">
           <div class="terminal-header">
             <div class="terminal-dot bg-[#ff5f57]"></div>
@@ -81,16 +113,14 @@
             <div class="terminal-dot bg-[#28c840]"></div>
           </div>
           <div class="terminal-body text-[13px] space-y-1">
-            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">setup telegram</span> <span class="text-text-secondary">&ensp;# alerts on your phone</span></div>
-            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">setup profile</span> <span class="text-text-secondary">&ensp;&ensp;# personalize with goals + interests</span></div>
-            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">setup gmail</span> <span class="text-text-secondary">&ensp;&ensp;&ensp;# professor emails</span></div>
-            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">setup slack</span> <span class="text-text-secondary">&ensp;&ensp;&ensp;# course Slack channels</span></div>
-            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">setup calendar</span> <span class="text-text-secondary">&ensp;# Google Calendar sync</span></div>
-            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">setup model</span> <span class="text-text-secondary">&ensp;&ensp;&ensp;# change your LLM model</span></div>
+            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">index --course 1001</span> <span class="text-text-secondary">&ensp;# search inside slides and readings</span></div>
+            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">doctor</span> <span class="text-text-secondary">&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;# check everything end to end</span></div>
+            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">update-data</span> <span class="text-text-secondary">&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;# refresh the Berkeley catalog</span></div>
+            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">config</span> <span class="text-text-secondary">&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;# show or change settings</span></div>
+            <div><span class="text-text-secondary">$</span> openmind <span class="text-text-primary">clear --all</span> <span class="text-text-secondary">&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;# delete everything it stores</span></div>
           </div>
         </div>
       </div>
-
 
     </div>
   </div>

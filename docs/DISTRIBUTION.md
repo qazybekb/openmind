@@ -1,99 +1,81 @@
-# OpenMind — Distribution
+# Distribution
 
-## Canonical package names
+OpenMind ships as a single PyPI package, `openmind-berkeley`, with two console scripts.
 
-- **Project name:** OpenMind
-- **Python import package:** `openmind`
-- **CLI command:** `openmind`
-- **PyPI distribution name:** `openmind-berkeley`
+| Script | Purpose |
+|---|---|
+| `openmind` | The CLI: setup, doctor, index, config, clear |
+| `openmind-mcp` | The MCP server itself, over stdio. This is what an AI app launches |
 
-The PyPI package name differs from the project name because `openmind` is already taken on PyPI. Keeping the import package and CLI command as `openmind` preserves the user experience:
-
-```bash
-pip install openmind-berkeley
-openmind
-```
-
-## Supported install channels
-
-### 1. GitHub install
-
-Good for early testers before the first PyPI release:
+## Installing
 
 ```bash
-pip install git+https://github.com/qazybekb/openmind.git
-openmind
+uv tool install openmind-berkeley     # recommended: isolated, on PATH
+pipx install openmind-berkeley        # equivalent
+pip install openmind-berkeley         # into an environment you manage
+uvx --from openmind-berkeley openmind setup   # no permanent install
 ```
 
-### 2. PyPI install
+`uv tool` and `pipx` are preferred because they put `openmind-mcp` on a stable absolute
+path, which is what an AI app's config needs.
 
-This should be the default public install path once the package is published:
+## What is in the wheel
+
+- The `openmind` package.
+- `openmind/data/*.csv` — the public Berkeley catalog snapshot (about 6 MB), so the
+  catalog works offline from the first launch.
+- `openmind/data/catalog_meta.json` — when that snapshot was captured, which terms it
+  covers, and the SHA-256 of the matching published asset.
+
+CI asserts the CSVs are present in the built wheel; a catalog that silently vanished
+from a release would leave course planning broken with no error.
+
+## Dependencies
+
+| Package | Why |
+|---|---|
+| `mcp` | The protocol. Pinned `>=2.1,<3`; only `server.py` imports it |
+| `httpx` | HTTP to bCourses and the class schedule |
+| `pypdf` | PDF text extraction. BSD licensed — PyMuPDF is AGPL and this project is MIT |
+| `keyring` | The OS credential store |
+| `tzdata` | Windows only; it has no system time zone database |
+
+No LLM SDK, no chat framework, no messaging client. Version 1's `typer`, `rich`,
+`prompt-toolkit`, `openai`, `pymupdf`, `python-telegram-bot`, and the Google API
+clients are all gone, and a test asserts they do not come back.
+
+## Releasing
 
 ```bash
-pip install openmind-berkeley
-openmind
+python -m build
+python -m twine check dist/*
+python -m twine upload dist/*
+git tag v2.0.0 && git push --tags
 ```
 
-### 3. `pipx` install
+Before tagging, run through [the acceptance checklist](#acceptance) below.
 
-Best option for CLI-first users and Homebrew users:
+## Data releases are separate from code releases
 
-```bash
-pipx install openmind-berkeley
-openmind
-```
+Course data changes on the university's calendar. `.github/workflows/refresh-data.yml`
+runs `scripts/refresh_catalog.py` daily, and when the data actually changed it commits
+the CSVs and publishes a `data-<date>` release with a `catalog-<date>.tar.gz` asset.
 
-On macOS, the cleanest path is:
+Installed clients check that manifest at most once a day, verify the SHA-256, and
+rebuild their local catalog. Students get current course data without upgrading the
+package, and the job keeps working with only the repository token.
 
-```bash
-brew install pipx
-pipx ensurepath
-pipx install openmind-berkeley
-```
+Turn the check off entirely with `openmind config --set data_updates=false`.
 
-## Release workflow
+## Acceptance
 
-The repo includes a publish workflow at `.github/workflows/publish.yml`.
+Before a release:
 
-Recommended release flow:
-
-1. Merge to `main` with passing CI.
-2. Bump the version in `pyproject.toml` and `src/openmind/__init__.py`.
-3. Update `CHANGELOG.md`.
-4. Create a Git tag like `v0.1.0`.
-5. Push the tag.
-6. Let GitHub Actions build the sdist and wheel, run `twine check`, and publish to PyPI.
-
-## PyPI setup
-
-Before the first release:
-
-1. Create the `openmind-berkeley` project on PyPI if needed.
-2. Configure PyPI trusted publishing for this GitHub repo.
-3. Verify the publish workflow has permission to request an OIDC token.
-
-The workflow in this repo is designed for trusted publishing and does not require storing a long-lived PyPI API token in GitHub secrets.
-
-## Optional integrations on PyPI
-
-Once published, extras should install like this:
-
-```bash
-pip install "openmind-berkeley[telegram]"
-pip install "openmind-berkeley[gmail]"
-pip install "openmind-berkeley[calendar]"
-pip install "openmind-berkeley[all]"
-```
-
-## Homebrew notes
-
-For now, the recommended Homebrew story is:
-
-```bash
-brew install pipx
-pipx install openmind-berkeley
-```
-
-This avoids maintaining a custom Homebrew formula for a Python app whose dependencies already resolve cleanly through PyPI.
-
-If you later want a dedicated Homebrew tap, treat that as a second distribution track after PyPI is stable.
+- `pytest -q` and `ruff check src tests scripts` clean on macOS, Linux, and Windows.
+- `openmind doctor` reports no problems on a fresh install.
+- The server starts in under a second, writes nothing to stdout, and makes no network
+  request until the first tool call.
+- A real question answered in Claude Desktop, Claude Code, and ChatGPT desktop.
+- A deadline at 11:59 PM renders on the correct local day.
+- One course returning 403 produces `partial: true` with a warning — never "nothing due".
+- A forced data-refresh run with unchanged data produces no commit.

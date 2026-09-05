@@ -5,36 +5,43 @@
     <div class="text-center mb-20 fade-in">
       <div class="badge mb-5">See it in action</div>
       <h2 class="text-3xl md:text-5xl font-bold text-text-primary tracking-tight mb-5">
-        Example conversations.<br/><span class="text-cal-gold">Representative tasks.</span>
+        Example conversations.<br/><span class="text-cal-gold">Real tool results.</span>
       </h2>
     </div>
 
-    <!-- Flagship demo: Skill gap analysis — full width, with glow -->
+    <!-- Flagship demo: assignment breakdown from the student's own materials -->
     <div class="terminal mb-8 fade-in shadow-2xl shadow-black/30 ring-1 ring-white/[0.03] border-l-2 border-l-cal-gold">
       <div class="terminal-header">
         <div class="terminal-dot bg-[#ff5f57]"></div>
         <div class="terminal-dot bg-[#febc2e]"></div>
         <div class="terminal-dot bg-[#28c840]"></div>
-        <span class="ml-3 text-xs text-text-secondary font-sans">openmind &mdash; skill gap analysis</span>
+        <span class="ml-3 text-xs text-text-secondary font-sans">Claude &mdash; explain an assignment</span>
       </div>
       <div class="terminal-body space-y-4 text-[13px] md:text-sm">
         <div>
           <span class="text-text-muted">You &rarr;</span>
-          <span class="text-text-primary"> What skills am I missing for AI PM roles?</span>
+          <span class="text-text-primary"> Explain problem set 3 using the week 3 slides</span>
         </div>
         <div class="text-text-secondary leading-relaxed">
-          Based on your resume and your goal of becoming an AI PM:
+          <span class="text-text-muted">Problem Set 3 &middot; due Fri Sep 4, 11:59 PM &middot; 20 points &middot; 20% of your grade &middot; not yet submitted</span>
           <br/><br/>
-          <span class="text-green-500">&check;</span> <span class="text-text-primary">Strong</span>: Python, ML fundamentals, NLP, data analysis<br/>
-          <span class="text-green-500">&check;</span> <span class="text-text-primary">Strong</span>: Technical communication (from your BAIR research)
+          It asks you to estimate an average treatment effect and state the assumptions that make
+          your estimate valid. Two rubric criteria:
           <br/><br/>
-          <span class="text-yellow-500">&triangle;</span> <span class="text-text-primary">Gap: Design/UX</span> &mdash; PMs need to evaluate UX and communicate with designers.<br/>
-          <span class="text-text-muted">&ensp;&rarr; Take INFO 214 (User Experience Design) next semester</span>
+          <span class="text-text-primary">Correctness (12 pts)</span> &mdash; the rubric asks specifically for
+          <em>identification assumptions stated</em>, so writing the estimator without justifying it
+          loses most of these points.<br/>
+          <span class="text-text-primary">Clarity (8 pts)</span> &mdash; the reasoning has to be followable.
           <br/><br/>
-          <span class="text-yellow-500">&triangle;</span> <span class="text-text-primary">Gap: Business strategy</span> &mdash; no business courses on your resume.<br/>
-          <span class="text-text-muted">&ensp;&rarr; Your Finance course helps. Focus on valuation frameworks.</span>
+          Your Week 3 slides define exactly what you need for the assumptions section:
           <br/><br/>
-          Your NLP + ML foundation is hella solid for AI PM roles. The gaps are fillable in 1&ndash;2 semesters. Fiat Lux! &#128161;
+          <span class="text-text-muted">&ldquo;A confounder causes both the treatment and the outcome. Adjusting for
+          it removes the backdoor path.&rdquo;</span><br/>
+          <span class="text-text-muted">&ensp;&mdash; (Week 3 Slides, p. 4)</span>
+          <br/><br/>
+          Suggested plan for ~6 hours: one hour on the assumptions section first (it's where the
+          points are), three on the estimation, two on writing it up. You're due tonight, so
+          start with the assumptions.
         </div>
       </div>
     </div>
@@ -42,63 +49,67 @@
     <!-- Two side-by-side demos -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-      <!-- Teach mode -->
+      <!-- Tutoring -->
       <div class="terminal fade-in fade-in-delay-1 shadow-lg shadow-black/20">
         <div class="terminal-header">
           <div class="terminal-dot bg-[#ff5f57]"></div>
           <div class="terminal-dot bg-[#febc2e]"></div>
           <div class="terminal-dot bg-[#28c840]"></div>
-          <span class="ml-3 text-xs text-text-secondary font-sans">teach mode</span>
+          <span class="ml-3 text-xs text-text-secondary font-sans">tutor</span>
         </div>
         <div class="terminal-body space-y-3 text-[13px]">
           <div>
             <span class="text-text-muted">You &rarr;</span>
-            <span class="text-text-primary"> Teach me about attention mechanisms</span>
+            <span class="text-text-primary"> Tutor me on confounding</span>
           </div>
           <div class="text-text-secondary leading-relaxed">
-            Think of reading a sentence. When you see &ldquo;it&rdquo; in &ldquo;The cat sat on the mat because it was tired&rdquo; &mdash; your brain looks back to figure out &ldquo;it&rdquo; = &ldquo;the cat.&rdquo; That's attention.
-            <br/><br/>
-            Quick check: if you have &ldquo;The bank was steep after the rain&rdquo; &mdash; which words would attention focus on to understand &ldquo;bank&rdquo;?
+            Before we start: what do you already know about confounding, and where does it break down?
           </div>
           <div>
             <span class="text-text-muted">You &rarr;</span>
-            <span class="text-text-primary"> Steep and rain?</span>
+            <span class="text-text-primary"> It's a third variable that messes up the result?</span>
           </div>
-          <div class="text-text-secondary">
-            Exactly &#128293; That's how contextual embeddings resolve ambiguity.
+          <div class="text-text-secondary leading-relaxed">
+            That's the right instinct, and there's a sharper version of it. Your slides say a confounder
+            causes <em>both</em> the treatment and the outcome <span class="text-text-muted">(Week 3 Slides, p. 4)</span>.
+            <br/><br/>
+            So: ice cream sales and drowning deaths rise together. What's causing both &mdash; and would
+            adjusting for it change the association?
           </div>
         </div>
       </div>
 
-      <!-- Guided learning -->
+      <!-- Course planning -->
       <div class="terminal fade-in fade-in-delay-2 shadow-lg shadow-black/20">
         <div class="terminal-header">
           <div class="terminal-dot bg-[#ff5f57]"></div>
           <div class="terminal-dot bg-[#febc2e]"></div>
           <div class="terminal-dot bg-[#28c840]"></div>
-          <span class="ml-3 text-xs text-text-secondary font-sans">guided learning</span>
+          <span class="ml-3 text-xs text-text-secondary font-sans">course planning</span>
         </div>
         <div class="terminal-body space-y-3 text-[13px]">
           <div>
             <span class="text-text-muted">You &rarr;</span>
-            <span class="text-text-primary"> /learn contextual integrity</span>
+            <span class="text-text-primary"> What should I take next semester? I'm into NLP.</span>
           </div>
-          <div class="text-text-secondary">
-            What do you already know about Nissenbaum's contextual integrity?
-          </div>
-          <div>
-            <span class="text-text-muted">You &rarr;</span>
-            <span class="text-text-primary"> Something about privacy norms?</span>
-          </div>
-          <div class="text-text-secondary">
-            Good start! There are 3 independent parameters. If a doctor asks your age &mdash; that's fine. But if a stranger does? Same data, different <span class="text-text-primary">actors</span>. What's the second parameter?
+          <div class="text-text-secondary leading-relaxed">
+            What's your major and year, and what are you aiming at after graduation? That changes
+            the answer a lot.
           </div>
           <div>
             <span class="text-text-muted">You &rarr;</span>
-            <span class="text-text-primary"> The type of information?</span>
+            <span class="text-text-primary"> MIMS, second year, applied research roles</span>
           </div>
-          <div class="text-text-secondary">
-            Exactly &#128293; Medical data in a hospital = appropriate. Same data sold to advertisers = violation. That's <span class="text-text-primary">information type</span>. One more parameter &mdash; hint: think about <em>how</em> data flows.
+          <div class="text-text-secondary leading-relaxed">
+            <span class="text-text-primary">INFO 259 &mdash; Natural Language Processing</span> (3 units)<br/>
+            <span class="text-text-muted">Fall 2026: 1 section &middot; directly on your path</span>
+            <br/><br/>
+            <span class="text-text-primary">STAT 156 &mdash; Causal Inference</span> (4 units)<br/>
+            <span class="text-text-muted">Fall 2026: 1 section, Peng Ding &middot; what applied research
+            interviews actually probe</span>
+            <br/><br/>
+            <span class="text-text-muted">Catalog snapshot Sep 5, 2026. These are fit-based suggestions
+            &mdash; check with your advisor for requirements.</span>
           </div>
         </div>
       </div>

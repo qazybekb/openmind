@@ -5,7 +5,7 @@ import Footer from '../../components/Footer.astro';
 import '../../styles/global.css';
 ---
 
-<Layout title="Get bCourses API Token — OpenMind" description="Step-by-step guide to generate a Canvas access token from bCourses for OpenMind.">
+<Layout title="Get bCourses API Token — OpenMind" description="Generate a Canvas access token from bCourses so OpenMind can read your courses, read-only.">
   <Nav />
   <main>
     <section class="pt-28 pb-20 md:pt-36 md:pb-28">
@@ -19,13 +19,13 @@ import '../../styles/global.css';
             <div>
               <h1 class="text-2xl md:text-4xl font-bold text-text-primary tracking-tight">bCourses API Token</h1>
               <div class="flex items-center gap-3 mt-1">
-                <span class="text-[10px] font-semibold text-cal-gold uppercase tracking-widest">Required</span>
+                <span class="text-[10px] font-semibold text-cal-gold uppercase tracking-widest">Step 1</span>
                 <span class="text-xs text-text-muted">~2 minutes</span>
               </div>
             </div>
           </div>
           <p class="text-text-body mt-4">
-            bCourses is UC Berkeley's Canvas LMS. OpenMind uses the Canvas API to read your courses, assignments, grades, announcements, and lecture materials. You need a personal access token to authenticate.
+            bCourses is UC Berkeley&rsquo;s Canvas LMS. OpenMind uses the Canvas API to read your courses, assignments, grades, announcements, and lecture materials &mdash; read-only, and only for the courses you choose. A personal access token is the one credential it needs.
           </p>
         </div>
 
@@ -112,11 +112,12 @@ import '../../styles/global.css';
                   <div class="terminal-dot bg-[#28c840]"></div>
                 </div>
                 <div class="terminal-body text-[13px] space-y-1.5">
-                  <div><span class="text-text-primary">Step 1 of 2</span> &mdash; Connect to bCourses</div>
+                  <div><span class="text-text-secondary">$</span> <span class="text-text-primary">openmind setup</span></div>
+                  <div class="mt-2 text-text-secondary">Paste your bCourses access token.</div>
+                  <div class="text-text-muted">It is stored in your operating system&rsquo;s credential store, not in a file.</div>
                   <div>&ensp;<span class="text-text-secondary">bCourses token:</span> &bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</div>
-                  <div>&ensp;<span class="text-text-muted">Key: 12345~****wxyz</span></div>
-                  <div>&ensp;<span class="text-green-500">Connected!</span> Hey Oski 🐻</div>
-                  <div>&ensp;Finding your courses... <span class="text-green-500">6 courses</span></div>
+                  <div>&ensp;<span class="text-text-muted">Token: 12345~****wxyz</span></div>
+                  <div>&ensp;<span class="text-green-500">Connected as Oski Bear (America/Los_Angeles).</span></div>
                 </div>
               </div>
             </div>
@@ -128,9 +129,18 @@ import '../../styles/global.css';
           <div class="flex items-start gap-3">
             <span class="text-lg">🔒</span>
             <div>
-              <h3 class="text-text-primary font-semibold text-sm mb-1">Security</h3>
+              <h3 class="text-text-primary font-semibold text-sm mb-1">Where the token goes</h3>
               <p class="text-xs text-text-secondary leading-relaxed">
-                Your token is stored locally at <code class="text-text-body">~/.openmind/config.json</code> with restricted permissions (owner-only read/write). It is sent only to <code class="text-text-body">bcourses.berkeley.edu</code> for authentication. OpenMind uses read-only Canvas API calls &mdash; it cannot modify your courses or grades.
+                Into your operating system&rsquo;s credential store &mdash; macOS Keychain, Windows Credential
+                Manager, or the Secret Service on Linux. Never into a config file, never into a log
+                line, and never into anything OpenMind returns to your AI app. It is sent only to
+                <code class="text-text-body">bcourses.berkeley.edu</code>, and it is dropped before
+                any file download follows a redirect off that host.
+              </p>
+              <p class="text-xs text-text-secondary leading-relaxed mt-2">
+                Every Canvas call OpenMind makes is a read. There is no code path that can submit
+                work, post a reply, or change a grade. To revoke access, delete the token in
+                bCourses &mdash; Account &rarr; Settings &rarr; Approved Integrations.
               </p>
             </div>
           </div>
@@ -139,7 +149,7 @@ import '../../styles/global.css';
         <!-- Navigation -->
         <div class="flex items-center justify-between mt-12 fade-in">
           <a href="/guides/" class="btn-secondary text-sm">&larr; All Guides</a>
-          <a href="/guides/openrouter/" class="btn-primary text-sm">Next: OpenRouter &rarr;</a>
+          <a href="/guides/connect/" class="btn-primary text-sm">Next: Connect your AI app &rarr;</a>
         </div>
 
       </div>
