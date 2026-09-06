@@ -2,7 +2,7 @@
 
 All notable changes to OpenMind are recorded here.
 
-## 2.0.1 - Unreleased
+## 2.0.1 — 2026-09-05
 
 ### Changed
 - Install and data-publication instructions distinguish preparation from successful
