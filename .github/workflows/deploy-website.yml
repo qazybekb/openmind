@@ -19,6 +19,8 @@ concurrency:
 
 jobs:
   build:
+    # The site is served from the public repo only; the working repo has no Pages site.
+    if: github.repository == 'qazybekb/openmind'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
