@@ -1,6 +1,7 @@
 # Distribution
 
-OpenMind ships as a single PyPI package, `openmind-berkeley`, with two console scripts.
+OpenMind builds as a single Python package, `openmind-berkeley`, with two console
+scripts. PyPI publication is pending trusted-publisher configuration by the owner.
 
 | Script | Purpose |
 |---|---|
@@ -10,11 +11,13 @@ OpenMind ships as a single PyPI package, `openmind-berkeley`, with two console s
 ## Installing
 
 ```bash
-uv tool install openmind-berkeley     # recommended: isolated, on PATH
-pipx install openmind-berkeley        # equivalent
-pip install openmind-berkeley         # into an environment you manage
-uvx --from openmind-berkeley openmind setup   # no permanent install
+uv tool install git+https://github.com/qazybekb/openmind.git
+uv tool install .                    # from a checkout of the corrected source
 ```
+
+After the corrected release reaches PyPI: `uv tool install openmind-berkeley`, or
+`pipx install openmind-berkeley`. Public catalog tools need no token; reading your own
+courses needs `openmind setup`.
 
 `uv tool` and `pipx` are preferred because they put `openmind-mcp` on a stable absolute
 path, which is what an AI app's config needs.
@@ -44,34 +47,52 @@ No LLM SDK, no chat framework, no messaging client. Version 1's `typer`, `rich`,
 `prompt-toolkit`, `openai`, `pymupdf`, `python-telegram-bot`, and the Google API
 clients are all gone, and a test asserts they do not come back.
 
-## Releasing
+## Releasing code
+
+Version 2.0.0 is already tagged. Do not move that tag or upload changed files under
+the same version. These fixes are prepared as 2.0.1, not yet published.
 
 ```bash
-python -m build
-python -m twine check dist/*
-python -m twine upload dist/*
-git tag v2.0.0 && git push --tags
+uv run python -m build --outdir .context/release-dist
+uv run python -m twine check .context/release-dist/*
 ```
 
-Before tagging, run through [docs/ACCEPTANCE.md](ACCEPTANCE.md) — the manual checks that need a real host and a real account — and the summary below.
+Before tagging, run [ACCEPTANCE.md](ACCEPTANCE.md), including real-host checks, and
+confirm the public repository contains the intended commit. Creating and pushing a
+new `v2.0.1` tag starts `publish.yml`; do not also run `twine upload` locally. A manual
+workflow run on a branch only builds artifacts, while a tag permits PyPI publication.
+
+### PyPI owner action
+
+For a project that does not yet exist, configure a **pending trusted publisher** in
+your PyPI account with project name `openmind-berkeley`, owner `qazybekb`, repository
+`openmind`, workflow `publish.yml`, and environment `pypi`. The first successful
+publish creates the project; there is no need for a placeholder upload. For an
+existing project, add the publisher under that project's publishing settings.
+[PyPI's first-project instructions](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/).
+Do not rerun the old 2.0.0 upload to release these fixes; release the new version after
+verification. Account configuration is the owner's, not a CI check.
 
 ## Data releases are separate from code releases
 
 Course data changes on the university's calendar. `.github/workflows/refresh-data.yml`
-runs `scripts/refresh_catalog.py` daily, and when the data actually changed it:
+runs in the canonical `qazybekb/openmind` repository only. Crawling and publication
+are separate, so an unchanged crawl cannot strand a missing asset:
 
-1. tars the four data files — `undergraduate_courses.csv`, `graduate_courses.csv`,
-   `term_offerings.csv`, `catalog_meta.json` — into `catalog-<catalog_as_of>.tar.gz`;
-2. takes the SHA-256 of that archive and writes it into the manifest as `data_sha256`,
-   so the manifest a client fetches names the hash of the file it will download;
-3. commits `src/openmind/data` to the default branch, which is where clients read the
-   manifest from;
-4. publishes a GitHub release tagged `data-<catalog_as_of>` with the archive attached,
-   clobbering the asset if the tag already exists.
+1. `refresh_catalog.py` optionally refreshes the CSVs, preserving prior offerings if
+   the schedule site blocks the runner.
+2. `prepare_data_release.py` always builds a deterministic archive of the four data
+   files, fills the outer manifest's `data_sha256`, and assigns an immutable
+   `data-<catalog_as_of>-<content-id>` release tag. Same-day corrections get a new tag.
+3. The workflow uploads the archive and verifies its GitHub asset digest. An existing
+   identical asset is reused; a conflicting asset is never overwritten.
+4. Only after verification does it commit the manifest and data to the default branch,
+   where clients read the manifest. Fully published, unchanged snapshots need no commit.
 
 Installed clients check that manifest at most once a day, verify the SHA-256, and
-rebuild their local catalog. Students get current course data without upgrading the
-package, and the job keeps working with only the repository token.
+rebuild their local catalog. A changed hash on the same date is accepted; an older
+snapshot is not. The job uses only the repository token. A failed upload leaves the
+published manifest untouched, and a failed push can be retried without replacing assets.
 
 Turn the check off entirely with `openmind config --set data_updates=false`.
 
@@ -95,9 +116,19 @@ maintainer's, or a self-hosted runner:
 python3 scripts/refresh_catalog.py --out src/openmind/data
 ```
 
-It prints `changed` or `unchanged` on stdout and its progress on stderr. On `changed`,
-commit `src/openmind/data` and do steps 1, 2 and 4 above, which is what the workflow
-would have done. The crawl takes roughly an hour at the polite one-second delay.
+It prints `changed` or `unchanged` on stdout and progress on stderr. Commit and push
+the refreshed files to the canonical repository, then run **Refresh Berkeley course
+data** from its Actions tab with **publish_only** enabled. Or, after that push:
+
+```bash
+gh workflow run refresh-data.yml --repo qazybekb/openmind --ref main -f publish_only=true
+```
+
+This skips another crawl and performs preparation, verified publication, and the
+final manifest commit. The local refresh intentionally leaves a blank hash, which
+clients ignore until publication completes. The next scheduled run will also repair
+an unpublished snapshot even if its crawl reports `unchanged`. Do not treat the local
+refresh commit alone as a completed data release.
 
 ## Acceptance
 
@@ -110,4 +141,5 @@ Before a release:
 - A real question answered in Claude Desktop, Claude Code, and ChatGPT desktop.
 - A deadline at 11:59 PM renders on the correct local day.
 - One course returning 403 produces `partial: true` with a warning — never "nothing due".
-- A forced data-refresh run with unchanged data produces no commit.
+- An unchanged, already-published snapshot produces no commit; an unpublished one is
+  repaired by `publish_only`, with its asset available before its hash is committed.

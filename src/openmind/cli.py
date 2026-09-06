@@ -227,7 +227,6 @@ def _print_host_config() -> int:
     """Print copy-paste config for each supported AI host. No secrets appear here."""
     try:
         snippet = json.dumps({"mcpServers": {hosts.ENTRY_NAME: hosts.entry()}}, indent=2)
-        command = hosts.command_line()
     except hosts.HostError as exc:
         # A snippet naming a launcher that does not exist is worse than no snippet: the
         # host would accept it and then fail silently at startup.
@@ -243,12 +242,12 @@ def _print_host_config() -> int:
     out(snippet)
     out("")
     out("Claude Code — run:")
-    out(f"  claude mcp add --scope user {hosts.ENTRY_NAME} -- {command}")
+    out(f"  {hosts.shell_command(_claude_code_args())}")
     out("")
     out(f"Cursor — add the same JSON block to {hosts.cursor_path()}")
     out("")
-    out("ChatGPT desktop — add a local (STDIO) MCP server with this command:")
-    out(f"  {command}")
+    out("ChatGPT desktop — add a local (STDIO) MCP server with this command path:")
+    out(f"  {hosts.server_command()[0]}")
     out("")
     out("Or let OpenMind write it for you:")
     out("  openmind mcp --write claude-desktop")
@@ -278,17 +277,17 @@ def _write_host_config(key: str, *, assume_yes: bool) -> int:
         return 1
 
     try:
-        command = hosts.command_line()
+        hosts.server_command()
     except hosts.HostError as exc:
         err(str(exc))
         return 1
 
     if key == "claude-code":
-        return _write_claude_code(command, assume_yes=assume_yes)
+        return _write_claude_code(assume_yes=assume_yes)
     if not host.writable:
         out(f"{host.label} has no config file to write. Add it in the app:")
         out(f"  {host.note}")
-        out(f"  Command: {command}")
+        out(f"  Command: {hosts.server_command()[0]}")
         return 0
 
     assert host.path is not None
@@ -325,10 +324,16 @@ def _write_host_config(key: str, *, assume_yes: bool) -> int:
     return 0
 
 
-def _write_claude_code(server_command: str, *, assume_yes: bool) -> int:
+def _claude_code_args() -> list[str]:
+    """Keep executable paths intact when registering a local server."""
+    executable, args = hosts.server_command()
+    return ["claude", "mcp", "add", "--scope", "user", hosts.ENTRY_NAME, "--", executable, *args]
+
+
+def _write_claude_code(*, assume_yes: bool) -> int:
     """Register the server with Claude Code, which owns its own config."""
-    command = ["claude", "mcp", "add", "--scope", "user", hosts.ENTRY_NAME, "--", *server_command.split(" ")]
-    printable = " ".join(command)
+    command = _claude_code_args()
+    printable = hosts.shell_command(command)
 
     if shutil.which("claude") is None:
         out("The `claude` command is not on your PATH. Once Claude Code is installed, run:")
@@ -517,13 +522,14 @@ def cmd_index(args: argparse.Namespace) -> int:
         err(str(exc))
         return 1
 
-    token = secrets.get_token()
-    if not token:
-        err("No bCourses token is stored. Run `openmind setup`.")
-        return 1
-
     course_ids = [args.course] if args.course else list(cfg.courses)
-    client = CanvasClient(cfg.canvas_url, token)
+    client = None
+    if not args.delete:
+        token = secrets.get_token()
+        if not token:
+            err("No bCourses token is stored. Run `openmind setup`.")
+            return 1
+        client = CanvasClient(cfg.canvas_url, token)
     session = Session(cfg, client)
     status = 0
     try:
@@ -545,7 +551,8 @@ def cmd_index(args: argparse.Namespace) -> int:
                 if not result["pending"]:
                     break
     finally:
-        client.close()
+        if client is not None:
+            client.close()
     return status
 
 

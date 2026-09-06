@@ -25,7 +25,7 @@
             <span class="ml-3 text-xs text-text-muted font-sans">Terminal</span>
           </div>
           <div class="terminal-body text-[13px] md:text-sm space-y-1.5">
-            <div><span class="text-text-secondary">$</span> <span class="text-text-primary">uv tool install openmind-berkeley</span></div>
+            <div><span class="text-text-secondary">$</span> <span class="text-text-primary">uv tool install git+https://github.com/qazybekb/openmind.git</span></div>
             <div><span class="text-text-secondary">$</span> <span class="text-text-primary">openmind setup</span></div>
             <div class="mt-3 text-text-secondary">Paste your bCourses access token.</div>
             <div class="text-text-muted">It is stored in your operating system's credential store, not in a file.</div>
@@ -42,6 +42,11 @@
             <div class="mt-2 text-text-muted">Course materials are NOT stored locally unless you ask for it.</div>
           </div>
         </div>
+        <p class="text-text-muted text-xs mt-3">
+          PyPI publication is pending. After the corrected release is published,
+          <code class="text-text-secondary">uv tool install openmind-berkeley</code> is an alternative.
+          From a local checkout, use <code class="text-text-secondary">uv tool install .</code>.
+        </p>
       </div>
 
       <!-- Step 3: connect the host -->

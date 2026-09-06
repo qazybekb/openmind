@@ -357,13 +357,25 @@ def test_the_readme_and_the_website_point_at_the_same_repository():
 def test_the_install_commands_agree_across_the_docs():
     for name in ("README.md", "docs/SETUP.md", "docs/DISTRIBUTION.md"):
         text = read(*name.split("/"))
+        assert f"uv tool install git+https://github.com/{REPO_SLUG}.git" in text, name
         assert "uv tool install openmind-berkeley" in text, name
-        assert "pip install git+" not in text, f"{name} still recommends a git install"
+        assert "publication is pending" in text.lower(), name
         assert "install openmind-mcp" not in text, f"{name} treats the launcher as a package"
 
     website = read("website", "src", "components", "Install.astro")
     assert "uv tool install openmind-berkeley" in website
-    assert "pip install git+" not in website
+    assert f"uv tool install git+https://github.com/{REPO_SLUG}.git" in website
+    assert "PyPI publication is pending" in website
+
+
+def test_the_who_can_use_this_paragraph_is_the_same_everywhere():
+    """One approved statement of the access policy, not three drifting paraphrases."""
+    for name in ("docs/SETUP.md", "docs/PRIVACY.md", "website/src/pages/guides/connect.astro"):
+        text = read(*name.split("/"))
+        assert "Who can use this" in text, name
+        assert "running their own copy on their own machine" in text, name
+        assert "what personal access tokens are for" in text, name
+        assert "Berkeley Research, Teaching, and" in text, name
 
 
 def test_pipx_is_offered_as_the_alternative_not_the_default():

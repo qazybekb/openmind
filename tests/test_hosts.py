@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -54,6 +55,38 @@ def test_the_entry_contains_a_path_and_nothing_else():
     assert set(entry) <= {"command", "args"}
     assert Path(entry["command"]).is_absolute()
     assert "token" not in json.dumps(entry).lower()
+
+
+@pytest.mark.parametrize("path", [
+    r"C:\Users\Test Student\Scripts\openmind-mcp.exe",
+    "/Users/test/An Install/bin/openmind-mcp",
+])
+def test_claude_code_registration_preserves_command_arguments(path, monkeypatch, capsys):
+    calls = []
+
+    def register(args, **kwargs):
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(hosts, "server_command", lambda: (path, ["--example", "two words"]))
+    monkeypatch.setattr(shutil, "which", lambda _: "claude")
+    monkeypatch.setattr(subprocess, "run", register)
+    assert cli.main(["mcp", "--write", "claude-code", "--yes"]) == 0
+    assert calls == [["claude", "mcp", "add", "--scope", "user", "openmind", "--", path, "--example", "two words"]]
+
+
+def test_shell_rendering_does_not_change_structured_arguments(monkeypatch):
+    import shlex
+
+    args = ["/path with spaces/openmind-mcp", "argument's value"]
+    with monkeypatch.context() as context:
+        context.setattr(os, "name", "posix")
+        rendered = hosts.shell_command(args)
+    assert shlex.split(rendered) == args
+    with monkeypatch.context() as context:
+        context.setattr(os, "name", "nt")
+        rendered = hosts.shell_command(args)
+    assert rendered == "& '/path with spaces/openmind-mcp' 'argument''s value'"
 
 
 def test_every_host_key_resolves():
@@ -198,7 +231,7 @@ def test_claude_code_without_the_cli_prints_the_command_instead(host_dir: Path, 
     code, out, _ = run(["mcp", "--write", "claude-code", "--yes"], capsys)
 
     assert code == 0
-    assert "claude mcp add --scope user openmind --" in out
+    assert hosts.shell_command(cli._claude_code_args()) in out
 
 
 def test_the_printed_snippets_still_work(host_dir: Path, capsys):
@@ -317,7 +350,7 @@ def no_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_the_launcher_is_found_beside_the_interpreter_when_path_is_empty(fake_install: Path):
     """A host does not inherit PATH, and neither does an IDE terminal."""
     assert hosts.find_server_script() == fake_install
-    assert hosts.command_line() == str(fake_install)
+    assert hosts.command_line() == hosts.shell_command([str(fake_install)])
 
 
 def test_a_symlinked_interpreter_is_not_followed_to_its_target(tmp_path: Path, monkeypatch):

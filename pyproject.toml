@@ -1,6 +1,6 @@
 [project]
 name = "openmind-berkeley"
-version = "2.0.0"
+version = "2.0.1"
 description = "A local, read-only bCourses (Canvas) MCP server for UC Berkeley students"
 readme = "README.md"
 requires-python = ">=3.11"

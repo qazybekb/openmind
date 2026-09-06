@@ -8,7 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from openmind import cli, secrets
+from openmind import cli, hosts, secrets
 from openmind.config import config_path
 from tests.conftest import handler
 
@@ -81,7 +81,7 @@ def test_setup_stores_courses_and_prints_host_config(home: Path, canvas, monkeyp
 
     assert "Connected as Test Student" in out
     assert "claude_desktop_config.json" in out
-    assert "claude mcp add" in out
+    assert hosts.shell_command(cli._claude_code_args()) in out
     assert "cursor" in out.lower() and "mcp.json" in out
     assert "ChatGPT desktop" in out
 
@@ -125,6 +125,30 @@ def test_setup_fails_cleanly_on_a_bad_token(home: Path, monkeypatch, capsys):
     assert code == 1
     assert "invalid or expired" in err
     assert not config_path().exists()
+
+
+def test_setup_with_your_own_token_is_all_live_access_needs(home: Path, canvas, monkeypatch, capsys):
+    """One student, one machine, one token: nothing else stands between setup and bCourses."""
+    from openmind.server import AppContext
+
+    monkeypatch.setenv(secrets.ENV_VAR, "fake-token-for-tests")
+    monkeypatch.setattr(secrets, "set_token", lambda token, allow_file=False: "keyring")
+    assert run(["setup", "--all-courses"], capsys)[0] == 0
+
+    monkeypatch.setattr("openmind.server.get_token", lambda: "fake-token-for-tests")
+    session = AppContext().session()
+    assert session.canvas is not None
+    assert set(session.cfg.courses) == {"1001", "1002", "9999"}
+
+
+def test_deleting_a_local_index_needs_no_token(config, monkeypatch, capsys):
+    """Removing what is already on disk never has to reach bCourses."""
+    def forbidden(*args, **kwargs):
+        pytest.fail("deleting a local index must not read a token or open a connection")
+
+    monkeypatch.setattr(secrets, "get_token", forbidden)
+    monkeypatch.setattr(cli, "CanvasClient", forbidden)
+    assert run(["index", "--course", "1001", "--delete"], capsys)[0] == 0
 
 
 # -- mcp -----------------------------------------------------------------------

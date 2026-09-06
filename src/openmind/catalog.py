@@ -853,7 +853,7 @@ def maybe_update(*, enabled: bool, force: bool = False, path: Path | None = None
         local = {}
     if local.get("data_sha256") == remote_hash:
         return None
-    if local.get("catalog_as_of", "") >= remote_as_of:
+    if local.get("catalog_as_of", "") > remote_as_of:
         return None
 
     return _download_and_rebuild(manifest, remote_as_of, remote_hash, target)

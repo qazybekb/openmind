@@ -216,8 +216,17 @@ def upsert_material(conn: sqlite3.Connection, *, course_id: str, kind: str, canv
             content_type = COALESCE(excluded.content_type, materials.content_type),
             size_bytes = COALESCE(excluded.size_bytes, materials.size_bytes),
             status = CASE
-                WHEN materials.source_updated_at IS NOT excluded.source_updated_at THEN 'pending'
+                WHEN materials.status = 'deleted'
+                    OR materials.source_updated_at IS NOT excluded.source_updated_at THEN 'pending'
                 ELSE materials.status END,
+            attempts = CASE
+                WHEN materials.status = 'deleted'
+                    OR materials.source_updated_at IS NOT excluded.source_updated_at THEN 0
+                ELSE materials.attempts END,
+            status_note = CASE
+                WHEN materials.status = 'deleted'
+                    OR materials.source_updated_at IS NOT excluded.source_updated_at THEN NULL
+                ELSE materials.status_note END,
             source_updated_at = excluded.source_updated_at
         """,
         (course_id, kind, canvas_id, title, module_name, module_position, item_position,

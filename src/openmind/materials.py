@@ -11,9 +11,13 @@ from __future__ import annotations
 
 import io
 import ipaddress
+import json
 import logging
+import os
 import re
 import socket
+import subprocess
+import sys
 import time
 import zipfile
 from dataclasses import dataclass, field
@@ -241,7 +245,53 @@ def extract(body: bytes, name: str, content_type: str = "") -> Extraction:
     return Extraction(status="skipped", note=reason)
 
 
+def _worker_command(kind: str) -> list[str]:
+    return [sys.executable, "-m", "openmind.extract_worker", kind,
+            str(MAX_PAGES), str(MAX_CHARS), str(MAX_MEMBER_BYTES)]
+
+
+def _extract_in_worker(kind: str, body: bytes) -> Extraction:
+    """Kill and reap a parser that exceeds its deadline; documents stay in pipes."""
+    if len(body) > MAX_DOWNLOAD_BYTES:
+        return Extraction(status="skipped", note="the document is too large to extract")
+    environment = {key: value for key, value in os.environ.items() if key in {
+        "PATH", "PYTHONPATH", "SYSTEMROOT", "WINDIR", "HOME", "USERPROFILE", "TEMP", "TMP"
+    }}
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    try:
+        result = subprocess.run(
+            _worker_command(kind), input=body, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            timeout=MAX_SECONDS, env=environment, check=False,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+    except subprocess.TimeoutExpired:
+        return Extraction(status="failed", truncated=True, note="document extraction exceeded its time limit")
+    except OSError:
+        return Extraction(status="failed", note="the document extractor could not start")
+    if result.returncode != 0 or len(result.stdout) > MAX_CHARS * 12 + 16_384:
+        return Extraction(status="failed", note="document extraction failed or exceeded its resource limits")
+    try:
+        return Extraction(**json.loads(result.stdout))
+    except (ValueError, TypeError):
+        return Extraction(status="failed", note="the document extractor returned an invalid result")
+
+
 def extract_pdf(body: bytes) -> Extraction:
+    """Extract a PDF in a deadline-limited worker process."""
+    return _extract_in_worker("pdf", body)
+
+
+def extract_pptx(body: bytes) -> Extraction:
+    """Extract a slide deck in a deadline-limited worker process."""
+    return _extract_in_worker("pptx", body)
+
+
+def extract_docx(body: bytes) -> Extraction:
+    """Extract a Word document in a deadline-limited worker process."""
+    return _extract_in_worker("docx", body)
+
+
+def _extract_pdf(body: bytes) -> Extraction:
     """Extract text from a PDF page by page, dropping headers and footers.
 
     Lines that repeat on at least half the pages are almost always running headers or
@@ -362,7 +412,7 @@ def read_member(archive: zipfile.ZipFile, name: str, budget: int) -> bytes:
     return bytes(collected)
 
 
-def extract_pptx(body: bytes) -> Extraction:
+def _extract_pptx(body: bytes) -> Extraction:
     """Extract slide text from a .pptx, one page per slide."""
     names: list[str] = []
     pages: list[str] = []
@@ -405,7 +455,7 @@ def extract_pptx(body: bytes) -> Extraction:
     )
 
 
-def extract_docx(body: bytes) -> Extraction:
+def _extract_docx(body: bytes) -> Extraction:
     """Extract paragraph text from a .docx."""
     try:
         with zipfile.ZipFile(io.BytesIO(body)) as archive:

@@ -1,17 +1,16 @@
 name: Refresh Berkeley course data
 
-# Course data changes on the university's calendar, not on ours. This job keeps the
-# catalog and the per-term offerings current without waiting for a release, and it runs
-# on GitHub's infrastructure with the repository token only — so it outlives the
-# maintainer's attention span.
-
 on:
   schedule:
     - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       skip_offerings:
-        description: "Export catalogs only (skip the class-schedule crawl)"
+        description: "Refresh catalogs only, keeping previous offerings"
+        type: boolean
+        default: false
+      publish_only:
+        description: "Publish the committed snapshot without crawling"
         type: boolean
         default: false
 
@@ -24,115 +23,82 @@ concurrency:
 
 jobs:
   refresh:
+    if: github.repository == 'qazybekb/openmind'
     runs-on: ubuntu-latest
     timeout-minutes: 90
-
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install the package
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev]"
 
-      # The parser fixtures run first. If classes.berkeley.edu has been restyled, this
-      # job must fail loudly rather than publish an empty offerings table that would
-      # tell every student their courses are not offered.
-      - name: Verify the schedule parser against saved fixtures
-        run: python -m pytest tests/test_schedule.py tests/test_catalog.py -q
+      - name: Verify the parser and publication contract
+        run: python -m pytest tests/test_schedule.py tests/test_catalog.py tests/test_refresh_script.py tests/test_refresh_coverage.py tests/test_data_release.py -q
 
-      # As of 2026-09-05, classes.berkeley.edu answers GitHub-hosted runner IP ranges with
-      # HTTP 403 — the same URLs return 200 from a laptop with the identical user agent,
-      # so it is an origin block, not a bug. This job therefore keeps the catalogs current
-      # and carries the previous offerings forward, saying so in the manifest. To refresh
-      # the offerings themselves, run
-      #
-      #     python3 scripts/refresh_catalog.py --out src/openmind/data
-      #
-      # from a machine that can reach the site (the maintainer's, or a self-hosted runner)
-      # and commit the result; the steps below are what this job would have done with it.
-      #
-      # pipefail matters here: without it the exit status is tee's, so a script that
-      # refused to publish an incomplete snapshot would look like a success and the job
-      # would carry on to commit and release it.
+      # GitHub runners may get HTTP 403 from classes.berkeley.edu. The script keeps
+      # previous offerings in that case; coverage failures still stop publication.
       - name: Refresh the data
-        id: refresh
+        if: ${{ !inputs.publish_only }}
+        env:
+          SKIP_OFFERINGS: ${{ inputs.skip_offerings }}
         run: |
-          set -o pipefail
-          python3 scripts/refresh_catalog.py \
-            --out src/openmind/data \
-            ${{ inputs.skip_offerings && '--skip-offerings' || '' }} \
-            | tee /tmp/refresh-status.txt
-          echo "status=$(tail -n1 /tmp/refresh-status.txt)" >> "$GITHUB_OUTPUT"
+          ARGS=()
+          if [ "$SKIP_OFFERINGS" = "true" ]; then ARGS+=(--skip-offerings); fi
+          python scripts/refresh_catalog.py --out src/openmind/data "${ARGS[@]}"
 
-      - name: Stop if nothing changed
-        if: steps.refresh.outputs.status != 'changed'
-        run: echo "Data is unchanged; no commit and no release." && exit 0
-
-      - name: Check the rebuilt data still passes its own tests
-        if: steps.refresh.outputs.status == 'changed'
+      - name: Validate the snapshot
         run: python -m pytest tests/test_catalog.py -q
 
-      # The asset is built before its hash is written into the committed manifest, so
-      # the manifest a client fetches names the hash of the file it will download.
-      - name: Build and hash the data asset
-        if: steps.refresh.outputs.status == 'changed'
+      # Always prepare: unchanged CSVs may still have no published asset. The
+      # content-addressed tag and deterministic archive make retries idempotent.
+      - name: Prepare the data asset and manifest
         id: asset
-        run: |
-          DATE=$(python3 -c "import json;print(json.load(open('src/openmind/data/catalog_meta.json'))['catalog_as_of'])")
-          tar -czf "catalog-${DATE}.tar.gz" -C src/openmind/data \
-            undergraduate_courses.csv graduate_courses.csv term_offerings.csv catalog_meta.json
-          SHA=$(python3 -c "import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())" "catalog-${DATE}.tar.gz")
-          python3 - "$SHA" <<'PY'
-          import json, sys, pathlib
-          path = pathlib.Path("src/openmind/data/catalog_meta.json")
-          manifest = json.loads(path.read_text())
-          manifest["data_sha256"] = sys.argv[1]
-          path.write_text(json.dumps(manifest, indent=2) + "\n")
-          PY
-          echo "date=${DATE}" >> "$GITHUB_OUTPUT"
-          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
-          echo "file=catalog-${DATE}.tar.gz" >> "$GITHUB_OUTPUT"
+        run: python scripts/prepare_data_release.py --data src/openmind/data --out "$RUNNER_TEMP/openmind-data" --github-output "$GITHUB_OUTPUT"
 
-      - name: Commit the refreshed data
-        if: steps.refresh.outputs.status == 'changed'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/openmind/data
-          git commit -m "Refresh Berkeley course data (${{ steps.asset.outputs.date }})
-
-          Catalog and per-term offerings re-exported by scripts/refresh_catalog.py.
-          Asset SHA-256: ${{ steps.asset.outputs.sha }}"
-          # Named explicitly: the manifest the client fetches is served from the default
-          # branch, so committing anywhere else would publish an asset nobody finds.
-          git push origin HEAD:${{ github.event.repository.default_branch }}
-
-      # Two runs on the same day would both want the data-<date> tag, so create the
-      # release only when it is absent and overwrite the asset otherwise. The manifest
-      # names the hash of whatever is published last, so the two stay in step.
-      - name: Publish the data asset
-        if: steps.refresh.outputs.status == 'changed'
+      - name: Publish and verify the immutable asset
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: data-${{ steps.asset.outputs.date }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.asset.outputs.tag }}
           FILE: ${{ steps.asset.outputs.file }}
+          ASSET_NAME: ${{ steps.asset.outputs.name }}
           SHA: ${{ steps.asset.outputs.sha }}
         run: |
-          NOTES="Public UC Berkeley catalog and class-schedule snapshot.
-
-          SHA-256: \`${SHA}\`
-
-          Clients with \`data_updates\` enabled pick this up automatically within a day,
-          verifying the hash before rebuilding. \`openmind update-data\` pulls it now."
-
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$FILE" --clobber
-            gh release edit "$TAG" --notes "$NOTES"
+          if gh api "repos/$REPO/releases/tags/$TAG" > "$RUNNER_TEMP/data-release.json"; then
+            EXISTING=$(jq -r --arg name "$ASSET_NAME" '.assets[] | select(.name == $name) | .digest' "$RUNNER_TEMP/data-release.json")
+            if [ -z "$EXISTING" ]; then
+              gh release upload "$TAG" "$FILE" --repo "$REPO"
+            elif [ "$EXISTING" != "sha256:$SHA" ]; then
+              echo "Existing immutable asset has an unexpected digest; refusing to overwrite it." >&2
+              exit 1
+            fi
           else
-            gh release create "$TAG" "$FILE" \
-              --title "Berkeley course data ${{ steps.asset.outputs.date }}" \
-              --notes "$NOTES"
+            gh release create "$TAG" "$FILE" --repo "$REPO" --target "$(git rev-parse HEAD)" \
+              --title "Berkeley course data $TAG" \
+              --notes "Public catalog snapshot. SHA-256: $SHA" --latest=false
+          fi
+          VERIFIED=$(gh api "repos/$REPO/releases/tags/$TAG" --jq ".assets[] | select(.name == \"$ASSET_NAME\") | .digest")
+          test "$VERIFIED" = "sha256:$SHA"
+
+      # Clients fetch src/openmind/data/catalog_meta.json from the default branch.
+      # Publish its hash only after the matching asset exists and has been verified.
+      - name: Commit the published manifest and refreshed data
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DATA_DATE: ${{ steps.asset.outputs.date }}
+        run: |
+          git add src/openmind/data
+          if git diff --cached --quiet; then
+            echo "Snapshot already published; no commit needed."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Publish Berkeley course data ($DATA_DATE)"
+            git push origin "HEAD:$DEFAULT_BRANCH"
           fi

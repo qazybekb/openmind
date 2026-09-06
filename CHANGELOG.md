@@ -2,6 +2,25 @@
 
 All notable changes to OpenMind are recorded here.
 
+## 2.0.1 - Unreleased
+
+### Changed
+- Install and data-publication instructions distinguish preparation from successful
+  publication, while `openmind-berkeley` is not yet on PyPI.
+
+### Fixed
+- Incomplete Canvas listings no longer delete unseen indexed materials.
+- Materials that reappear or receive a new source revision can be indexed again;
+  obsolete failure notes and exhausted retry counts no longer strand them.
+- Claude Code registration preserves executable paths and arguments containing spaces.
+  Printed shell commands are quoted for POSIX shells or Windows PowerShell.
+- Unchanged crawls can publish missing catalog assets. Deterministic, immutable assets
+  are verified before the matching manifest is committed, with a publish-only repair mode.
+- Same-day catalog corrections install when their verified hash changes, without
+  permitting older-date rollbacks.
+- PDF, PPTX, and DOCX parsing runs in a subprocess that is killed and reaped on timeout,
+  instead of checking elapsed time only after a potentially blocking parser returns.
+
 ## 2.0.0 — 2026-09-05
 
 OpenMind is now a **read-only bCourses (Canvas) MCP server** that you run on your own

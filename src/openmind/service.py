@@ -964,7 +964,8 @@ class Session:
                 )
                 found.add(slug)
                 count += 1
-            seen["page"] = found
+            if not self.canvas.was_truncated(f"/courses/{course_id}/pages", {"published": "true", "per_page": "100"}):
+                seen["page"] = found
         except CanvasError:
             warnings.append("Course pages could not be read.")
 
@@ -986,7 +987,10 @@ class Session:
                 )
                 found.add(summary["canvas_id"])
                 count += 1
-            seen["file"] = found
+            if not self.canvas.was_truncated(
+                f"/courses/{course_id}/files", {"sort": "updated_at", "order": "desc", "per_page": "100"}
+            ):
+                seen["file"] = found
         except CanvasError:
             warnings.append(
                 "This course does not share its file list with students; only pages and the syllabus were indexed."

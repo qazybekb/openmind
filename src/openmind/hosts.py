@@ -16,6 +16,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import shlex
 import shutil
 import sys
 from dataclasses import dataclass
@@ -159,7 +160,15 @@ def entry() -> dict[str, Any]:
 def command_line() -> str:
     """Return the launch command as a shell would spell it."""
     command, args = server_command()
-    return " ".join([command, *args])
+    return shell_command([command, *args])
+
+
+def shell_command(args: list[str]) -> str:
+    """Render arguments for POSIX shells or PowerShell, without changing execution."""
+    if os.name == "nt":
+        quoted = ["'" + arg.replace("'", "''") + "'" for arg in args]
+        return "& " + " ".join(quoted)
+    return shlex.join(args)
 
 
 def same_script(command: str) -> bool:
@@ -224,7 +233,7 @@ def hosts() -> list[Host]:
     return [
         Host("claude-desktop", "Claude Desktop", claude_desktop_path(), "mcpServers"),
         Host("claude-code", "Claude Code", None, None,
-             note=f"claude mcp add --scope user {ENTRY_NAME} -- {_command_or_placeholder()}"),
+             note="Run `openmind mcp --write claude-code` to register the server."),
         Host("cursor", "Cursor", cursor_path(), "mcpServers"),
         Host("chatgpt", "ChatGPT desktop", None, None,
              note="Add a local (STDIO) MCP server in the app's settings with the command above."),

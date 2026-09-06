@@ -94,7 +94,7 @@ def test_a_pdf_that_runs_past_its_deadline_stops_and_says_so(monkeypatch: pytest
     ticks = iter([0.0] + [materials.MAX_SECONDS + 1] * 50)
     monkeypatch.setattr(materials.time, "monotonic", lambda: next(ticks))
 
-    result = materials.extract_pdf(body)
+    result = materials._extract_pdf(body)
     assert result.truncated is True
     assert result.page_count < 8
 

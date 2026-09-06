@@ -54,7 +54,7 @@ Everything lives under `~/.openmind/mcp/` (or `$OPENMIND_HOME`).
 | OS credential store | Your bCourses token | After `openmind setup`. Not a file — macOS Keychain, Windows Credential Manager, or Secret Service |
 | `config.json` (mode 0600) | Enabled course ids and nicknames, your Canvas time zone, your name, preferences | After setup |
 | `index.db` (mode 0600) | Extracted text of course materials, **only for courses you explicitly index** | Only after you run `openmind index` or the `index_course` tool |
-| `catalog.db` | The public Berkeley course catalog | After setup |
+| `catalog.db` | The public Berkeley course catalog | After a catalog tool runs, `update-data`, or setup |
 | `data_check` | A timestamp of the last catalog update check | If updates are on |
 
 `token` (mode 0600) appears only if you ran setup with `--allow-file-secrets` on a
@@ -75,6 +75,14 @@ machine with no credential store, and setup prints a warning when it does.
 At setup you pick which courses OpenMind may read at all — courses you leave out are
 invisible to every tool. Storing materials on disk is a second, separate choice, made
 per course. `list_courses` shows which courses are indexed.
+
+PDF, PPTX, and DOCX extraction runs in a separate process with a 20-second deadline.
+On timeout the parent kills and reaps that process. Documents and extracted text pass
+through pipes, not temporary document files; Canvas credentials are not included in
+the worker environment. POSIX workers disable core dumps and attempt a 768 MiB
+address-space limit where supported. Windows relies on the timeout and document,
+decompression, page, and text limits, not a process-wide memory cap. This is resource
+isolation, not an OS security sandbox; it does not control swap, backups, or host storage.
 
 ## Deleting everything
 
@@ -104,9 +112,9 @@ tool does — the tool surface is fixed before any document is read.
 your own machine, which is what personal access tokens are for. OpenMind never asks for
 anyone else's credentials and never operates a shared service.
 
-**Can my instructor see this?** No. OpenMind makes the same read requests bCourses
-serves to your browser.
+**Can my instructor see this?** OpenMind does not send instructors a notification.
+Canvas can log API activity; OpenMind cannot guarantee who can access those logs.
 
 **What if I stop using it?** Run `openmind clear --all`, uninstall the package, and
-delete the token in bCourses. Nothing remains anywhere else, because there is nowhere
-else.
+delete the token in bCourses. This deletes OpenMind-managed local state, not copies in
+your backups or data already returned to an AI host and its provider.

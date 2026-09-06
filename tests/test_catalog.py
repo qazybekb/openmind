@@ -199,6 +199,27 @@ def test_a_newer_snapshot_is_downloaded_verified_and_rebuilt(sample_catalog, mon
         assert catalog.meta(conn)["data_sha256"] == digest
 
 
+@pytest.mark.parametrize("force", [False, True])
+def test_a_same_day_correction_is_downloaded_once(sample_catalog, monkeypatch, force):
+    asset, digest = make_asset(sample_catalog)
+    calls = []
+    stub_http(monkeypatch, {"catalog_as_of": "2026-09-05", "data_sha256": digest}, asset, calls)
+    assert catalog.maybe_update(enabled=True, force=force)
+    assert len(calls) == 2
+    assert catalog.maybe_update(enabled=True, force=True) is None
+    assert len(calls) == 3
+    with catalog.connect() as conn:
+        assert catalog.meta(conn)["data_sha256"] == digest
+
+
+def test_an_older_snapshot_cannot_roll_back_a_client(sample_catalog, monkeypatch):
+    asset, digest = make_asset(sample_catalog)
+    calls = []
+    stub_http(monkeypatch, {"catalog_as_of": "2026-09-04", "data_sha256": digest}, asset, calls)
+    assert catalog.maybe_update(enabled=True, force=True) is None
+    assert len(calls) == 1
+
+
 def test_a_corrupted_asset_is_rejected_and_the_old_catalog_survives(sample_catalog, monkeypatch):
     asset, _ = make_asset(sample_catalog)
     calls: list[str] = []

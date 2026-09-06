@@ -178,6 +178,58 @@ def test_a_material_still_present_is_left_alone(home):
         assert index.list_materials(conn, "1")[0]["status"] == "pending"
 
 
+@pytest.mark.parametrize("kind", ["page", "file"])
+def test_a_truncated_listing_preserves_unseen_materials(config, kind):
+    from openmind.materials import Chunk
+
+    endpoint = "pages" if kind == "page" else "files"
+    params = {"published": "true", "per_page": "100"} if kind == "page" else {
+        "sort": "updated_at", "order": "desc", "per_page": "100"
+    }
+
+    def respond(request):
+        if request.url.path == f"/api/v1/courses/1001/{endpoint}":
+            return httpx.Response(200, json=[], headers={
+                "Link": f'<https://bcourses.berkeley.edu/api/v1/courses/1001/{endpoint}?page=2>; rel="next"'
+            })
+        return handler(request)
+
+    with index.connect() as conn:
+        material_id = index.upsert_material(conn, course_id="1001", kind=kind, canvas_id="unseen", title="Older Notes")
+        index.store_chunks(conn, material_id, "Older Notes", [Chunk(ord=0, text="retain this evidence", page_start=1, page_end=1)])
+
+    with course_with(respond) as client, index.connect() as conn:
+        warnings = []
+        Session(config, client)._discover_materials(conn, "1001", warnings, refresh=True)
+        assert client.was_truncated(f"/courses/1001/{endpoint}", params)
+        assert index.get_material(conn, material_id)["status"] == "indexed"
+        assert index.search(conn, "1001", "retain")
+        assert not any("removed from bCourses" in warning for warning in warnings)
+
+
+def test_rediscovering_a_hidden_page_restores_its_text(removable_page):
+    state, session = removable_page
+    session.index_course("1001")
+    state["deleted"] = True
+    session.index_course("1001", refresh=True)
+    state["deleted"] = False
+    session.index_course("1001", refresh=True)
+    assert session.find_materials("1001", query="confounder")["hits"]
+
+
+def test_a_new_revision_resets_exhausted_retries(home):
+    with index.connect() as conn:
+        args = {"course_id": "1", "kind": "page", "canvas_id": "p", "title": "Notes"}
+        material_id = index.upsert_material(conn, **args, source_updated_at="2026-09-01")
+        for _ in range(index.MAX_ATTEMPTS):
+            index.mark(conn, material_id, "failed", "HTTP 503")
+        assert not index.pending(conn, "1", retry_failed=True)
+        index.upsert_material(conn, **args, source_updated_at="2026-09-02")
+        row = index.pending(conn, "1", retry_failed=True)[0]
+        assert row["id"] == material_id
+        assert row["attempts"] == 0 and row["status"] == "pending" and row["status_note"] is None
+
+
 def test_search_results_carry_the_date_the_index_was_built(session: Session):
     session.index_course("1001")
     assert session.find_materials("1001", query="confounder")["indexed_at"].startswith("20")

@@ -1,11 +1,13 @@
 # Acceptance checklist
 
-Run before tagging a release. Everything here needs a real AI app and a real bCourses
-account, so none of it is in CI. Record the host version and account tier, and mark each
-line pass or fail — a partial pass is a fail.
+Run before tagging a release. The host and live-account checks need a real AI app and
+your own bCourses account, so none of them are established by CI. Public catalog checks
+need no bCourses account. Record the host version and account tier, and mark each line
+pass or fail — a partial pass is a fail. Never mark a fixture or stdio test as a host pass.
 
 Automated first: `ruff check src tests scripts`, `pytest -q`, `python -m build`,
-`twine check dist/*`, and `PYTHONPATH=src:. python .context/mcp_review_probes.py`.
+`twine check dist/*`, and the website build. All regression tests live under `tests/`;
+no ignored workspace scripts are required.
 
 ## Per host
 
@@ -13,7 +15,7 @@ Do this for **Claude Desktop**, **ChatGPT desktop**, **Claude Code**, and **Curs
 
 | # | Step | Pass |
 |---|---|---|
-| 0 | `uv tool install openmind-berkeley` on a machine with no previous install | |
+| 0 | Install the newly built wheel on a clean machine; public catalog tools work without setup or a token | |
 | 1 | `openmind setup` with your own token: connects, names you, reports your time zone, lists your courses | |
 | 2 | `openmind mcp --write claude-desktop` / `--write cursor` / `--write claude-code`; ChatGPT desktop: add the printed command in the app | |
 | 3 | Restart the host completely. It lists 12 tools and 5 prompts | |
@@ -42,24 +44,34 @@ Do these once, on any host.
 
 On a Windows machine, with Claude Desktop:
 
-- `uv tool install openmind-berkeley`, then `openmind setup` — the token goes into
-  Credential Manager, and `getpass` does not echo it.
+- Install the new wheel, then `openmind setup` — the token goes into Credential
+  Manager, and `getpass` does not echo it.
 - `openmind mcp --write claude-desktop --yes` writes `%APPDATA%\Claude\claude_desktop_config.json`.
 - `openmind doctor` runs clean, with no encoding errors in the output.
 - One tool call from Claude Desktop returns real data.
+- From a path containing spaces, `openmind mcp --write claude-code` registers the full
+  command. Printed PowerShell commands also run without splitting the path.
 
 ## Data pipeline
 
 - Trigger `refresh-data.yml` manually. It runs the parser fixtures first, then the
-  crawl; confirm it commits `src/openmind/data/` and publishes a `data-<date>` release.
+  crawl; confirm it publishes a `data-<date>-<content-id>` asset, verifies its digest,
+  and only then commits `src/openmind/data/`.
+- Commit a locally refreshed snapshot with a blank hash, then use `publish_only`.
+  Confirm the asset and final manifest are published without a crawl. Rerunning it
+  with unchanged data must reuse the asset without a commit.
 - On a fresh `OPENMIND_HOME` with no token, run `openmind update-data`. It builds from
   the packaged snapshot, then picks up the published asset and verifies its SHA-256.
 - Corrupt a copy of the asset and confirm the client rejects it and keeps the old
   catalog.
+- A same-day correction with a different hash is installed. An older-date snapshot
+  is rejected, including with a forced update.
 - `openmind config --set data_updates=false`, then confirm no GitHub request is made.
 
 ## Before tagging
 
 - `CHANGELOG.md` describes this version in the words a student would use.
-- The website builds and its install command matches what PyPI will serve.
+- The website builds and its install command names an available source or release.
+- The "Who can use this" paragraph reads the same in `docs/SETUP.md`, `docs/PRIVACY.md`,
+  and the connect guide.
 - `docs/PRIVACY.md` still lists exactly the network destinations the code contacts.

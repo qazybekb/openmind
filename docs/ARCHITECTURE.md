@@ -1,6 +1,6 @@
 # Architecture
 
-About 2,600 lines of Python, in three layers that never reach past each other.
+Three layers separate the MCP protocol, academic operations, and data access.
 
 ```
 AI host (Claude, Cursor, ChatGPT)
@@ -15,7 +15,7 @@ AI host (Claude, Cursor, ChatGPT)
         ├── agenda.py     What's due, what it's worth, when to start (pure functions)
         ├── pedagogy.py   Tutoring protocol as data
         ├── index.py      Opt-in FTS5 search over course materials
-        ├── materials.py  Bounded document extraction
+        ├── materials.py  Downloads and bounded extraction via extract_worker.py
         ├── catalog.py    Berkeley catalog + per-term offerings (SQLite)
         └── schedule.py   Live sections from classes.berkeley.edu
         │
@@ -64,6 +64,12 @@ tool surface is fixed before any document is read, so a slide that says "ignore 
 instructions" changes nothing. Search queries are tokenised and quoted before reaching
 FTS5, so neither a document title nor a model can inject query operators.
 
+PDF, PPTX, and DOCX parsers run in `extract_worker.py`, with a parent-enforced
+20-second timeout that kills and reaps the child. Input and output travel through
+pipes and the child does not inherit Canvas credentials. Size, decompression, page,
+and text caps apply on every platform; POSIX workers also disable core dumps and
+attempt an address-space cap. This is not an OS sandbox or a Windows memory limit.
+
 ### Stdio hygiene
 
 A host spawns `openmind-mcp` and waits for a protocol frame on stdout. Nothing else may
@@ -86,6 +92,12 @@ the university's calendar. A scheduled job re-exports them, publishes a hashed a
 and clients pick it up within a day after verifying the SHA-256. A student gets current
 course data without upgrading anything, and the job needs only the repository token.
 
+Publication runs even when crawling reports unchanged. `prepare_data_release.py`
+creates deterministic, content-addressed assets; the workflow verifies the uploaded
+asset before committing its hash to the public manifest. A publish-only mode handles
+locally refreshed data without another crawl. Clients accept a changed hash on the
+same date, but do not install older-date snapshots.
+
 `classes.berkeley.edu` refuses GitHub-hosted runners with HTTP 403, so that job refreshes
 the catalogs and carries the previous offerings forward untouched rather than failing;
 the offerings themselves are refreshed from a machine the site answers
@@ -103,7 +115,7 @@ the shipped snapshot is over a year old.
 | OS credential store | The bCourses token | After setup |
 | `~/.openmind/mcp/config.json` | Enabled courses, time zone, preferences (0600) | After setup |
 | `~/.openmind/mcp/index.db` | Extracted course material text (0600) | Only for courses you index |
-| `~/.openmind/mcp/catalog.db` | The public Berkeley catalog | After setup |
+| `~/.openmind/mcp/catalog.db` | The public Berkeley catalog | After the first catalog lookup, update-data, or setup |
 
 Deadlines and grades are never written to disk. They live in a 5-minute in-memory cache
 that dies with the process.

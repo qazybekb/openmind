@@ -26,19 +26,21 @@ Learning for guidance on personal-token use and follow whatever comes back.
 ## 1. Install
 
 ```bash
+uv tool install git+https://github.com/qazybekb/openmind.git
+```
+
+From a checkout of this repository:
+
+```bash
+uv tool install .
+```
+
+PyPI publication is pending. Once the corrected release is published, either of these
+will install it into an isolated environment:
+
+```bash
 uv tool install openmind-berkeley
-```
-
-Or with pipx:
-
-```bash
 pipx install openmind-berkeley
-```
-
-Or run it without installing anything permanently:
-
-```bash
-uvx --from openmind-berkeley openmind setup
 ```
 
 ## 2. Connect your bCourses account
@@ -68,7 +70,7 @@ Setup then:
 - builds a local index of the public Berkeley course catalog, for course planning.
 
 Course *materials* — slides, readings, pages — are **not** stored unless you ask. See
-step 4.
+step 5.
 
 ### If your machine has no credential store
 
@@ -132,9 +134,10 @@ Add the same JSON block to `~/.cursor/mcp.json`, then reload Cursor.
 
 ### ChatGPT desktop
 
-In settings, add a local (STDIO) MCP server with the command `openmind mcp` printed.
-Local MCP support varies by plan — if you don't see the option, check your plan's
-documentation.
+Open Settings > MCP servers > Add server, choose STDIO, and enter the command
+`openmind mcp` printed. Save and restart. See the
+[official OpenAI MCP guide](https://learn.chatgpt.com/docs/extend/mcp) for current
+desktop configuration; availability in your host must be checked during acceptance.
 
 ## 4. Ask a question
 

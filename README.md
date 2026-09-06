@@ -1,7 +1,6 @@
 # OpenMind
 
 [![CI](https://github.com/qazybekb/openmind/actions/workflows/ci.yml/badge.svg)](https://github.com/qazybekb/openmind/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/openmind-berkeley)](https://pypi.org/project/openmind-berkeley/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **Your bCourses, in Claude.** A read-only Canvas connector for UC Berkeley students that
@@ -15,7 +14,7 @@ citing the page.
 ```
 You:  what's due this week?
 
-Claude:  Two things, and one is overdue.
+Claude:  Three items, including one overdue.
 
          OVERDUE — Causal Inference: Problem Set 4, was due Tue Sep 1, 11:59 PM.
          Still submittable; it's 20% of your grade.
@@ -46,12 +45,17 @@ app**.
 ## Install
 
 ```bash
-uv tool install openmind-berkeley     # or: pipx install openmind-berkeley
-openmind setup                        # paste a bCourses token, pick your courses
-openmind mcp                          # prints the config for your AI app
+uv tool install git+https://github.com/qazybekb/openmind.git
+openmind setup                       # paste a bCourses token, pick your courses
+openmind mcp                         # prints the config for your AI app
 ```
 
+From a local checkout, use `uv tool install .`. PyPI publication is pending; once the
+corrected release is available, `uv tool install openmind-berkeley` is an alternative.
+`pipx install openmind-berkeley` is equivalent once that release is on PyPI.
+
 Then paste that config into your AI app, restart it, and ask "what's due this week?".
+Catalog search, catalog details, and offering checks work without a bCourses token.
 Full walkthrough: [docs/SETUP.md](docs/SETUP.md).
 
 ## What you can ask
