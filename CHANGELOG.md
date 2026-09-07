@@ -28,6 +28,10 @@ Found by running a real account through every Canvas-backed tool over stdio.
   consent and intake items are now paperwork (0.25 h) whatever they are forms for.
 - Subprocess tests never consult the developer's real credential store or reach GitHub.
   `OPENMIND_CREDENTIAL_STORE=none` disables the OS store for a process.
+- The daily data job republished an identical graduate catalog on 2026-09-06 because
+  Coursedog served the same rows in a different order. Catalog rows are now sorted
+  before rendering, and the packaged files are sorted once, so an unchanged catalog
+  stops the job without a new asset, manifest commit, or client download.
 
 ## 2.0.1 — 2026-09-05
 

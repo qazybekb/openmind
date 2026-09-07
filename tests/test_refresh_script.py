@@ -95,6 +95,20 @@ def test_the_unfiltered_export_drops_the_printed_catalog_restriction(refresh):
     assert "status" in names and "courseApproved" in names
 
 
+def test_rendered_catalogs_do_not_depend_on_the_export_order(refresh):
+    """Coursedog reorders its export between days; identical rows must render identically."""
+    fieldnames = ["Subject", "Course Number", "Course Title", "In Printed Catalog"]
+    rows = [
+        {"Subject": "MECENG", "Course Number": "253", "Course Title": "Optics", "In Printed Catalog": "1"},
+        {"Subject": "ENGIN", "Course Number": "238E", "Course Title": "Robust Optimization", "In Printed Catalog": "1"},
+        {"Subject": "ENGIN", "Course Number": "238E", "Course Title": "Robust Optimization", "In Printed Catalog": "0"},
+    ]
+    forward = refresh.render_csv(rows, fieldnames)
+    backward = refresh.render_csv(list(reversed(rows)), fieldnames)
+    assert forward == backward
+    assert forward.splitlines()[1].startswith("ENGIN,238E,Robust Optimization,0")
+
+
 def test_the_content_hash_is_stable_and_order_independent(refresh, tmp_path: Path):
     first = tmp_path / "a.csv"
     second = tmp_path / "b.csv"

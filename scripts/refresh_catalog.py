@@ -311,12 +311,30 @@ def coverage_problems(rows: list[dict[str, str]], previous: list[dict[str, str]]
 OFFERING_FIELDS = ["subject", "number", "term", "section_count", "instruction_modes", "instructors"]
 
 
+def catalog_order(fieldnames: list[str]):
+    """Return a sort key that puts catalog rows in one order whatever order they arrived in.
+
+    Coursedog's export serves the same rows in a different order from one day to the
+    next. On 2026-09-06 the daily job republished a graduate catalog whose every row
+    had moved and none had changed: a new asset, a new manifest commit, and a download
+    for every student for nothing. Sorting on subject, number, then the whole row makes
+    "unchanged" mean what it says.
+    """
+    lead = [name for name in ("Subject", "Course Number") if name in fieldnames]
+    rest = [name for name in fieldnames if name not in lead]
+
+    def key(row: dict[str, str]) -> tuple[str, ...]:
+        return tuple(str(row.get(name, "") or "") for name in (*lead, *rest))
+
+    return key
+
+
 def render_csv(rows: list[dict[str, str]], fieldnames: list[str]) -> str:
-    """Render rows as CSV text with stable ordering."""
+    """Render rows as CSV text in a stable order, whatever order they arrived in."""
     buffer = io.StringIO(newline="")
     writer = csv.DictWriter(buffer, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
-    writer.writerows(rows)
+    writer.writerows(sorted(rows, key=catalog_order(fieldnames)))
     return buffer.getvalue()
 
 
@@ -452,9 +470,7 @@ def main() -> int:
 
     if not note:
         path = out / "term_offerings.csv"
-        pending[path] = render_csv(
-            sorted(offerings, key=lambda r: (r["term"], r["subject"], r["number"])), OFFERING_FIELDS
-        )
+        pending[path] = render_csv(offerings, OFFERING_FIELDS)
         log(f"{path}: {len(offerings)} rows")
 
     # "Changed" is a claim about the data this run rebuilt. A run that deliberately left
