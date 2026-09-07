@@ -49,8 +49,8 @@ clients are all gone, and a test asserts they do not come back.
 
 ## Releasing code
 
-Versions 2.0.0 and 2.0.1 are already tagged. Do not move a tag or upload changed files
-under the same version; every change ships as a new patch version (2.0.2 is next).
+Versions 2.0.0, 2.0.1, and 2.0.2 are already tagged. Do not move a tag or upload changed
+files under the same version; every change ships as a new patch version.
 
 ```bash
 uv run python -m build --outdir .context/release-dist
