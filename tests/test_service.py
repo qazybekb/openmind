@@ -11,7 +11,7 @@ from openmind import index
 from openmind.canvas import CanvasClient
 from openmind.config import ConfigError
 from openmind.service import BUDGETS, ServiceError, Session, shrink
-from tests.conftest import NOW_UTC, handler
+from tests.conftest import COURSES, NOW_UTC, TZ, handler
 
 # -- courses -------------------------------------------------------------------
 
@@ -122,6 +122,44 @@ def test_a_course_that_403s_makes_the_payload_partial_rather_than_empty(config, 
     assert payload["partial"] is True
     assert any("NLP" in note for note in payload["warnings"])
     assert payload["items"], "items must still be returned for the courses that worked"
+
+
+def test_weights_are_read_only_for_courses_with_work_in_the_window(home, monkeypatch):
+    """A student keeps old courses enabled for their materials; deadlines must not pay for them.
+
+    Twenty enabled courses cost twenty weight requests before this — thirteen seconds on
+    a real account — when only the handful with Planner items needed one.
+    """
+    from openmind.config import Config
+
+    cfg = Config(
+        {
+            "canvas_url": "https://bcourses.berkeley.edu", "time_zone": TZ, "user_name": "Test Student",
+            "courses": {"1001": "Causal Inference", "1002": "NLP", "1003": "Old Course"},
+            "index_enabled": [], "capacity_hours_per_day": 2.0, "data_updates": False,
+        },
+        home / "config.json",
+    )
+    seen: list[str] = []
+
+    def counting(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/courses"):
+            old_course = {**COURSES[0], "id": 1003, "name": "INFO 288 - Old Course", "course_code": "INFO 288"}
+            return httpx.Response(200, json=[*COURSES, old_course], request=request)
+        if request.url.path.endswith("/assignment_groups"):
+            seen.append(request.url.path)
+        if request.url.path.endswith("/courses/1003/assignment_groups"):
+            return httpx.Response(200, json=[], request=request)
+        return handler(request)
+
+    client = CanvasClient("https://bcourses.berkeley.edu", "t", transport=httpx.MockTransport(counting))
+    payload = Session(cfg, client, clock=NOW_UTC).deadlines(window="2weeks")
+    client.close()
+
+    assert not any("Old Course" in note for note in payload["warnings"]), "the third course must be enabled and found"
+    assert payload["items"], "the courses with work must still be answered"
+    assert not any("/1003/" in path for path in seen), "a course with nothing due costs no weight request"
+    assert {path.split("/")[-2] for path in seen} == {"1001", "1002"}
 
 
 def test_planner_failure_falls_back_to_assignments_and_says_so(config):

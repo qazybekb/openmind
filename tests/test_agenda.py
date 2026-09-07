@@ -134,6 +134,9 @@ def test_an_item_without_a_due_date_is_undated(weights: agenda.WeightTable):
         ("Reading response 2", "assignment", 10, 1.5),
         ("Reading: Chapter 4", "assignment", 5, 0.75),
         ("Course survey", "assignment", 1, 0.25),
+        ("[Teaming] Final Project Team Interest Form", "assignment", 0, 0.25),
+        ("Get to Know You: Intro Form", "assignment", 1, 0.25),
+        ("A Survey of Transformer Architectures (paper)", "assignment", 100, 6.0),
         ("Widget", "assignment", 40, 4.0),
     ],
 )
@@ -321,4 +324,5 @@ def test_rendered_items_carry_both_machine_and_human_dates(weights: agenda.Weigh
     assert payload["due_local"].startswith("2026-09-04T23:59")
     assert payload["days"] == 0
     assert payload["weight_pct"] == 20.0
-    assert payload["start_by_human"].startswith("Fri Sep 4")
+    assert payload["start_by"].startswith("Fri Sep 4")
+    assert "url" not in payload  # derivable from course_id + assignment_id; kept off the wire

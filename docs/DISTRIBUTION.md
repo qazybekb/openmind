@@ -49,8 +49,8 @@ clients are all gone, and a test asserts they do not come back.
 
 ## Releasing code
 
-Version 2.0.0 is already tagged. Do not move that tag or upload changed files under
-the same version. These fixes are prepared as 2.0.1, not yet published.
+Versions 2.0.0 and 2.0.1 are already tagged. Do not move a tag or upload changed files
+under the same version; every change ships as a new patch version (2.0.2 is next).
 
 ```bash
 uv run python -m build --outdir .context/release-dist
@@ -59,7 +59,7 @@ uv run python -m twine check .context/release-dist/*
 
 Before tagging, run [ACCEPTANCE.md](ACCEPTANCE.md), including real-host checks, and
 confirm the public repository contains the intended commit. Creating and pushing a
-new `v2.0.1` tag starts `publish.yml`; do not also run `twine upload` locally. A manual
+new `v2.0.x` tag starts `publish.yml`; do not also run `twine upload` locally. A manual
 workflow run on a branch only builds artifacts, while a tag permits PyPI publication.
 
 ### PyPI owner action

@@ -33,8 +33,15 @@ def _fallback_path() -> Path:
     return home_dir() / "token"
 
 
+NO_STORE_ENV: Final[str] = "OPENMIND_CREDENTIAL_STORE"
+
+
 def keyring_available() -> bool:
     """Return whether a usable OS credential store is present."""
+    # Tests and CI set this to "none" so a developer's real credential store is never
+    # consulted, and never mistaken for a fixture.
+    if os.environ.get(NO_STORE_ENV, "").strip().lower() == "none":
+        return False
     try:
         import keyring
         from keyring.backends.fail import Keyring as FailKeyring

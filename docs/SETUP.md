@@ -65,8 +65,12 @@ Setup then:
 
 - confirms who you are and reads your time zone from your Canvas profile, so deadlines
   come out on the right day;
-- lists your active courses and asks which ones to share. **Courses you leave out are
-  invisible to every tool**, so leave out anything you would rather your AI app not see;
+- lists your active courses and asks which ones to share. bCourses keeps every past
+  course "active", so the list runs back years; pressing Enter shares the newest term's
+  courses, typing `all` shares everything, and numbers pick exactly. **Courses you leave
+  out are invisible to every tool**, so leave out anything you would rather your AI app
+  not see. Re-run `openmind setup` any time to change the selection; press Enter at the
+  token prompt to keep the token you already stored;
 - builds a local index of the public Berkeley course catalog, for course planning.
 
 Course *materials* — slides, readings, pages — are **not** stored unless you ask. See

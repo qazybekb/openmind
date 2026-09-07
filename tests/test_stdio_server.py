@@ -26,6 +26,9 @@ STARTUP_BUDGET_S = 5.0
 @pytest.fixture
 def server(home: Path) -> StdioServerParameters:
     """Launch parameters pointing at this checkout with an isolated home."""
+    # The spawned process is outside the in-process fixtures, so the file it reads
+    # must say what they would: no update check against GitHub during a test.
+    (home / "config.json").write_text(json.dumps({"data_updates": False}), encoding="utf-8")
     return StdioServerParameters(
         command=sys.executable,
         args=["-m", "openmind.server"],
@@ -33,6 +36,7 @@ def server(home: Path) -> StdioServerParameters:
             "PATH": os.environ.get("PATH", ""),
             "PYTHONPATH": str(REPO_ROOT / "src"),
             "OPENMIND_HOME": os.environ["OPENMIND_HOME"],
+            "OPENMIND_CREDENTIAL_STORE": "none",
             "HOME": os.environ.get("HOME", "/tmp"),
             "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
         },

@@ -41,7 +41,14 @@ def bare_environment() -> dict[str, str]:
     OpenMind's own code runs. Those variables belong to the operating system, not to
     OpenMind's configuration, so keeping them gives up nothing this check is about.
     """
-    environment = {"PATH": "/usr/bin:/bin", "PYTHONPATH": str(REPO_ROOT / "src"), "HOME": "/tmp"}
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "PYTHONPATH": str(REPO_ROOT / "src"),
+        "HOME": "/tmp",
+        # A developer who has run `openmind setup` for real has a token in their keychain;
+        # the contract is about a machine with nothing configured.
+        "OPENMIND_CREDENTIAL_STORE": "none",
+    }
     if os.name == "nt":
         for name in ("SYSTEMROOT", "PATHEXT", "TEMP", "TMP", "USERPROFILE"):
             value = os.environ.get(name)

@@ -241,6 +241,7 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     target.mkdir()
     monkeypatch.setenv("OPENMIND_HOME", str(target))
     monkeypatch.delenv("OPENMIND_CANVAS_TOKEN", raising=False)
+    monkeypatch.setenv("OPENMIND_CREDENTIAL_STORE", "none")
     return target
 
 
@@ -253,6 +254,9 @@ def isolated_host_configs(tmp_path_factory, monkeypatch: pytest.MonkeyPatch) -> 
     """
     target = tmp_path_factory.mktemp("hostconfig")
     monkeypatch.setenv("OPENMIND_HOST_CONFIG_DIR", str(target))
+    # Same reasoning for the OS credential store: a developer who has run `openmind setup`
+    # for real has a token in their keychain, and no test may see it.
+    monkeypatch.setenv("OPENMIND_CREDENTIAL_STORE", "none")
     return target
 
 

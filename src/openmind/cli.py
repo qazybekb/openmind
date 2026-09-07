@@ -12,8 +12,10 @@ import contextlib
 import json
 import logging
 import os
+import re
 import shutil
 import sys
+from dataclasses import dataclass
 from datetime import date
 from getpass import getpass
 from pathlib import Path
@@ -29,7 +31,15 @@ MIN_PYTHON: Final[tuple[int, int]] = (3, 11)
 # Berkeley publishes a new catalog each academic year; four months without an update
 # means the update path is broken, not that nothing changed.
 STALE_CATALOG_DAYS: Final[int] = 120
-MAX_NICKNAME_LENGTH: Final[int] = 40
+# Long enough for a full Berkeley course title; a title cut mid-phrase reads worse in a
+# deadline list than a long one.
+MAX_NICKNAME_LENGTH: Final[int] = 60
+# bCourses appends the term to many course names; the term field already carries it.
+_TERM_SUFFIX: Final[re.Pattern[str]] = re.compile(
+    r"\s*[\(\[]\s*(?:fall|spring|summer|winter)\s+\d{4}\s*[\)\]]\s*$", re.IGNORECASE
+)
+_TERM_NAME: Final[re.Pattern[str]] = re.compile(r"(winter|spring|summer|fall)\s+(\d{4})", re.IGNORECASE)
+_SEASON_ORDER: Final[dict[str, int]] = {"winter": 0, "spring": 1, "summer": 2, "fall": 3}
 TOKEN_HELP: Final[str] = (
     "Create one in bCourses: Account -> Settings -> Approved Integrations -> + New Access Token."
 )
@@ -71,8 +81,13 @@ def cmd_setup(args: argparse.Namespace) -> int:
     out("")
 
     token = os.environ.get(secrets.ENV_VAR, "").strip()
+    stored = "" if token else (secrets.get_token() or "")
     if token:
         out(f"Using the token from ${secrets.ENV_VAR}.")
+    elif stored:
+        # Changing which courses are shared should not cost a new token.
+        out(f"A bCourses token is already stored ({secrets.mask(stored)}).")
+        token = getpass("Paste a new token, or press Enter to keep it: ").strip() or stored
     else:
         out(f"Paste your bCourses access token. {TOKEN_HELP}")
         out("It is stored in your operating system's credential store, not in a file.")
@@ -103,7 +118,11 @@ def cmd_setup(args: argparse.Namespace) -> int:
         return 1
 
     active = [
-        (str(course.get("id")), _nickname(str(course.get("name") or ""), str(course.get("course_code") or "")))
+        Listed(
+            id=str(course.get("id")),
+            nickname=_nickname(str(course.get("name") or ""), str(course.get("course_code") or "")),
+            term=_term_name(course),
+        )
         for course in courses
         if course.get("id")
     ]
@@ -112,12 +131,16 @@ def cmd_setup(args: argparse.Namespace) -> int:
         client.close()
         return 1
 
-    out("Your active courses:")
-    for position, (course_id, nickname) in enumerate(active, start=1):
-        out(f"  {position:2d}. {nickname}  (id {course_id})")
+    current = _current_term_courses(active)
+    out("Your active courses (* = current term):")
+    for position, course in enumerate(active, start=1):
+        marker = "*" if course.id in current else " "
+        term = f"  [{course.term}]" if course.term else ""
+        out(f"  {position:2d}. {marker} {course.nickname}{term}  (id {course.id})")
     out("")
     out("OpenMind shares only the courses you choose here with your AI app.")
-    chosen = _select(active, args.all_courses)
+    out("Sharing a course lets your AI app read its assignments, grades, and materials.")
+    chosen = _select(active, current, args.all_courses)
     if not chosen:
         err("No courses selected. Nothing was changed.")
         client.close()
@@ -169,26 +192,70 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return 0
 
 
+@dataclass(frozen=True)
+class Listed:
+    """One course as setup shows it."""
+
+    id: str
+    nickname: str
+    term: str
+
+
 def _nickname(name: str, code: str) -> str:
     """Shorten a Canvas course name into something a student would say out loud."""
     nickname = name.split(" - ")[-1].strip() if " - " in name else name.strip()
+    nickname = _TERM_SUFFIX.sub("", nickname).strip()
     nickname = nickname or code or "Course"
     if len(nickname) > MAX_NICKNAME_LENGTH:
         nickname = nickname[:MAX_NICKNAME_LENGTH].rsplit(" ", 1)[0]
     return nickname
 
 
-def _select(active: list[tuple[str, str]], take_all: bool) -> list[tuple[str, str]]:
-    """Ask which courses to share, defaulting to all of them."""
-    if take_all or not sys.stdin.isatty():
-        return active
-    answer = input("Numbers to share, comma separated, or Enter for all: ").strip()
+def _term_name(course: dict[str, Any]) -> str:
+    """Return the course's term name as bCourses spells it, or an empty string."""
+    term = course.get("term") if isinstance(course.get("term"), dict) else {}
+    return str(term.get("name") or "").strip()
+
+
+def _term_rank(term: str) -> tuple[int, int] | None:
+    """Order 'Fall 2026' after 'Spring 2026'; None for terms that are not named that way."""
+    match = _TERM_NAME.search(term)
+    if match is None:
+        return None
+    return int(match.group(2)), _SEASON_ORDER[match.group(1).lower()]
+
+
+def _current_term_courses(active: list[Listed]) -> set[str]:
+    """Return the ids of the courses in the newest term.
+
+    bCourses keeps every past course "active" and gives its terms no end date, so a
+    student's list runs years back. The newest term is the one they are taking now, or
+    about to; a term this function cannot read (a programme year like "SHAPE 2026-2027")
+    is kept rather than hidden, since hiding a live course is the costlier mistake.
+    """
+    ranks = {course.id: _term_rank(course.term) for course in active}
+    known = [rank for rank in ranks.values() if rank is not None]
+    newest = max(known) if known else None
+    return {cid for cid, rank in ranks.items() if rank is None or rank == newest}
+
+
+def _select(active: list[Listed], current: set[str], take_all: bool) -> list[tuple[str, str]]:
+    """Ask which courses to share, defaulting to the current term's."""
+    everything = [(course.id, course.nickname) for course in active]
+    default = [(course.id, course.nickname) for course in active if course.id in current]
+    if take_all:
+        return everything
+    if not sys.stdin.isatty():
+        return default
+    answer = input(f"Numbers to share, comma separated; Enter for the {len(default)} current; 'all' for all: ").strip()
     if not answer:
-        return active
+        return default
+    if answer.lower() == "all":
+        return everything
     chosen: list[tuple[str, str]] = []
     for part in answer.replace(" ", "").split(","):
         if part.isdigit() and 1 <= int(part) <= len(active):
-            chosen.append(active[int(part) - 1])
+            chosen.append(everything[int(part) - 1])
     return chosen
 
 
@@ -665,7 +732,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     setup = subparsers.add_parser("setup", help="store your bCourses token and choose courses")
-    setup.add_argument("--all-courses", action="store_true", help="share every active course without asking")
+    setup.add_argument("--all-courses", action="store_true",
+                       help="share every active course, past terms included, without asking")
     setup.add_argument("--index", action="store_true", help="index course materials for the chosen courses now")
     setup.add_argument("--allow-file-secrets", action="store_true",
                        help="fall back to a 0600 file if no OS credential store is available")

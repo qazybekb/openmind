@@ -2,6 +2,33 @@
 
 All notable changes to OpenMind are recorded here.
 
+## 2.0.2 — 2026-09-06
+
+Found by running a real account through every Canvas-backed tool over stdio.
+
+### Changed
+- `openmind setup` marks the newest term's courses and shares only those by default.
+  bCourses keeps every past course "active" with no term end date, so "Enter for all"
+  shared two years of courses. Type `all` to share everything; re-running setup keeps
+  the stored token when you press Enter at the token prompt.
+- Course nicknames keep their full title (up to 60 characters) and drop a trailing
+  "(Fall 2026)", which the term field already carries.
+- `get_deadlines` reads the Planner first and fetches grade weights only for courses
+  with work in the window, a few at a time. A twenty-course account went from 13 s to
+  about 2 s.
+- Deadline items are leaner: one human `start_by` date, no URL (derivable from the ids),
+  and confidence only when it is low. Budgets for `list_courses`, `get_deadlines`, and
+  `get_grades` are sized for twenty enabled courses, and the omission note for course
+  lists says to share fewer courses rather than to narrow a query.
+- A catalog answer that refreshed its snapshot from GitHub reports that as `data_note`,
+  not as a warning: the answer is more complete, not less, so `partial` stays false.
+
+### Fixed
+- "Final Project Team Interest Form" was estimated at 15 hours; forms, questionnaires,
+  consent and intake items are now paperwork (0.25 h) whatever they are forms for.
+- Subprocess tests never consult the developer's real credential store or reach GitHub.
+  `OPENMIND_CREDENTIAL_STORE=none` disables the OS store for a process.
+
 ## 2.0.1 — 2026-09-05
 
 ### Changed

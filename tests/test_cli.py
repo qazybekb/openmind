@@ -328,11 +328,60 @@ def test_clear_says_what_it_will_delete_before_doing_it(config, capsys):
         ("STAT 156 - Causal Inference", "STAT 156", "Causal Inference"),
         ("Causal Inference", "STAT 156", "Causal Inference"),
         ("", "STAT 156", "STAT 156"),
-        ("x" * 60, "C", "x" * 40),
+        ("x" * 70, "C", "x" * 60),
+        ("EW & MBA 277-LEC-012 - Ethical AI Business Design (Spring 2026)", "MBA 277", "Ethical AI Business Design"),
+        ("Theory and Practice of Tangible User Interfaces (Fall 2026)", "INFO 262",
+         "Theory and Practice of Tangible User Interfaces"),
     ],
 )
 def test_course_nicknames_are_readable(name: str, code: str, expected: str):
     assert cli._nickname(name, code) == expected
+
+
+def test_rerunning_setup_keeps_the_stored_token_on_enter(home: Path, canvas, monkeypatch, capsys):
+    """Re-choosing courses must not send a student back to bCourses for another token."""
+    monkeypatch.delenv(secrets.ENV_VAR, raising=False)
+    monkeypatch.setattr(secrets, "get_token", lambda: "already-stored-token-0123456789")
+    stored: list[str] = []
+    monkeypatch.setattr(secrets, "set_token", lambda token, allow_file=False: stored.append(token) or "keyring")
+    monkeypatch.setattr(cli, "getpass", lambda prompt: "")
+
+    code, out, _ = run(["setup", "--all-courses"], capsys)
+    assert code == 0
+    assert stored == ["already-stored-token-0123456789"]
+    assert "already stored" in out
+    assert "already-stored-token" not in out, "the token must never be printed"
+
+
+def test_setup_defaults_to_the_newest_term_but_all_can_still_be_asked_for():
+    """bCourses never retires a course, so 'all' would share two years of history by default."""
+    listed = [
+        cli.Listed("1", "Old", "Fall 2025"),
+        cli.Listed("2", "Last", "Spring 2026"),
+        cli.Listed("3", "Now", "Fall 2026"),
+        cli.Listed("4", "Also now", "Fall 2026"),
+        cli.Listed("5", "Programme", " SHAPE 2026-2027"),
+    ]
+    current = cli._current_term_courses(listed)
+    assert current == {"3", "4", "5"}
+    assert [cid for cid, _ in cli._select(listed, current, take_all=True)] == ["1", "2", "3", "4", "5"]
+
+
+def test_setup_without_a_terminal_shares_the_current_term(monkeypatch):
+    listed = [cli.Listed("1", "Old", "Fall 2025"), cli.Listed("2", "Now", "Fall 2026")]
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
+    assert cli._select(listed, {"2"}, take_all=False) == [("2", "Now")]
+
+
+def test_setup_accepts_numbers_or_all_at_the_prompt(monkeypatch):
+    listed = [cli.Listed("1", "Old", "Fall 2025"), cli.Listed("2", "Now", "Fall 2026")]
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda prompt: "all")
+    assert cli._select(listed, {"2"}, take_all=False) == [("1", "Old"), ("2", "Now")]
+    monkeypatch.setattr("builtins.input", lambda prompt: "1")
+    assert cli._select(listed, {"2"}, take_all=False) == [("1", "Old")]
+    monkeypatch.setattr("builtins.input", lambda prompt: "")
+    assert cli._select(listed, {"2"}, take_all=False) == [("2", "Now")]
 
 
 # -- Windows console -----------------------------------------------------------

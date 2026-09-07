@@ -20,14 +20,15 @@ import json
 import logging
 import sqlite3
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Final
+from typing import Any, Final, TypeVar
 
 from openmind import agenda, catalog, index, materials, pedagogy, schedule
 from openmind.cache import TTLCache
-from openmind.canvas import CanvasClient, CanvasError
+from openmind.canvas import CanvasClient, CanvasError, JsonList
 from openmind.config import Config
 from openmind.timeutil import UTC, human, iso, now, to_local, zone
 
@@ -38,17 +39,23 @@ OFFERING_CACHE_S: Final[float] = 24 * 3600
 MAX_ANNOUNCEMENTS: Final[int] = 10
 MAX_RUBRIC_ROWS: Final[int] = 12
 MAX_GRADED: Final[int] = 20
+# Concurrent Canvas reads when a question touches several courses.
+FAN_OUT_WORKERS: Final[int] = 4
+
+T = TypeVar("T")
 # Room kept back for the "continues, call again with cursor=N" line.
 _CONTINUATION_ALLOWANCE: Final[int] = 160
 # Slack for JSON escaping of the prose plus the cursor field it may add.
 _JSON_STRING_OVERHEAD: Final[int] = 220
 
 BUDGETS: Final[dict[str, int]] = {
-    "list_courses": 1_500,
-    "get_deadlines": 4_000,
+    # Sized for a real account: bCourses keeps every past course active, so a student who
+    # shares two years of courses has twenty entries here, each about 220 bytes.
+    "list_courses": 8_000,
+    "get_deadlines": 8_000,
     "get_assignment": 5_000,
     "get_course_overview": 6_000,
-    "get_grades": 2_000,
+    "get_grades": 4_000,
     "find_materials": 4_000,
     "read_material": 6_000,
     "prepare_study_session": 6_000,
@@ -78,7 +85,7 @@ def encoded_size(payload: Any) -> int:
     return len(json.dumps(payload, default=str, separators=(",", ":")))
 
 
-def shrink(payload: dict[str, Any], budget: int) -> dict[str, Any]:
+def shrink(payload: dict[str, Any], budget: int, *, advice: str = "narrow the query") -> dict[str, Any]:
     """Trim a payload to a byte budget by dropping list items from the end.
 
     Silent truncation is the failure mode worth avoiding: a host that receives half a
@@ -95,7 +102,7 @@ def shrink(payload: dict[str, Any], budget: int) -> dict[str, Any]:
         """Measure the payload as it will actually be returned, note included."""
         preview = dict(trimmed)
         preview["truncated"] = True
-        preview["warnings"] = [*(trimmed.get("warnings") or []), _omission_note(dropped or 1)]
+        preview["warnings"] = [*(trimmed.get("warnings") or []), _omission_note(dropped or 1, advice)]
         return encoded_size(preview)
 
     for key in _LIST_KEYS:
@@ -107,14 +114,18 @@ def shrink(payload: dict[str, Any], budget: int) -> dict[str, Any]:
             break
 
     if dropped:
-        trimmed["warnings"] = [*(trimmed.get("warnings") or []), _omission_note(dropped)]
+        trimmed["warnings"] = [*(trimmed.get("warnings") or []), _omission_note(dropped, advice)]
         trimmed["truncated"] = True
     return trimmed
 
 
-def _omission_note(dropped: int) -> str:
+def _omission_note(dropped: int, advice: str) -> str:
     """Say plainly that results were left out, and what to do about it."""
-    return f"{dropped} more result(s) omitted to stay within the response size limit; narrow the query."
+    return f"{dropped} more result(s) omitted to stay within the response size limit; {advice}."
+
+
+# What to do when the enabled courses themselves do not fit: there is no query to narrow.
+_FEWER_COURSES: Final[str] = "share fewer courses by running `openmind setup` again"
 
 
 def fit_prose(payload: dict[str, Any], field: str, text: str, offset: int, requested: int,
@@ -303,7 +314,7 @@ class Session:
             "user": {"name": self.cfg.user_name, "tz": self.tz},
             **self.stamp(warnings),
         }
-        return shrink(payload, BUDGETS["list_courses"])
+        return shrink(payload, BUDGETS["list_courses"], advice=_FEWER_COURSES)
 
     # -- deadlines ---------------------------------------------------------
 
@@ -332,29 +343,31 @@ class Session:
         start, end = agenda.resolve_range(window, reference)
         capacity = self.cfg.capacity_hours_per_day
 
-        weights: dict[str, agenda.WeightTable] = {}
-        for cid, course in facts.items():
-            table = self.weight_table(cid, weighted=course.weighted, refresh=refresh)
-            if table is None:
-                warnings.append(f"Grade weights for {course.nickname} could not be read; weights are shown as unknown.")
-                table = agenda.WeightTable()
-            weights[cid] = table
-
         use_assignments = status in {"all", "undated"}
         items: list[agenda.AgendaItem] = []
+        weights: dict[str, agenda.WeightTable] = {}
         skipped = 0
         source = "planner"
 
         if not use_assignments:
             try:
-                items, skipped = self._planner_items(facts, weights, start, end, reference, capacity, refresh=refresh)
+                raw = self._planner_raw(facts, end, reference, refresh=refresh)
             except CanvasError as exc:
                 logger.info("Planner unavailable, falling back to per-course assignments: %s", exc)
                 use_assignments = True
                 warnings.append("bCourses Planner was unavailable; deadlines came from each course's assignment list.")
+            else:
+                # Weights are one request per course, and a student keeps old courses
+                # enabled for their materials. Only the courses with work in the window
+                # need theirs read.
+                present = {str(entry.get("course_id") or "") for entry in raw}
+                weights = self._weight_tables(facts, [cid for cid in facts if cid in present],
+                                              warnings, refresh=refresh)
+                items, skipped = self._build_planner_items(raw, facts, weights, reference, capacity)
 
         if use_assignments:
             source = "assignments"
+            weights = self._weight_tables(facts, list(facts), warnings, refresh=refresh)
             items, failures = self._assignment_items(facts, weights, reference, capacity, refresh=refresh)
             warnings.extend(failures)
 
@@ -429,19 +442,50 @@ class Session:
             payload["remaining"] = len(records) - (offset + emitted)
         return payload
 
-    def _planner_items(self, facts: dict[str, CourseFacts], weights: dict[str, agenda.WeightTable],
-                       start: Any, end: Any, reference: datetime, capacity: float, *,
-                       refresh: bool) -> tuple[list[agenda.AgendaItem], int]:
+    def _fan_out(self, course_ids: Sequence[str], read: Callable[[str], T]) -> dict[str, T]:
+        """Run one Canvas read per course on a few threads, keeping the courses' order.
+
+        The reads are independent GETs against a client and cache built for it; four at
+        a time keeps a twenty-course account under a few seconds without leaning on
+        bCourses harder than a browser tab does. *read* must handle its own errors, so
+        one course's failure never hides the others' answers.
+        """
+        ids = list(course_ids)
+        if len(ids) <= 1:
+            return {cid: read(cid) for cid in ids}
+        with ThreadPoolExecutor(max_workers=min(FAN_OUT_WORKERS, len(ids)), thread_name_prefix="openmind-canvas") as pool:
+            return dict(zip(ids, pool.map(read, ids), strict=True))
+
+    def _weight_tables(self, facts: dict[str, CourseFacts], course_ids: Sequence[str], warnings: list[str], *,
+                       refresh: bool) -> dict[str, agenda.WeightTable]:
+        """Read the weight tables for some courses, noting the ones bCourses would not give."""
+        read = lambda cid: self.weight_table(cid, weighted=facts[cid].weighted, refresh=refresh)  # noqa: E731
+        tables: dict[str, agenda.WeightTable] = {}
+        for cid, table in self._fan_out(course_ids, read).items():
+            if table is None:
+                warnings.append(
+                    f"Grade weights for {facts[cid].nickname} could not be read; weights are shown as unknown."
+                )
+                table = agenda.WeightTable()
+            tables[cid] = table
+        return tables
+
+    def _planner_raw(self, facts: dict[str, CourseFacts], end: Any, reference: datetime, *,
+                     refresh: bool) -> JsonList:
         """Read the Planner, which is the only source with per-student due dates."""
         lookback = reference - timedelta(days=agenda.OVERDUE_LOOKBACK_DAYS)
         finish = datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=zone(self.tz))
-        raw = self.canvas.planner_items(
+        return self.canvas.planner_items(
             lookback.astimezone(UTC).isoformat(),
             finish.astimezone(UTC).isoformat(),
             list(facts),
             refresh=refresh,
         )
 
+    def _build_planner_items(self, raw: JsonList, facts: dict[str, CourseFacts],
+                             weights: dict[str, agenda.WeightTable], reference: datetime,
+                             capacity: float) -> tuple[list[agenda.AgendaItem], int]:
+        """Turn Planner entries into agenda items, counting what is not graded work."""
         items: list[agenda.AgendaItem] = []
         skipped = 0
         for entry in raw:
@@ -471,11 +515,17 @@ class Session:
         """Read every course's assignment list — the fallback, and the only undated source."""
         items: list[agenda.AgendaItem] = []
         failures: list[str] = []
-        for course_id, course in facts.items():
+
+        def read(course_id: str) -> JsonList | CanvasError:
             try:
-                raw = self.canvas.assignments(course_id, refresh=refresh)
+                return self.canvas.assignments(course_id, refresh=refresh)
             except CanvasError as exc:
-                failures.append(f"{course.nickname}: {exc}")
+                return exc
+
+        for course_id, raw in self._fan_out(list(facts), read).items():
+            course = facts[course_id]
+            if isinstance(raw, CanvasError):
+                failures.append(f"{course.nickname}: {raw}")
                 continue
             for entry in raw:
                 item = agenda.build_item_from_assignment(
@@ -667,7 +717,7 @@ class Session:
 
         if course_id:
             payload.update(self._grade_detail(course_id, facts.get(course_id), refresh=refresh))
-        return shrink(payload, BUDGETS["get_grades"])
+        return shrink(payload, BUDGETS["get_grades"], advice=_FEWER_COURSES if course_id is None else "narrow the query")
 
     def _grade_detail(self, course_id: str, course: CourseFacts | None, *, refresh: bool) -> dict[str, Any]:
         """Break one course down by assignment group and recent graded work."""
@@ -1230,12 +1280,16 @@ class Session:
                 conn, query=query, subject=subject, level=level, units=units,
                 offered_term=offered_term, limit=limit,
             )
-        warnings = [message] if message else []
+        warnings = []
         if offered_term and offered_term not in result.get("terms_known", []):
             warnings.append(
                 f"{offered_term} is not in the offerings snapshot. The Registrar posts one term ahead at most."
             )
         result.update(self.stamp(warnings))
+        # A fresh snapshot makes the answer more complete, not less: it is news, not a warning,
+        # so it must not flip ``partial``.
+        if message:
+            result["data_note"] = message
         result["advice_note"] = (
             "These are fit-based matches from a catalog snapshot, not official advising. "
             "Prefer courses with known offerings, and check requirements with your advisor."
@@ -1249,7 +1303,7 @@ class Session:
     def catalog_course(self, subject: str, number: str) -> dict[str, Any]:
         """Return one catalog course in full."""
         catalog.ensure_built()
-        catalog.maybe_update(enabled=self.cfg.data_updates)
+        message = catalog.maybe_update(enabled=self.cfg.data_updates)
         with catalog.connect() as conn:
             course = catalog.details(conn, subject, number)
             known = catalog.terms_known(conn)
@@ -1260,6 +1314,8 @@ class Session:
                 "search_catalog, or try check_offering for live section data."
             )
         payload = {"course": course, "terms_known": known, **self.stamp()}
+        if message:
+            payload["data_note"] = message
         # One note, not two: why this course has no sections listed and why the snapshot
         # they would have come from is older than the catalog are the same question.
         notes: list[str] = []

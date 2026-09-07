@@ -170,6 +170,9 @@ def build_weight_table(groups: list[dict[str, Any]], *, apply_group_weights: boo
 # -- estimates ---------------------------------------------------------------
 
 _KEYWORD_HOURS: Final[tuple[tuple[str, float], ...]] = (
+    # Paperwork first: a "Final Project Team Interest Form" is a form, whatever it is
+    # a form for. A "Survey of ..." paper is still a paper, so `survey` stays lower down.
+    (r"\bforms?\b|questionnaire|\bconsent\b|\brsvp\b|get to know|intake|acknowledg", 0.25),
     (r"final\s*(project|paper)|capstone|thesis|dissertation", 15.0),
     (r"\bfinal\b", 8.0),
     (r"midterm|\bexam\b|\btest\b", 4.0),
@@ -320,8 +323,14 @@ class AgendaItem:
             "priority": self.priority,
             "reason": self.reason,
             "est_hours": self.est_hours,
-            "est_confidence": self.est_confidence,
         }
+        # Every field here costs about 25 bytes per item, and a page is budgeted in bytes:
+        # a two-week window on a real account runs to 17 items, so the item stays lean.
+        # `est_confidence` is only worth stating when it is not the common "low"; the
+        # machine-readable `start_by` date is derivable from `start_by_human`; the URL
+        # follows the pattern given in the server instructions from the two ids.
+        if self.est_confidence != "low":
+            payload["est_confidence"] = self.est_confidence
         if self.assignment_id:
             payload["assignment_id"] = self.assignment_id
         if self.points is not None:
@@ -332,14 +341,11 @@ class AgendaItem:
         if self.weight_note:
             payload["weight_note"] = self.weight_note
         if self.start_by is not None:
-            payload["start_by"] = self.start_by.isoformat()
-            payload["start_by_human"] = human_date(self.start_by)
+            payload["start_by"] = human_date(self.start_by)
         if self.start_now:
             payload["start_note"] = "start now"
-        if self.lock_local is not None:
+        if self.lock_local is not None and self.status in ("missing", "unsubmitted"):
             payload["lock_human"] = human(self.lock_local, reference=reference)
-        if self.html_url:
-            payload["url"] = self.html_url
         return payload
 
 
