@@ -332,6 +332,11 @@ def test_clear_says_what_it_will_delete_before_doing_it(config, capsys):
         ("EW & MBA 277-LEC-012 - Ethical AI Business Design (Spring 2026)", "MBA 277", "Ethical AI Business Design"),
         ("Theory and Practice of Tangible User Interfaces (Fall 2026)", "INFO 262",
          "Theory and Practice of Tangible User Interfaces"),
+        ("Fall 2026, INFO 290: Storytelling for UX Portfolio", "INFO 290-LEC-001",
+         "INFO 290: Storytelling for UX Portfolio"),
+        ("SHAPE Student Training - UCB - 2026-2027", "SHAPE Student Training - UCB - 2026-2027",
+         "SHAPE Student Training - UCB - 2026-2027"),
+        ("MBA 231-LEC-001/002 Corporate Finance (Spring 2026)", "MBA 231", "MBA 231-LEC-001/002 Corporate Finance"),
     ],
 )
 def test_course_nicknames_are_readable(name: str, code: str, expected: str):
@@ -351,6 +356,30 @@ def test_rerunning_setup_keeps_the_stored_token_on_enter(home: Path, canvas, mon
     assert stored == ["already-stored-token-0123456789"]
     assert "already stored" in out
     assert "already-stored-token" not in out, "the token must never be printed"
+
+
+def test_setup_without_a_terminal_keeps_the_stored_token_without_asking(home: Path, canvas, monkeypatch, capsys):
+    """`openmind setup < /dev/null` raised EOFError from getpass; a closed stdin means 'keep it'."""
+    monkeypatch.delenv(secrets.ENV_VAR, raising=False)
+    monkeypatch.setattr(secrets, "get_token", lambda: "already-stored-token-0123456789")
+    monkeypatch.setattr(secrets, "set_token", lambda token, allow_file=False: "keyring")
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
+
+    def no_terminal(prompt):
+        raise AssertionError("must not prompt without a terminal")
+
+    monkeypatch.setattr(cli, "getpass", no_terminal)
+    code, out, _ = run(["setup"], capsys)
+    assert code == 0
+    assert "Keeping it" in out
+
+
+def test_a_closed_stdin_at_the_token_prompt_is_an_empty_answer(monkeypatch):
+    def closed(prompt):
+        raise EOFError
+
+    monkeypatch.setattr(cli, "getpass", closed)
+    assert cli._ask_secret("token: ") == ""
 
 
 def test_setup_defaults_to_the_newest_term_but_all_can_still_be_asked_for():

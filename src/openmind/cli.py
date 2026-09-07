@@ -38,6 +38,10 @@ MAX_NICKNAME_LENGTH: Final[int] = 60
 _TERM_SUFFIX: Final[re.Pattern[str]] = re.compile(
     r"\s*[\(\[]\s*(?:fall|spring|summer|winter)\s+\d{4}\s*[\)\]]\s*$", re.IGNORECASE
 )
+# ...and some prefix it: "Fall 2026, INFO 290: Storytelling for UX Portfolio".
+_TERM_PREFIX: Final[re.Pattern[str]] = re.compile(
+    r"^\s*(?:fall|spring|summer|winter)\s+\d{4}\s*[,:;\-–—]?\s+", re.IGNORECASE
+)
 _TERM_NAME: Final[re.Pattern[str]] = re.compile(r"(winter|spring|summer|fall)\s+(\d{4})", re.IGNORECASE)
 _SEASON_ORDER: Final[dict[str, int]] = {"winter": 0, "spring": 1, "summer": 2, "fall": 3}
 TOKEN_HELP: Final[str] = (
@@ -87,11 +91,15 @@ def cmd_setup(args: argparse.Namespace) -> int:
     elif stored:
         # Changing which courses are shared should not cost a new token.
         out(f"A bCourses token is already stored ({secrets.mask(stored)}).")
-        token = getpass("Paste a new token, or press Enter to keep it: ").strip() or stored
+        if sys.stdin.isatty():
+            token = _ask_secret("Paste a new token, or press Enter to keep it: ") or stored
+        else:
+            out("Keeping it (no terminal to ask in).")
+            token = stored
     else:
         out(f"Paste your bCourses access token. {TOKEN_HELP}")
         out("It is stored in your operating system's credential store, not in a file.")
-        token = getpass("bCourses token: ").strip()
+        token = _ask_secret("bCourses token: ")
     if not token:
         err("No token entered. Nothing was changed.")
         return 1
@@ -192,6 +200,14 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return 0
 
 
+def _ask_secret(prompt: str) -> str:
+    """Read a secret without echo; an exhausted or closed stdin is an empty answer, not a crash."""
+    try:
+        return getpass(prompt).strip()
+    except EOFError:
+        return ""
+
+
 @dataclass(frozen=True)
 class Listed:
     """One course as setup shows it."""
@@ -202,8 +218,18 @@ class Listed:
 
 
 def _nickname(name: str, code: str) -> str:
-    """Shorten a Canvas course name into something a student would say out loud."""
-    nickname = name.split(" - ")[-1].strip() if " - " in name else name.strip()
+    """Shorten a Canvas course name into something a student would say out loud.
+
+    "STAT 156 - Causal Inference" is the common shape, so the last " - " part is the
+    title. "SHAPE Student Training - UCB - 2026-2027" is not: a tail with no letters
+    in it is not a title, and the whole name is kept.
+    """
+    nickname = name.strip()
+    if " - " in nickname:
+        tail = nickname.split(" - ")[-1].strip()
+        if re.search(r"[A-Za-z]", tail):
+            nickname = tail
+    nickname = _TERM_PREFIX.sub("", nickname)
     nickname = _TERM_SUFFIX.sub("", nickname).strip()
     nickname = nickname or code or "Course"
     if len(nickname) > MAX_NICKNAME_LENGTH:

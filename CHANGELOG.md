@@ -11,8 +11,12 @@ Found by running a real account through every Canvas-backed tool over stdio.
   bCourses keeps every past course "active" with no term end date, so "Enter for all"
   shared two years of courses. Type `all` to share everything; re-running setup keeps
   the stored token when you press Enter at the token prompt.
-- Course nicknames keep their full title (up to 60 characters) and drop a trailing
-  "(Fall 2026)", which the term field already carries.
+- Course nicknames keep their full title (up to 60 characters), drop a leading
+  "Fall 2026, " or trailing "(Fall 2026)", which the term field already carries, and
+  keep the whole name when the part after the last " - " has no letters in it
+  ("SHAPE Student Training - UCB - 2026-2027" is not called "2026-2027").
+- `openmind setup` with no terminal (piped or closed stdin) keeps the stored token
+  instead of dying in `getpass` with an EOFError traceback.
 - `get_deadlines` reads the Planner first and fetches grade weights only for courses
   with work in the window, a few at a time. A twenty-course account went from 13 s to
   about 2 s.
