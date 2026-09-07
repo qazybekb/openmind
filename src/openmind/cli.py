@@ -695,9 +695,11 @@ def cmd_clear(args: argparse.Namespace) -> int:
         (home_dir() / "data_check").unlink(missing_ok=True)
         config_path().unlink(missing_ok=True)
         out("Deleted your config.")
-        secrets.delete_token()
-        out("Deleted your stored bCourses token.")
-        out("Your bCourses account is untouched. Revoke the token in bCourses if you want it gone there too.")
+        if secrets.delete_token():
+            out("Deleted your stored bCourses token.")
+            out("Your bCourses account is untouched. Revoke the token in bCourses if you want it gone there too.")
+        else:
+            out("No stored bCourses token to delete.")
     return 0
 
 

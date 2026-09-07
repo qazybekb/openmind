@@ -118,24 +118,37 @@ def set_token(token: str, *, allow_file: bool = False) -> str:
     return "file"
 
 
-def delete_token() -> None:
-    """Remove the Canvas token from every backend we may have written to."""
+def delete_token() -> bool:
+    """Remove the Canvas token from every backend we may have written to.
+
+    Returns whether anything was there to remove, so `openmind clear` can say
+    "deleted" only when it did.
+    """
+    removed = False
     if keyring_available():
         try:
             import keyring
 
-            keyring.delete_password(SERVICE, ACCOUNT)
+            # Backends differ on deleting a missing item (some raise, fakes do not), so
+            # look first rather than read the answer from an exception.
+            if keyring.get_password(SERVICE, ACCOUNT) is not None:
+                keyring.delete_password(SERVICE, ACCOUNT)
+                removed = True
         except Exception:
             logger.debug("No Canvas token was present in the OS credential store.")
-    _delete_file_token()
+    return _delete_file_token() or removed
 
 
-def _delete_file_token() -> None:
+def _delete_file_token() -> bool:
     """Remove the plain-file token fallback when present."""
+    path = _fallback_path()
     try:
-        _fallback_path().unlink(missing_ok=True)
+        existed = path.exists()
+        path.unlink(missing_ok=True)
+        return existed
     except OSError:  # pragma: no cover
         logger.debug("Could not remove the token file.")
+        return False
 
 
 def backend_name() -> str:

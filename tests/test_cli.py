@@ -304,7 +304,7 @@ def test_clear_removes_the_materials_index_only(config, canvas, stored_token, sa
 
 def test_clear_all_removes_config_catalog_and_token(config, sample_catalog, monkeypatch, capsys):
     deleted: list[str] = []
-    monkeypatch.setattr(secrets, "delete_token", lambda: deleted.append("token"))
+    monkeypatch.setattr(secrets, "delete_token", lambda: deleted.append("token") or True)
 
     code, out, _ = run(["clear", "--all", "--yes"], capsys)
     assert code == 0
@@ -312,6 +312,14 @@ def test_clear_all_removes_config_catalog_and_token(config, sample_catalog, monk
     assert not (config.path.parent / "catalog.db").exists()
     assert deleted == ["token"]
     assert "bCourses account is untouched" in out
+
+
+def test_clear_all_does_not_claim_to_delete_a_token_that_was_never_stored(config, sample_catalog, monkeypatch, capsys):
+    monkeypatch.setattr(secrets, "delete_token", lambda: False)
+    code, out, _ = run(["clear", "--all", "--yes"], capsys)
+    assert code == 0
+    assert "No stored bCourses token to delete" in out
+    assert "Deleted your stored bCourses token" not in out
 
 
 def test_clear_says_what_it_will_delete_before_doing_it(config, capsys):

@@ -17,6 +17,8 @@ Found by running a real account through every Canvas-backed tool over stdio.
   ("SHAPE Student Training - UCB - 2026-2027" is not called "2026-2027").
 - `openmind setup` with no terminal (piped or closed stdin) keeps the stored token
   instead of dying in `getpass` with an EOFError traceback.
+- `openmind clear --all` says "No stored bCourses token to delete" when there was none,
+  instead of claiming to have deleted one.
 - `get_deadlines` reads the Planner first and fetches grade weights only for courses
   with work in the window, a few at a time. A twenty-course account went from 13 s to
   about 2 s.

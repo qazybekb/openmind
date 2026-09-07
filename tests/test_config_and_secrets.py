@@ -143,8 +143,9 @@ def test_a_token_round_trips_through_the_credential_store(home: Path, fake_keyri
     assert secrets.set_token(TOKEN) == "keyring"
     assert secrets.get_token() == TOKEN
     assert (home / "token").exists() is False
-    secrets.delete_token()
+    assert secrets.delete_token() is True
     assert secrets.get_token() is None
+    assert secrets.delete_token() is False, "nothing left to delete the second time"
 
 
 def test_the_environment_variable_wins_over_the_store(home: Path, fake_keyring: FakeKeyring,
