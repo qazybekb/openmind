@@ -28,6 +28,8 @@ Found by running a real account through every Canvas-backed tool over stdio.
   not as a warning: the answer is more complete, not less, so `partial` stays false.
 
 ### Fixed
+- `check_offering` and `get_catalog_course` find a cross-listed course asked for
+  without its C ("INFO 262" for "INFO C262") and say which code they matched.
 - "Final Project Team Interest Form" was estimated at 15 hours; forms, questionnaires,
   consent and intake items are now paperwork (0.25 h) whatever they are forms for.
 - Subprocess tests never consult the developer's real credential store or reach GitHub.

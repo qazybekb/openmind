@@ -292,6 +292,23 @@ def normalise_course_code(code: str) -> str:
     return " ".join((code or "").upper().split())
 
 
+def same_course(a: str, b: str) -> bool:
+    """Return whether two normalised codes name one course.
+
+    Berkeley marks a cross-listed course with a C in front of its number: the course a
+    student calls "INFO 262" is scheduled as "INFO C262". An exact match is preferred
+    wherever this is used; this is the fallback that stops the C from hiding the course.
+    """
+    return a == b or _without_c(a) == _without_c(b)
+
+
+def _without_c(code: str) -> str:
+    subject, _, number = code.rpartition(" ")
+    if number[:1] == "C" and number[1:2].isdigit():
+        number = number[1:]
+    return f"{subject} {number}"
+
+
 def subject_of(course_code: str) -> str:
     """Return the subject part of a course code, or "" when it is not one."""
     from openmind.catalog import parse_course_code
@@ -426,6 +443,8 @@ def find_sections(course_code: str, term_facet: str | None = None, *, client: An
         fetch(search_url(wanted, term_facet), client=client), page_url=search_url(wanted, term_facet)
     )
     exact = [s for s in sections if s.course_code == wanted]
+    if not exact:
+        exact = [s for s in sections if same_course(s.course_code, wanted)]
     return exact[:limit]
 
 

@@ -505,3 +505,23 @@ def test_check_offering_says_when_a_term_is_not_posted_yet(session: Session, mon
 def test_a_string_that_is_not_a_course_code_is_refused(session: Session):
     with pytest.raises(ServiceError, match="does not look like a course code"):
         session.check_offering("something about machine learning")
+
+
+def test_the_catalog_answers_a_cross_listed_course_asked_without_its_c(config, client, sample_catalog):
+    """"INFO 262" on a syllabus is "INFO C262" in the catalog; the student should not have to know."""
+    from openmind import catalog
+
+    with catalog.connect() as conn:
+        conn.execute(
+            "INSERT INTO catalog_courses (subject, number, level, title, units_min, units_max, department, "
+            "description, cross_listed, repeat_rules, offering_details, in_printed_catalog) "
+            "VALUES ('INFO', 'C262', 'graduate', 'Tangible User Interfaces', '3', '3', 'Information', "
+            "'Physical computing.', 'NWMEDIA C262', '', '', 1)"
+        )
+        conn.commit()
+    payload = Session(config, client, clock=NOW_UTC).catalog_course("INFO", "262")
+    assert payload["course"]["number"] == "C262"
+    assert "catalogued as INFO C262" in payload["lookup_note"]
+    exact = Session(config, client, clock=NOW_UTC).catalog_course("INFO", "C262")
+    assert "lookup_note" not in exact
+

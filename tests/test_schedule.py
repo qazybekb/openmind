@@ -166,6 +166,24 @@ def test_finding_sections_makes_exactly_one_request(results_html: str):
     assert [s.course_code for s in sections] == ["STAT 156"]
 
 
+def test_a_cross_listed_course_is_found_without_its_c(results_html: str):
+    """The course a student calls "INTEGBI 156" is scheduled as "INTEGBI C156"."""
+    client = httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(200, text=results_html, request=request)
+    ))
+    without_c = schedule.find_sections("INTEGBI 156", "8588", client=client)
+    with_c = schedule.find_sections("INTEGBI C156", "8588", client=client)
+    exact_wins = schedule.find_sections("STAT 156", "8588", client=client)
+    client.close()
+
+    assert with_c and {s.course_code for s in with_c} == {"INTEGBI C156"}
+    assert [s.ccn for s in without_c] == [s.ccn for s in with_c]
+    assert {s.course_code for s in exact_wins} == {"STAT 156"}, "an exact match never widens to a C variant"
+    assert schedule.same_course("STAT 131A", "STAT C131A")
+    assert not schedule.same_course("STAT 131A", "STAT 131B")
+    assert not schedule.same_course("STAT C8", "STAT 8B")
+
+
 def test_a_polite_user_agent_identifies_the_project(results_html: str):
     seen: list[httpx.Request] = []
 

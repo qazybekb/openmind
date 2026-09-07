@@ -56,6 +56,15 @@ def test_a_real_course_can_be_looked_up(packaged: Path):
     assert course["units"] == "4"
 
 
+def test_a_cross_listed_course_is_found_without_its_c(packaged: Path):
+    """"STAT 205A" is catalogued as "STAT C205A"; the C must not hide it."""
+    with catalog.connect(packaged) as conn:
+        course = catalog.details(conn, "STAT", "205A")
+        exact = catalog.details(conn, "STAT", "C205A")
+    assert course is not None and exact is not None
+    assert course["number"] == exact["number"] == "C205A"
+
+
 # -- search --------------------------------------------------------------------
 
 

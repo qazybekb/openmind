@@ -1314,6 +1314,11 @@ class Session:
                 "search_catalog, or try check_offering for live section data."
             )
         payload = {"course": course, "terms_known": known, **self.stamp()}
+        if course["number"].upper() != number.strip().upper():
+            payload["lookup_note"] = (
+                f"{subject.upper()} {number.strip().upper()} is catalogued as {course['subject']} {course['number']}; "
+                "the C marks a cross-listing."
+            )
         if message:
             payload["data_note"] = message
         # One note, not two: why this course has no sections listed and why the snapshot
@@ -1392,6 +1397,9 @@ class Session:
         }
         if not sections:
             payload["note"] = f"{wanted} has no scheduled sections in {chosen.name}."
+        elif sections[0].course_code != wanted:
+            payload["course"] = sections[0].course_code
+            payload["note"] = f"{wanted} is scheduled as {sections[0].course_code}; the C marks a cross-listing."
         payload["terms_available"] = [t.name for t in schedule.sorted_terms(terms)[:4]]
         payload = shrink(payload, BUDGETS["check_offering"])
         self.cache.set(key, payload, OFFERING_CACHE_S)

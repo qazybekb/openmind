@@ -656,12 +656,26 @@ def details(conn: sqlite3.Connection, subject: str, number: str) -> dict[str, An
             (subject.strip().upper(), number.strip().upper()),
         ).fetchone()
     if row is None:
+        # "INFO 262" is catalogued as "INFO C262": the C marks a cross-listing, and a
+        # student asking without it should still get the course.
+        row = conn.execute(
+            "SELECT * FROM catalog_courses WHERE subject = ? AND UPPER(number) = ?",
+            (subject.strip().upper(), _cross_listed_variant(number.strip().upper())),
+        ).fetchone()
+    if row is None:
         return None
     course = format_course(conn, row, preview=False)
     info = meta(conn)
     course["catalog_as_of"] = info.get("catalog_as_of", "unknown")
     course["offerings_as_of"] = info.get("offerings_as_of", "unknown")
     return course
+
+
+def _cross_listed_variant(number: str) -> str:
+    """Return the number with the cross-listing C added or removed."""
+    if number[:1] == "C" and number[1:2].isdigit():
+        return number[1:]
+    return f"C{number}"
 
 
 def subjects(conn: sqlite3.Connection) -> list[dict[str, Any]]:

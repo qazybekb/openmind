@@ -22,7 +22,7 @@ OpenMind means "nothing is due", never "the request failed".
 | `prepare_study_session` | `course_id`, `topic`, `mode` (`tutor`/`practice`/`explain_assignment`/`weekly_plan`), `assignment_id` | Tutoring rules, a hint ladder, up to four cited excerpts, your course's AI policy, and an opening move. |
 | `search_catalog` | `query`, `subject`, `level`, `units`, `offered_term`, `limit` | Berkeley catalog matches with units, department, a description gist, and the terms each course is known to be offered. Courses titled after the query rank first. Use `get_catalog_course` for the full text and cross-listings. A `data_note` says when the call refreshed the snapshot from GitHub; that is news, not a warning. |
 | `get_catalog_course` | `subject`, `number` | One course in full: description, units range, repeat rules, cross-listings, known offerings. |
-| `check_offering` | `course_code`, `term` | Live sections from classes.berkeley.edu: times, instructors, seats, instruction mode. One request, cached for a day. |
+| `check_offering` | `course_code`, `term` | Live sections from classes.berkeley.edu: times, instructors, seats, instruction mode. One request, cached for a day. A course asked for without its cross-listing C ("INFO 262" for "INFO C262") is matched and the note says so. |
 
 ### What the deadline fields mean
 
