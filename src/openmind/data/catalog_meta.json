@@ -1,8 +1,8 @@
 {
-  "asset_url": "https://github.com/qazybekb/openmind/releases/download/data-2026-09-28-17b5db0994b97986/catalog-2026-09-28.tar.gz",
-  "catalog_as_of": "2026-09-28",
+  "asset_url": "https://github.com/qazybekb/openmind/releases/download/data-2026-09-29-202f43ea91c8ce27/catalog-2026-09-29.tar.gz",
+  "catalog_as_of": "2026-09-29",
   "course_count": 11022,
-  "data_sha256": "09ef54fe8e2dc7d02a0567e2786bbbe92a3e58ca6b1cc6ae796471641caade70",
+  "data_sha256": "a746325b4b3cb4b174d2306c72bacc5e67245278e0250b58e8621a849560ed37",
   "offering_count": 2690,
   "offerings_as_of": "2026-09-05",
   "offerings_note": "offerings not refreshed: classes.berkeley.edu returned HTTP 403; previous snapshot kept",
